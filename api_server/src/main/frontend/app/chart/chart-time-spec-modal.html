@@ -1,0 +1,26 @@
+<modal #dialog>
+  <form (ngSubmit)="onSubmit()" #chartExprForm="ngForm">
+    <modal-header [show-close]="true">
+      <h4 class="modal-title">Change Time Selection</h4>
+    </modal-header>
+    <modal-body>
+      <div class="form-group">
+        <label for="begin">Duration (seconds)</label>
+        <input type="text" [(ngModel)]="model.duration_seconds" ngControl="duration" #duration="ngForm" class="form-control" required #spy />
+        <div [hidden]="duration.valid || duration.pristine" class="alert alert-danger">
+          Duration is required
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="end">End</label>
+        <input type="text" [(ngModel)]="model.end" ngControl="end" #end="ngForm" class="form-control" #spy />
+        <div [hidden]="end.valid || end.pristine" class="alert alert-danger">
+          End timestamp is required
+        </div>
+      </div>
+    </modal-body>
+    <modal-footer>
+      <button type="submit" class="btn btn-default btn-success" [disabled]="!chartExprForm.form.valid">Update</button>
+    </modal-footer>
+  </form>
+</modal>

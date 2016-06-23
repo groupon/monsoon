@@ -1,0 +1,9 @@
+environment:
+  language: java
+  language_versions: 1.8.0_60
+  packages:
+    - apache_maven-3.1.1
+    - npm_npm-2015.02.27_20.23
+    - node-v6.1.0
+build: 
+  run: mvn -U clean deploy

@@ -1,0 +1,10 @@
+target
+dependency-reduced-pom.xml
+
+.project
+.settings
+.classpath
+
+# IntelliJ project directories
+**/*.idea
+**/*.iml

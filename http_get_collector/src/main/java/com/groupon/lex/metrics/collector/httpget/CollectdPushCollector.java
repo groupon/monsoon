@@ -1,0 +1,253 @@
+/*
+ * Copyright (c) 2016, Groupon, Inc.
+ * All rights reserved. 
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met: 
+ *
+ * Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer. 
+ *
+ * Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution. 
+ *
+ * Neither the name of GROUPON nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without
+ * specific prior written permission. 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+package com.groupon.lex.metrics.collector.httpget;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import com.groupon.lex.metrics.GroupGenerator;
+import static com.groupon.lex.metrics.GroupGenerator.successResult;
+import com.groupon.lex.metrics.GroupName;
+import com.groupon.lex.metrics.Metric;
+import com.groupon.lex.metrics.MetricGroup;
+import com.groupon.lex.metrics.MetricName;
+import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.NameCache;
+import com.groupon.lex.metrics.SimpleGroupPath;
+import com.groupon.lex.metrics.SimpleMetric;
+import com.groupon.lex.metrics.SimpleMetricGroup;
+import com.groupon.lex.metrics.httpd.EndpointRegistration;
+import com.groupon.lex.metrics.lib.SimpleMapEntry;
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import static java.util.Objects.requireNonNull;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import static javax.servlet.http.HttpServletResponse.SC_OK;
+
+/**
+ *
+ * @author ariane
+ */
+public class CollectdPushCollector implements GroupGenerator {
+    private static final Logger LOG = Logger.getLogger(CollectdPushCollector.class.getName());
+    public static final String API_ENDPOINT_BASE = "/collectd/jsonpush/";
+    private final static Charset UTF8 = Charset.forName("UTF-8");
+    private final static Type collectd_type_ = new TypeToken<List<CollectdMessage>>(){}.getType();
+
+    public static class CollectdKey {
+        public final String host, plugin, plugin_instance, type, type_instance;
+
+        public CollectdKey(String host, String plugin, String plugin_instance, String type, String type_instance) {
+            this.host = host;
+            this.plugin = plugin;
+            this.plugin_instance = plugin_instance;
+            this.type = type;
+            this.type_instance = type_instance;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 5;
+            hash = 43 * hash + Objects.hashCode(this.host);
+            hash = 43 * hash + Objects.hashCode(this.plugin);
+            hash = 43 * hash + Objects.hashCode(this.plugin_instance);
+            hash = 43 * hash + Objects.hashCode(this.type);
+            hash = 43 * hash + Objects.hashCode(this.type_instance);
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final CollectdKey other = (CollectdKey) obj;
+            if (!Objects.equals(this.host, other.host)) {
+                return false;
+            }
+            if (!Objects.equals(this.plugin, other.plugin)) {
+                return false;
+            }
+            if (!Objects.equals(this.plugin_instance, other.plugin_instance)) {
+                return false;
+            }
+            if (!Objects.equals(this.type, other.type)) {
+                return false;
+            }
+            if (!Objects.equals(this.type_instance, other.type_instance)) {
+                return false;
+            }
+            return true;
+        }
+    }
+
+    public static class CollectdMessage {
+        public List<Number> values;
+        public List<String> dstypes;
+        public List<String> dsnames;
+        public double time;
+        public long interval;
+        public String host;
+        public String plugin;
+        public String plugin_instance;
+        public String type;
+        public String type_instance;
+
+        public CollectdKey getKey() {
+            return new CollectdKey(host, plugin, plugin_instance, type, type_instance);
+        }
+
+        public int metricCount() { return values.size(); }
+
+        /**
+         * Work around for Google gson parser emitting numbers as 'lazily parsed' numbers.
+         * @param elem An instance of a gson lazily parsed number.
+         * @return A metric value containing the number.
+         */
+        private static MetricValue number_to_metric_value_(Number elem) {
+            if (elem == null) return MetricValue.EMPTY;
+
+            final String num = elem.toString();
+            try {
+                return MetricValue.fromIntValue(Long.parseLong(num));
+            } catch (NumberFormatException ex) {
+                /* SKIP */
+            }
+            try {
+                return MetricValue.fromDblValue(Double.parseDouble(num));
+            } catch (NumberFormatException ex ) {
+                /* SKIP */
+            }
+            return MetricValue.fromStrValue(num);
+        }
+
+        private MetricName to_metric_name_(String name) {
+            if ("value".equals(name) && metricCount() == 1)
+                name = null;
+
+            final List<String> path = Stream.of(type, type_instance, name)
+                    .filter(x -> x != null)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList());
+            return NameCache.singleton.newMetricName(path.isEmpty() ? singletonList("value") : path);
+        }
+
+        public MetricGroup toMetricGroup(SimpleGroupPath base_path) {
+            final GroupName group = NameCache.singleton.newGroupName(
+                    NameCache.singleton.newSimpleGroupPath(Stream.concat(
+                            base_path.getPath().stream(),
+                            Stream.of(plugin, plugin_instance)
+                                    .filter(x -> x != null)
+                                    .filter(s -> !s.isEmpty()))
+                            .collect(Collectors.toList())),
+                    NameCache.singleton.newTags(singletonMap("host", MetricValue.fromStrValue(host))));
+
+            final List<SimpleMetric> entries = new ArrayList<>(metricCount());
+            for (int i = 0; i < metricCount(); ++i)
+                entries.add(new SimpleMetric(to_metric_name_(dsnames.get(i)), number_to_metric_value_(values.get(i))));
+
+            return new SimpleMetricGroup(group, entries);
+        }
+    }
+
+    private class Endpoint extends HttpServlet {
+        private final Gson gson = new Gson();
+
+        @Override
+        protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+            final List<CollectdMessage> msgs = gson.fromJson(req.getReader(), collectd_type_);
+
+            final Lock lck = messages_guard_.readLock();
+            lck.lock();
+            try {
+                msgs.forEach(msg -> messages_.put(msg.getKey(), msg));
+            } finally {
+                lck.unlock();
+            }
+
+            resp.setStatus(SC_OK);
+            resp.getWriter().write("Monsoon accepted " + msgs.size() + " metric groups\n");
+        }
+    }
+
+    private final ReadWriteLock messages_guard_ = new ReentrantReadWriteLock();  // Protects messages_
+    private final Map<CollectdKey, CollectdMessage> messages_ = new ConcurrentHashMap<>();
+    private final SimpleGroupPath base_path_;
+
+    public CollectdPushCollector(EndpointRegistration er, SimpleGroupPath base_path, String name) {
+        requireNonNull(name);
+        if (name.isEmpty()) throw new IllegalArgumentException("empty endpoint name");
+
+        er.addEndpoint(API_ENDPOINT_BASE + name, new Endpoint());
+        base_path_ = requireNonNull(base_path);
+    }
+
+    @Override
+    public GroupCollection getGroups() {
+        Lock lck = messages_guard_.writeLock();
+        lck.lock();
+        try {
+            return successResult(messages_.values().stream()
+                    .map(cm -> cm.toMetricGroup(base_path_))
+                    .flatMap(mg -> Arrays.stream(mg.getMetrics()).map(m -> SimpleMapEntry.create(mg.getName(), m)))
+                    .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.mapping(Map.Entry::getValue, Collectors.toList())))
+                    .entrySet()
+                    .stream()
+                    .map((Map.Entry<GroupName, List<Metric>> entry) -> new SimpleMetricGroup(entry.getKey(), entry.getValue()))
+                    .collect(Collectors.toList()));
+        } finally {
+            messages_.clear();
+            lck.unlock();
+        }
+    }
+
+    public SimpleGroupPath getBasePath() { return base_path_; }
+}

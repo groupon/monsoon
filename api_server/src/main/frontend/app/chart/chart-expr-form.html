@@ -1,0 +1,42 @@
+<div class="container">
+  <form (ngSubmit)="onSubmit()" [ngFormModel]="formModel" #chartExprForm="ngForm">
+    <div *ngFor="let line of model.lines; let i = index" class="form-group">
+      <label for="label">Label</label>
+      <input type="text"
+             [(ngModel)]="line.label"
+             [ngFormControl]="formModel.controls['lines'].at(i).find('label')"
+             #name="ngForm"
+             placeholder="Specify a label..."
+             class="form-control"
+             required
+             #spy />
+      <div *ngIf="!formModel.controls['lines'].at(i).find('label').valid && formModel.controls['lines'].at(i).find('label').dirty" class="alert alert-danger">
+        <p *ngIf="formModel.controls['lines'].at(i).find('label').hasError('required')">
+          Label is required
+        </p>
+      </div>
+
+      <label for="expr">Expression</label>
+      <textarea type="text"
+                [(ngModel)]="line.expr"
+                [ngFormControl]="formModel.controls['lines'].at(i).find('expr')"
+                #expr="ngForm"
+                placeholder="Specify a monsoon expression to graph..."
+                class="form-control"
+                required
+                validate-expr
+                #spy></textarea>
+      <div *ngIf="!formModel.controls['lines'].at(i).find('expr').valid && !formModel.controls['lines'].at(i).find('expr').pending && formModel.controls['lines'].at(i).find('expr').dirty" class="alert alert-danger">
+        <p *ngIf="formModel.controls['lines'].at(i).find('expr').hasError('required')">
+          Expression is required
+        </p>
+        <p *ngFor="let pe of formModel.controls['lines'].at(i).find('expr').getError('validateExpr').parseErrors">
+          {{ pe }}
+        </p>
+      </div>
+    </div>
+
+    <button type="button" class="btn btn-default" (click)="add(null)">Add Line</button>
+    <button type="submit" class="btn btn-default" [disabled]="!chartExprForm.form.valid">Render</button>
+  </form>
+</div>
