@@ -111,7 +111,7 @@ public class MBeanGroupInstanceTest {
         test_value.setStringval("foobar");
         test_value.getNested().setDblval(17);
 
-        Metric[] metrics = mbg.getMetrics();
+        Metric[] metrics = mbg.getMetrics().get().getMetrics();
 
         /** Create metrics map for easy test asserting. */
         Map<MetricName, MetricValue> metrics_map = Arrays.stream(metrics).collect(Collectors.toMap(Metric::getName, Metric::getValue));

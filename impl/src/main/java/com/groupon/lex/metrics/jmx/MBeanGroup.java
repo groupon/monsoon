@@ -31,7 +31,7 @@
  */
 package com.groupon.lex.metrics.jmx;
 
-import com.groupon.lex.metrics.MetricGroup;
+import com.groupon.lex.metrics.GroupName;
 import javax.management.MXBean;
 import javax.management.ObjectName;
 
@@ -40,7 +40,13 @@ import javax.management.ObjectName;
  * @author ariane
  */
 @MXBean
-public interface MBeanGroup extends MetricGroup {
+public interface MBeanGroup {
+    /**
+     * Get the name of this metric group.
+     * @return The name of the metric group.
+     */
+    public GroupName getName();
+
     /**
      * The name of the monitored object.
      * @return The name of the monitored object.

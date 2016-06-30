@@ -35,10 +35,12 @@ import static com.groupon.lex.metrics.AttributeConverter.resolve_property;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.JmxClient;
 import com.groupon.lex.metrics.Metric;
+import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleMetric;
+import com.groupon.lex.metrics.SimpleMetricGroup;
 import com.groupon.lex.metrics.Tags;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,6 +49,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -195,24 +198,24 @@ public class MBeanGroupInstance implements MBeanGroup {
         return resolve_property(Arrays.asList(attribute), property);
     }
 
-    @Override
-    public Metric[] getMetrics() {
+    public Optional<MetricGroup> getMetrics() {
         MBeanAttributeInfo[] attributes;
         try {
             attributes = conn_.getConnection().getMBeanInfo(obj_name_).getAttributes();
         } catch (InstanceNotFoundException ex) {
-            return new Metric[0];
+            return Optional.empty();
         } catch (IntrospectionException | ReflectionException | IOException ex) {
             logger.log(Level.WARNING, "failed to load properties on " + obj_name_, ex);
-            return new Metric[0];
+            return Optional.empty();
         }
 
-        return Arrays.stream(attributes)
-                .map(MBeanAttributeInfo::getName)
-                .distinct()
-                .flatMap(this::resolve_)
-                .map(m -> new SimpleMetric(m.getKey(), m.getValue()))
-                .toArray(Metric[]::new);
+        return Optional.of(new SimpleMetricGroup(
+                getName(),
+                Arrays.stream(attributes)
+                        .map(MBeanAttributeInfo::getName)
+                        .distinct()
+                        .flatMap(this::resolve_)
+                        .map(m -> new SimpleMetric(m.getKey(), m.getValue()))));
     }
 
     @Override
@@ -227,7 +230,10 @@ public class MBeanGroupInstance implements MBeanGroup {
 
     @Override
     public String[] getMonitoredProperties() {
-        return Arrays.stream(getMetrics())
+        return Stream.of(getMetrics())
+                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
+                .map(MetricGroup::getMetrics)
+                .flatMap(Arrays::stream)
                 .map(Metric::getName)
                 .map(MetricName::configString)
                 .map(StringBuilder::toString)

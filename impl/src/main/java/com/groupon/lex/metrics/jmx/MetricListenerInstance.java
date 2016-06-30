@@ -36,6 +36,7 @@ import static com.groupon.lex.metrics.GroupGenerator.failedResult;
 import static com.groupon.lex.metrics.GroupGenerator.successResult;
 import com.groupon.lex.metrics.JmxClient;
 import com.groupon.lex.metrics.JmxClient.ConnectionDecorator;
+import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.Tags;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -46,8 +47,14 @@ import java.util.List;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.management.InstanceNotFoundException;
 import javax.management.ListenerNotFoundException;
 import javax.management.MBeanServerConnection;
@@ -217,6 +224,39 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
         }
 
         // Copy collection, to isolate it from mbean events add/removing elements.
-        return successResult(detected_groups_.values());
+        final List<MetricGroup> values;
+        try {
+            // Load values, but apply a timeout in case a specific MBean getter blocks for a very long time.
+            values = ForkJoinPool.commonPool()
+                    .invokeAll(
+                            detected_groups_.values().stream()
+                                    .map(v -> new Callable<Optional<MetricGroup>>() {
+                                        @Override
+                                        public Optional<MetricGroup> call() throws Exception {
+                                            return v.getMetrics();
+                                        }
+                                    })
+                                    .collect(Collectors.toList()),
+                            30, TimeUnit.SECONDS
+                    )
+                    .stream()
+                    .map(fut -> {
+                        try {
+                            return fut.get();
+                        } catch (InterruptedException ex) {
+                            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.SEVERE, "Should not happen?", ex);
+                            return Optional.<MetricGroup>empty();
+                        } catch (ExecutionException ex) {
+                            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.WARNING, "Error gathering JMX bean", ex);
+                            return Optional.<MetricGroup>empty();
+                        }
+                    })
+                    .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
+                    .collect(Collectors.toList());
+        } catch (InterruptedException ex) {
+            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.SEVERE, "Interrupted while reading JMX beans", ex);
+            return failedResult();
+        }
+        return successResult(values);
     }
 }
