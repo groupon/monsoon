@@ -7,7 +7,7 @@ An extensible monitor system that checks java processes and exposes metrics base
 
 The project is extensible and allows for new datasources to be created, so it's not just Java it can monitor.
 
-It should be easy to implement a new processor, to direct monitored data to systems other than monitord.
+It should be easy to implement a new processor, to direct monitored data to other systems.
 
 Usage
 ----
