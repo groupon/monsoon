@@ -44,6 +44,7 @@ import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Arrays;
+import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -77,8 +78,10 @@ public class CollectdPushCollectorTest {
     private HttpServlet collectd_acceptor;
     private DateTime NOW = DateTime.now(DateTimeZone.UTC);
     private String json;
-    private static final GroupName UPTIME_NAME = new GroupName(new SimpleGroupPath("foo", "uptime", "0"), singletonMap("host", MetricValue.fromStrValue("localhost")));
-    private static final GroupName DOWNTIME_NAME = new GroupName(new SimpleGroupPath("foo", "downtime", "0"), singletonMap("host", MetricValue.fromStrValue("localhost")));
+    private static final GroupName BASE_NAME = new GroupName(new SimpleGroupPath("foo"), singletonMap("host", MetricValue.fromStrValue("localhost")));
+    private static final GroupName UPTIME_NAME = new GroupName(new SimpleGroupPath("foo", "uptime", "0"), BASE_NAME.getTags());
+    private static final GroupName DOWNTIME_NAME = new GroupName(new SimpleGroupPath("foo", "downtime", "0"), BASE_NAME.getTags());
+    private static final MetricName UP_METRIC = new MetricName("up");
     private static final MetricName UPTIME_METRIC = new MetricName("uptime", "0");
     private static final MetricName DOWNTIME_METRIC = new MetricName("downtime", "0");
 
@@ -154,16 +157,22 @@ public class CollectdPushCollectorTest {
         assertTrue(groups.isSuccessful());
         // Convenience map for validation.
         Map<GroupName, Metric[]> group_map = groups.getGroups().stream().map(x -> (MetricGroup)x).collect(Collectors.toMap(MetricGroup::getName, MetricGroup::getMetrics));
-        assertThat(group_map, allOf(hasKey(UPTIME_NAME), hasKey(DOWNTIME_NAME)));
+        assertThat(group_map, allOf(hasKey(UPTIME_NAME), hasKey(DOWNTIME_NAME), hasKey(BASE_NAME)));
         assertEquals(UPTIME_METRIC, group_map.get(UPTIME_NAME)[0].getName());
         assertEquals(MetricValue.fromIntValue(17), group_map.get(UPTIME_NAME)[0].getValue());
         assertEquals(DOWNTIME_METRIC, group_map.get(DOWNTIME_NAME)[0].getName());
         assertEquals(MetricValue.fromIntValue(-17), group_map.get(DOWNTIME_NAME)[0].getValue());
+        assertEquals(UP_METRIC, group_map.get(BASE_NAME)[0].getName());
+        assertEquals(MetricValue.TRUE, group_map.get(BASE_NAME)[0].getValue());
 
-        /* After data collection, data must be removed from set. */
+        /* After data collection, data must be removed from set, but the base names must still exist. */
         groups = collectd.getGroups();
+        // Convenience map for validation.
+        group_map = groups.getGroups().stream().map(x -> (MetricGroup)x).collect(Collectors.toMap(MetricGroup::getName, MetricGroup::getMetrics));
         assertTrue(groups.isSuccessful());
-        assertTrue(groups.getGroups().isEmpty());
+        assertEquals(group_map.keySet(), singleton(BASE_NAME));
+        assertEquals(UP_METRIC, group_map.get(BASE_NAME)[0].getName());
+        assertEquals(MetricValue.FALSE, group_map.get(BASE_NAME)[0].getValue());
 
         verify(response, times(1)).setStatus(200);
     }

@@ -48,19 +48,22 @@ import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import static java.util.Collections.EMPTY_MAP;
+import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import static java.util.Objects.requireNonNull;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -68,6 +71,9 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Duration;
 
 /**
  *
@@ -76,8 +82,11 @@ import static javax.servlet.http.HttpServletResponse.SC_OK;
 public class CollectdPushCollector implements GroupGenerator {
     private static final Logger LOG = Logger.getLogger(CollectdPushCollector.class.getName());
     public static final String API_ENDPOINT_BASE = "/collectd/jsonpush/";
-    private final static Charset UTF8 = Charset.forName("UTF-8");
     private final static Type collectd_type_ = new TypeToken<List<CollectdMessage>>(){}.getType();
+    private Map<String, DateTime> known_hosts_ = EMPTY_MAP;  // Replaced on each collection.
+    public final static Duration DROP_DURATION = Duration.standardHours(1);
+    private final static Metric UP_METRIC = new SimpleMetric(NameCache.singleton.newMetricName("up"), Boolean.TRUE);
+    private final static Metric DOWN_METRIC = new SimpleMetric(NameCache.singleton.newMetricName("up"), Boolean.FALSE);
 
     public static class CollectdKey {
         public final String host, plugin, plugin_instance, type, type_instance;
@@ -232,21 +241,56 @@ public class CollectdPushCollector implements GroupGenerator {
 
     @Override
     public GroupCollection getGroups() {
+        final DateTime now = new DateTime(DateTimeZone.UTC);
+        final DateTime drop = now.minus(DROP_DURATION);
+
         Lock lck = messages_guard_.writeLock();
         lck.lock();
         try {
-            return successResult(messages_.values().stream()
+            // Transform all messages into metrics.
+            final Stream<MetricGroup> msg_stream = messages_.values().stream()
                     .map(cm -> cm.toMetricGroup(base_path_))
                     .flatMap(mg -> Arrays.stream(mg.getMetrics()).map(m -> SimpleMapEntry.create(mg.getName(), m)))
                     .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.mapping(Map.Entry::getValue, Collectors.toList())))
                     .entrySet()
                     .stream()
-                    .map((Map.Entry<GroupName, List<Metric>> entry) -> new SimpleMetricGroup(entry.getKey(), entry.getValue()))
-                    .collect(Collectors.toList()));
+                    .map((Map.Entry<GroupName, List<Metric>> entry) -> new SimpleMetricGroup(entry.getKey(), entry.getValue()));
+            // Collect the set of hosts that are 'up'.
+            final Set<String> up_hosts = messages_.values().stream()
+                    .map(msg -> msg.host)
+                    .distinct()
+                    .collect(Collectors.toSet());
+            // Collect the set of hosts that are 'down'.
+            final Map<String, DateTime> down_hosts = known_hosts_.entrySet().stream()
+                    .filter(entry -> entry.getValue().isAfter(drop))  // Don't remember host names for ever.
+                    .filter(entry -> !up_hosts.contains(entry.getKey())) // No need to remember hosts that emitted metrics.
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            // Create metrics for all up/down hosts.
+            final Stream<MetricGroup> up_hosts_stream = up_hosts.stream()
+                    .map(host -> up_down_host_(host, true));
+            final Stream<MetricGroup> down_hosts_stream = down_hosts.keySet().stream()
+                    .map(host -> up_down_host_(host, false));
+            // Replace the map of known hosts.
+            known_hosts_ = Stream.concat(down_hosts.entrySet().stream(), up_hosts.stream().map(host -> SimpleMapEntry.create(host, now)))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+            // Done, return result.
+            return successResult(
+                    Stream.of(msg_stream, up_hosts_stream, down_hosts_stream)
+                            .flatMap(Function.identity())
+                            .collect(Collectors.toList()));
         } finally {
             messages_.clear();
             lck.unlock();
         }
+    }
+
+    /** Return a metric group indicating if the host is up or down. */
+    private MetricGroup up_down_host_(String host, boolean up) {
+        final GroupName group = NameCache.singleton.newGroupName(
+                getBasePath(),
+                NameCache.singleton.newTags(singletonMap("host", MetricValue.fromStrValue(host))));
+        return new SimpleMetricGroup(group, singleton(up ? UP_METRIC : DOWN_METRIC));
     }
 
     public SimpleGroupPath getBasePath() { return base_path_; }
