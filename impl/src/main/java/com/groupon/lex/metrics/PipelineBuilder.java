@@ -44,6 +44,12 @@ import java.util.List;
 import lombok.NonNull;
 
 public class PipelineBuilder {
+    /**
+     * A supplier for Push Processors.
+     *
+     * The supplier takes an endpoint registration object, which can be used to
+     * create additional endpoints for this processor.
+     */
     public static interface PushProcessorSupplier {
         public PushProcessor build(EndpointRegistration epr) throws Exception;
     }
@@ -52,34 +58,40 @@ public class PipelineBuilder {
     private final Configuration cfg_;
     private int api_port_ = 9998;
     private CollectHistory history_;
-    private int interval_ = 60;
+    private int collect_interval_seconds_ = 60;
 
+    /** Create a new pipeline with the given configuration. */
     public PipelineBuilder(Configuration cfg) {
         cfg_ = cfg;
     }
 
+    /** Create a new pipeline builder from a reader. */
     public PipelineBuilder(File dir, Reader reader) throws IOException, ConfigurationException {
         cfg_ = Configuration.readFromFile(dir, reader).resolve();
     }
 
+    /** Create a new pipeline builder from the given file. */
     public PipelineBuilder(File file) throws IOException, ConfigurationException {
         cfg_ = Configuration.readFromFile(file).resolve();
     }
 
+    /** Make the API listen on the specified port. */
     public PipelineBuilder withApiPort(int api_port) {
         if (api_port <= 0 || api_port >= 65536) throw new IllegalArgumentException("port must be a valid TCP port");
         api_port_ = api_port;
         return this;
     }
 
+    /** Add a history module. */
     public PipelineBuilder withHistory(CollectHistory history) {
         history_ = history;
         return this;
     }
 
+    /** Use the specified seconds as scrape interval. */
     public PipelineBuilder withCollectIntervalSeconds(int seconds) {
         if (seconds <= 0) throw new IllegalArgumentException("not enough seconds: " + seconds);
-        interval_ = seconds;
+        collect_interval_seconds_ = seconds;
         return this;
     }
 
@@ -95,7 +107,7 @@ public class PipelineBuilder {
             registry = cfg_.create(api);
             if (history_ != null)
                 registry.setHistory(history_);
-            return new PushProcessorPipeline(registry, interval_, processors);
+            return new PushProcessorPipeline(registry, collect_interval_seconds_, processors);
         } catch (Exception ex) {
             if (api != null) api.close();
             if (registry != null) registry.close();
