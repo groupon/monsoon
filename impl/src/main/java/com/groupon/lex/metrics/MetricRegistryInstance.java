@@ -164,8 +164,8 @@ public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
         generators_.forEach((g) -> {
                     try {
                         g.close();
-                    } catch (Throwable t) {
-                        logger.log(Level.SEVERE, "failed to close group generator " + g, t);
+                    } catch (Exception e) {
+                        logger.log(Level.SEVERE, "failed to close group generator " + g, e);
                     }
                 });
     }

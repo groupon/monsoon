@@ -45,11 +45,11 @@ public class AlreadyStartedException extends Exception {
         super(msg);
     }
 
-    public AlreadyStartedException(Throwable t) {
-        super(t);
+    public AlreadyStartedException(Exception e) {
+        super(e);
     }
 
-    public AlreadyStartedException(String msg, Throwable t) {
-        super(msg, t);
+    public AlreadyStartedException(String msg, Exception e) {
+        super(msg, e);
     }
 }

@@ -203,9 +203,9 @@ public class JmxClient_remoteTest {
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             try {
                 jmx_client.getConnection();  // Ensure connection exists.
-            } catch (Throwable t) {
+            } catch (Exception e) {
                 /* Ensure we catch any exception from getConnection, just in case. */
-                throw new AssertionError("getConnection() may not throw at this point", t);
+                throw new AssertionError("getConnection() may not throw at this point", e);
             }
 
             jmx_server.stop();  // Server going down...
@@ -277,9 +277,9 @@ public class JmxClient_remoteTest {
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             try {
                 jmx_client.getConnection();  // Ensure connection exists.
-            } catch (Throwable t) {
+            } catch (Exception e) {
                 /* Ensure we catch any exception from getConnection, just in case. */
-                throw new AssertionError("getConnection() may not throw at this point", t);
+                throw new AssertionError("getConnection() may not throw at this point", e);
             }
 
             jmx_server.stop();  // Server going down...
