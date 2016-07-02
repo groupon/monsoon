@@ -1,5 +1,6 @@
 <img src="Monsoon-Logo.png" Monsoon-Logo.png width="200">
-====
+
+
 Mon-soon
 ====
 
@@ -44,3 +45,5 @@ Development
 ----
 
 Development documentation has its [own section](doc/dev/README.md).
+
+[![Build Status](https://travis-ci.org/groupon/monsoon.svg?branch=master)](https://travis-ci.org/groupon/monsoon)
