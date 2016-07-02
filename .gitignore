@@ -8,3 +8,5 @@ dependency-reduced-pom.xml
 # IntelliJ project directories
 **/*.idea
 **/*.iml
+
+.sonar
