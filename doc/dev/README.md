@@ -16,7 +16,9 @@ Build Process
 
 The project is written in [Java 8](http://openjdk.java.net/) and built using [maven](http://maven.apache.org/).
 As of time of writing, all tests are unit tests and should work entirely independant of the environment you are running.
-Make sure your tests pass: ``maven test``.
+Make sure your tests pass: ``mvn test``.
+
+Note that older releases of JDK 8 have a bug which will cause crashes while running this code. It is recommended that you use a recent build of JDK 8 (at the time of writing, version 1.8.91 is being used). Monsoon does not run on JDK versions below 8 due to a reliance on language features introduced in version 8.
 
 Release Process
 ----
