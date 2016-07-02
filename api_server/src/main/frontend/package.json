@@ -21,7 +21,7 @@
     "@angular/router-deprecated": "2.0.0-rc.2",
     "@angular/upgrade": "2.0.0-rc.2",
     "angular2-in-memory-web-api": "0.0.7",
-    "angular2-modal": "^1.0.0",
+    "angular2-modal": "1.0.6",
     "bootstrap": "^3.3.6",
     "es6-shim": "^0.35.0",
     "ng2-bs3-modal": "^0.6.0",
