@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import static java.util.Collections.singletonList;
 import java.util.List;
 import lombok.NonNull;
 
@@ -62,6 +63,7 @@ public class PipelineBuilder {
     private final Configuration cfg_;
     private InetSocketAddress api_sockaddr_ = new InetSocketAddress(DEFAULT_API_PORT);
     private CollectHistory history_;
+    private EndpointRegistration epr_;
     private int collect_interval_seconds_ = DEFAULT_COLLECT_INTERVAL_SECONDS;
 
     /** Create a new pipeline with the given configuration. */
@@ -87,6 +89,12 @@ public class PipelineBuilder {
     /** Make the API listen on the specified address. */
     public PipelineBuilder withApiSockaddr(@NonNull InetSocketAddress api_sockaddr) {
         api_sockaddr_ = api_sockaddr;
+        return this;
+    }
+
+    /** Use a non-standard API server. */
+    public PipelineBuilder withApi(EndpointRegistration epr) {
+        epr_ = epr;
         return this;
     }
 
@@ -118,14 +126,21 @@ public class PipelineBuilder {
         PushMetricRegistryInstance registry = null;
         final List<PushProcessor> processors = new ArrayList<>(processor_suppliers.size());
         try {
-            api = new ApiServer(api_sockaddr_);
-            registry = cfg_.create(api);
+            final EndpointRegistration epr;
+            if (epr_ == null) {
+                api = new ApiServer(api_sockaddr_);
+                epr = api;
+            } else {
+                epr = epr_;
+            }
+
+            registry = cfg_.create(epr);
             for (PushProcessorSupplier pps : processor_suppliers)
                 processors.add(pps.build(api));
 
             if (history_ != null)
                 registry.setHistory(history_);
-            api.start();
+            if (api != null) api.start();
             return new PushProcessorPipeline(registry, collect_interval_seconds_, processors);
         } catch (Exception ex) {
             if (api != null) api.close();
@@ -134,5 +149,19 @@ public class PipelineBuilder {
                 pp.close();
             throw ex;
         }
+    }
+
+    /**
+     * Creates a push processor.
+     *
+     * The API server is started by this method.
+     * The returned push processor is not started.
+     * @param processor_supplier A PushProcessorSupplier, that will instantiate the push processor.
+     * @return A Push Processor pipeline.  You'll need to start it yourself.
+     * @throws Exception indicating construction failed.
+     *     Push Processors that were created before the exception was thrown, will be closed.
+     */
+    public PushProcessorPipeline build(PushProcessorSupplier processor_supplier) throws Exception {
+        return build(singletonList(processor_supplier));
     }
 }
