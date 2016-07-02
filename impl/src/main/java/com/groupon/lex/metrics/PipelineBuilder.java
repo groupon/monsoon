@@ -53,11 +53,11 @@ public class PipelineBuilder {
     }
 
     public PipelineBuilder(File dir, Reader reader) throws IOException, ConfigurationException {
-        cfg_ = Configuration.readFromFile(dir, reader);
+        cfg_ = Configuration.readFromFile(dir, reader).resolve();
     }
 
     public PipelineBuilder(File file) throws IOException, ConfigurationException {
-        cfg_ = Configuration.readFromFile(file);
+        cfg_ = Configuration.readFromFile(file).resolve();
     }
 
     public PipelineBuilder withApiPort(int api_port) {
