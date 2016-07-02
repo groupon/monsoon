@@ -95,18 +95,29 @@ public class PipelineBuilder {
         return this;
     }
 
+    /**
+     * Creates a push processor.
+     *
+     * The API server is started by this method.
+     * The returned push processor is not started.
+     * @param processor_suppliers A list of PushProcessorSupplier, that will instantiate the push processors.
+     * @return A Push Processor pipeline.  You'll need to start it yourself.
+     * @throws Exception indicating construction failed.
+     *     Push Processors that were created before the exception was thrown, will be closed.
+     */
     public PushProcessorPipeline build(List<PushProcessorSupplier> processor_suppliers) throws Exception {
         ApiServer api = null;
         PushMetricRegistryInstance registry = null;
         final List<PushProcessor> processors = new ArrayList<>(processor_suppliers.size());
         try {
             api = new ApiServer(api_port_);
+            registry = cfg_.create(api);
             for (PushProcessorSupplier pps : processor_suppliers)
                 processors.add(pps.build(api));
 
-            registry = cfg_.create(api);
             if (history_ != null)
                 registry.setHistory(history_);
+            api.start();
             return new PushProcessorPipeline(registry, collect_interval_seconds_, processors);
         } catch (Exception ex) {
             if (api != null) api.close();
