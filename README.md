@@ -9,6 +9,16 @@ The project is extensible and allows for new datasources to be created, so it's 
 
 It should be easy to implement a new processor, to direct monitored data to other systems.
 
+Monsoon supports:
+
+1. collectd Metrics 
+2. JMX local and remote.
+3. URL HTTP (think a simple pingdom)
+4. Scrape a JSON endpoint over HTTP, I.E Hadoop metricz endpoint.
+5. A history module that will write time series to disk.
+6. It has metrics API endpoint for graphing ( work in progress).
+7. It also has a prometheus exporter.
+
 Usage
 ----
 
