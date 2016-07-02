@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -75,12 +75,12 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
     private Optional<Duration> rule_eval_duration_ = Optional.empty();
     private Optional<CollectHistory> history_ = Optional.empty();
 
-    public PushMetricRegistryInstance(String package_name, boolean has_config, EndpointRegistration api) {
-        this(package_name, () -> DateTime.now(DateTimeZone.UTC), has_config, api);
+    public PushMetricRegistryInstance(boolean has_config, EndpointRegistration api) {
+        this(() -> DateTime.now(DateTimeZone.UTC), has_config, api);
     }
 
-    public PushMetricRegistryInstance(String package_name, Supplier<DateTime> now, boolean has_config, EndpointRegistration api) {
-        super(package_name, has_config, api);
+    public PushMetricRegistryInstance(Supplier<DateTime> now, boolean has_config, EndpointRegistration api) {
+        super(has_config, api);
         now_ = requireNonNull(now);
         decorators_.add(new MonitorMonitor(this));
     }
@@ -180,13 +180,12 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
      * Create a plain, uninitialized metric registry.
      *
      * The metric registry is registered under its mbeanObjectName(package_name).
-     * @param package_name The name of the package that owns this registry.
      * @param now A function returning DateTime.now(DateTimeZone.UTC).  Allowing specifying it, for the benefit of unit tests.
      * @param has_config True if the metric registry instance should mark monsoon as being supplied with a configuration file.
      * @param api The endpoint registration interface.
      * @return An empty metric registry.
      */
-    public static synchronized PushMetricRegistryInstance create(String package_name, Supplier<DateTime> now, boolean has_config, EndpointRegistration api) {
-        return new PushMetricRegistryInstance(package_name, now, has_config, api);
+    public static synchronized PushMetricRegistryInstance create(Supplier<DateTime> now, boolean has_config, EndpointRegistration api) {
+        return new PushMetricRegistryInstance(now, has_config, api);
     }
 }

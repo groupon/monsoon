@@ -104,12 +104,11 @@ public class PushProcessorPipeline extends AbstractProcessor<PushMetricRegistryI
         registry_.updateProcessorDuration(Duration.millis(TimeUnit.NANOSECONDS.toMillis(t_processor - t0)));
     }
 
-    public final Support getSupport() { return registry_.getSupport(); }
     public final int getIntervalSeconds() { return interval_seconds_; }
 
     private synchronized void stop_() {
         my_task_.ifPresent((sf) -> {
-                    logger.log(Level.INFO, "Stopping thread for push processor for {0}", getMetricRegistry().getPackageName());
+                    logger.log(Level.INFO, "Stopping thread for push processor");
                     sf.cancel(false);
                 });
         my_task_ = Optional.empty();
@@ -120,7 +119,7 @@ public class PushProcessorPipeline extends AbstractProcessor<PushMetricRegistryI
 
     private synchronized void start_(ScheduledExecutorService ses, boolean own_ses) {
         stop_();
-        logger.log(Level.INFO, "Starting thread for push processor for {0}", getMetricRegistry().getPackageName());
+        logger.log(Level.INFO, "Starting thread for push processor");
         my_task_ = Optional.of(ses.scheduleAtFixedRate(this, INITIAL_RUN_DELAY, getIntervalSeconds(), TimeUnit.SECONDS));
         if (own_ses) owner_executor_ = Optional.of(ses);
     }
@@ -136,7 +135,7 @@ public class PushProcessorPipeline extends AbstractProcessor<PushMetricRegistryI
 
         start_(Executors.newSingleThreadScheduledExecutor((Runnable r) -> {
                     logger.entering(getClass().getName(), "start_", r);
-                    Thread t = new Thread(r, getMetricRegistry().getPackageName());
+                    Thread t = new Thread(r, "monsoon processor");
                     t.setDaemon(daemon);
                     t.setPriority(thread_priority);
                     return t;
@@ -186,7 +185,7 @@ public class PushProcessorPipeline extends AbstractProcessor<PushMetricRegistryI
 
     @Override
     public void close() {
-        logger.log(Level.INFO, "Closing push processor for {0}", getMetricRegistry().getPackageName());
+        logger.log(Level.INFO, "Closing push processor");
         stop_();
         super.close();
 

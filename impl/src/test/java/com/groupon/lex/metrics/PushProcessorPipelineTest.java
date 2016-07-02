@@ -34,12 +34,10 @@ package com.groupon.lex.metrics;
 import java.util.concurrent.CompletableFuture;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import static org.mockito.Mockito.when;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.runners.MockitoJUnitRunner;
 import org.mockito.stubbing.Answer;
@@ -54,12 +52,6 @@ public class PushProcessorPipelineTest {
     private PushMetricRegistryInstance registry;
     @Mock
     private PushProcessor processor;
-
-    @Before
-    public void setup() {
-        when(registry.getPackageName()).thenReturn("abracadabra");
-        when(registry.getSupport()).thenReturn(new Support("abracadabra"));
-    }
 
     @Test
     public void constructor() {
@@ -86,13 +78,6 @@ public class PushProcessorPipelineTest {
         }
 
         Mockito.verify(processor, Mockito.times(1)).accept(Mockito.any(), Mockito.any());
-    }
-
-    @Test
-    public void get_support() {
-        try (PushProcessorPipeline impl = new PushProcessorPipeline(registry, 10, processor)) {
-            assertEquals("abracadabra", impl.getSupport().getPackageName());
-        }
     }
 
     @Test(timeout = 25000)
