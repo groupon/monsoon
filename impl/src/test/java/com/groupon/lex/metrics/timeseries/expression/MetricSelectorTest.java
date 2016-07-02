@@ -39,7 +39,6 @@ import com.groupon.lex.metrics.expression.LiteralGroupExpression;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPairInstance;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
@@ -68,7 +67,7 @@ public class MetricSelectorTest {
 
     @Before
     public void setup() {
-        final MutableTimeSeriesCollection previous = TimeSeriesCollection.empty(t0.minus(Duration.standardMinutes(1)));
+        final MutableTimeSeriesCollection previous = new MutableTimeSeriesCollection(t0.minus(Duration.standardMinutes(1)));
         final MutableTimeSeriesCollection current = new MutableTimeSeriesCollection(t0, Stream.of(new MutableTimeSeriesValue(t0, new GroupName("99", "Luftballons"), singletonMap(new MetricName("value"), MetricValue.fromIntValue(17)))));
         final TimeSeriesCollectionPair ts_data = new TimeSeriesCollectionPairInstance() {{
             startNewCycle(previous.getTimestamp(), ExpressionLookBack.EMPTY);
