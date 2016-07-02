@@ -85,7 +85,7 @@ public class Configuration {
     private boolean has_config_ = true;
 
     /**
-     * Creates a new MetricRegistryInstance and exposes it using JMX.
+     * Creates a new MetricRegistryInstance.
      * @param now A function returning DateTime.now(DateTimeZone.UTC).  Allowing specifying it, for the benefit of unit tests.
      * @param api The api with which to register configuration-specific endpoints.
      * @return A metric registry instance, initialized based on this configuration.
