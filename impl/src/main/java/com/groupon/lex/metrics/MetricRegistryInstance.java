@@ -165,6 +165,13 @@ public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
                         logger.log(Level.SEVERE, "failed to close group generator " + g, t);
                     }
                 });
+        if (api_ instanceof AutoCloseable) {
+            try {
+                ((AutoCloseable)api_).close();
+            } catch (Exception ex) {
+                logger.log(Level.SEVERE, "unable to close API " + api_.getClass(), ex);
+            }
+        }
     }
 
     @Override
