@@ -54,14 +54,17 @@ public class PipelineBuilder {
         public PushProcessor build(EndpointRegistration epr) throws Exception;
     }
 
+    public static final int DEFAULT_API_PORT = 9998;
+    public static final int DEFAULT_COLLECT_INTERVAL_SECONDS = 60;
+
     @NonNull
     private final Configuration cfg_;
-    private int api_port_ = 9998;
+    private int api_port_ = DEFAULT_API_PORT;
     private CollectHistory history_;
-    private int collect_interval_seconds_ = 60;
+    private int collect_interval_seconds_ = DEFAULT_COLLECT_INTERVAL_SECONDS;
 
     /** Create a new pipeline with the given configuration. */
-    public PipelineBuilder(Configuration cfg) {
+    public PipelineBuilder(@NonNull Configuration cfg) {
         cfg_ = cfg;
     }
 
