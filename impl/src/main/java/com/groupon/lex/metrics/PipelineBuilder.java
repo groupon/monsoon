@@ -39,6 +39,7 @@ import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.NonNull;
@@ -59,7 +60,7 @@ public class PipelineBuilder {
 
     @NonNull
     private final Configuration cfg_;
-    private int api_port_ = DEFAULT_API_PORT;
+    private InetSocketAddress api_sockaddr_ = new InetSocketAddress(DEFAULT_API_PORT);
     private CollectHistory history_;
     private int collect_interval_seconds_ = DEFAULT_COLLECT_INTERVAL_SECONDS;
 
@@ -80,8 +81,12 @@ public class PipelineBuilder {
 
     /** Make the API listen on the specified port. */
     public PipelineBuilder withApiPort(int api_port) {
-        if (api_port <= 0 || api_port >= 65536) throw new IllegalArgumentException("port must be a valid TCP port");
-        api_port_ = api_port;
+        return withApiSockaddr(new InetSocketAddress(api_port));
+    }
+
+    /** Make the API listen on the specified address. */
+    public PipelineBuilder withApiSockaddr(@NonNull InetSocketAddress api_sockaddr) {
+        api_sockaddr_ = api_sockaddr;
         return this;
     }
 
@@ -113,7 +118,7 @@ public class PipelineBuilder {
         PushMetricRegistryInstance registry = null;
         final List<PushProcessor> processors = new ArrayList<>(processor_suppliers.size());
         try {
-            api = new ApiServer(api_port_);
+            api = new ApiServer(api_sockaddr_);
             registry = cfg_.create(api);
             for (PushProcessorSupplier pps : processor_suppliers)
                 processors.add(pps.build(api));

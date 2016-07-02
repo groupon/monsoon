@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.api.ApiServer;
 import com.groupon.lex.metrics.config.Configuration;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -84,7 +85,7 @@ public class PrometheusServer {
     }
 
     public static void main(String[] args) throws Exception {
-        final ApiServer api = new ApiServer();
+        final ApiServer api = new ApiServer(new InetSocketAddress(9998));
 
         PrometheusConfig cfg = createPrometheusConfig(args);
         Configuration _cfg = cfg.getConfiguration();

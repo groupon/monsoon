@@ -2,6 +2,7 @@ package com.groupon.lex.metrics.api;
 
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -29,12 +30,8 @@ public class ApiServer implements AutoCloseable, EndpointRegistration {
     private final ContextHandlerCollection context_ = new ContextHandlerCollection();
     private final ServletContextHandler servlet_handler;
 
-    public ApiServer() {
-        this(9998);
-    }
-
-    public ApiServer(int port) {
-        server_ = new Server(port);
+    public ApiServer(InetSocketAddress address) {
+        server_ = new Server(address);
 
         final HandlerList chain = new HandlerList();
         {
