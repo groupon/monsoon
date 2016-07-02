@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -69,17 +69,15 @@ public class MetricRegistryInstanceTest {
 
     @Test
     public void constructor() {
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create("xyzzy.one", true, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = MetricRegistryInstance.create(true, (pattern, servlet) -> {})) {
             assertTrue(mr.hasConfig());
-            assertEquals("xyzzy.one", mr.getPackageName());
 
             assertEquals(Optional.empty(), mr.getRuleEvalDuration());
             assertEquals(Optional.empty(), mr.getProcessorDuration());
         }
 
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create("xyzzy.two", false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
             assertFalse(mr.hasConfig());
-            assertEquals("xyzzy.two", mr.getPackageName());
 
             assertEquals(Optional.empty(), mr.getRuleEvalDuration());
             assertEquals(Optional.empty(), mr.getProcessorDuration());
@@ -88,7 +86,7 @@ public class MetricRegistryInstanceTest {
 
     @Test
     public void processor_duration_is_remembered() {
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create("xyzzy.three", false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
             mr.updateProcessorDuration(Duration.standardSeconds(17));
             assertEquals(Optional.of(Duration.standardSeconds(17)), mr.getProcessorDuration());
         }
@@ -99,7 +97,7 @@ public class MetricRegistryInstanceTest {
         when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(new GroupName("test"), Stream.of(new SimpleMetric(new MetricName("x"), 17))))));
         final DateTime now = DateTime.now(DateTimeZone.UTC);
 
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create("xyzzy.four", false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
             mr.add(generator);
             List<TimeSeriesValue> sgroups = mr.streamGroups(now).collect(Collectors.toList());
 
@@ -115,7 +113,7 @@ public class MetricRegistryInstanceTest {
     public void stream_groups() throws Exception {
         when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(new GroupName("test"), Stream.of(new SimpleMetric(new MetricName("x"), 17))))));
 
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create("xyzzy.five", false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
             mr.add(generator);
             mr.streamGroups().collect(Collectors.toList());
         }
@@ -128,17 +126,10 @@ public class MetricRegistryInstanceTest {
     public void group_names_resolution() throws Exception {
         when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(new GroupName("test"), Stream.of(new SimpleMetric(new MetricName("x"), 17))))));
 
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create("xyzzy.six", false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
             mr.add(generator);
             assertThat(mr.getGroupNames(),
                     arrayContaining(new GroupName("test")));
-        }
-    }
-
-    @Test
-    public void support() throws Exception {
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create("xyzzy.seven", false, (pattern, servlet) -> {})) {
-            assertEquals("xyzzy.seven", mr.getSupport().getPackageName());
         }
     }
 
@@ -147,7 +138,7 @@ public class MetricRegistryInstanceTest {
         Mockito.doThrow(IOException.class).when(generator).close();
         Mockito.doThrow(IOException.class).when(extra_generator).close();
 
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create("xyzzy.eight", false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
             mr.add(generator);
             mr.add(extra_generator);
         }

@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -85,17 +85,16 @@ public class Configuration {
     private boolean has_config_ = true;
 
     /**
-     * Creates a new MetricRegistryInstance and exposes it using JMX.
-     * @param package_name the implementation package, under which the MetricRegistryInstance will be registered.
-     * @param conn JMX client connection.
+     * Creates a new MetricRegistryInstance.
      * @param now A function returning DateTime.now(DateTimeZone.UTC).  Allowing specifying it, for the benefit of unit tests.
+     * @param api The api with which to register configuration-specific endpoints.
      * @return A metric registry instance, initialized based on this configuration.
      * @throws RuntimeException if anything goes wrong during registration, for example the name is already in use.
      */
-    public synchronized PushMetricRegistryInstance create(String package_name, Supplier<DateTime> now, EndpointRegistration api) {
+    public synchronized PushMetricRegistryInstance create(Supplier<DateTime> now, EndpointRegistration api) {
         if (needsResolve()) throw new IllegalStateException("Configuration.create invoked on unresolved configuration");
 
-        PushMetricRegistryInstance spawn = PushMetricRegistryInstance.create(package_name, now, has_config_, api);
+        PushMetricRegistryInstance spawn = PushMetricRegistryInstance.create(now, has_config_, api);
         Logger.getLogger(MetricRegistryInstance.class.getName()).log(Level.INFO, "Using configuration:\n{0}", this);
         try {
             getMonitors().forEach((MonitorStatement mon) -> {
@@ -117,13 +116,12 @@ public class Configuration {
 
     /**
      * Creates a new MetricRegistryInstance and exposes it using JMX.
-     * @param package_name the implementation package, under which the MetricRegistryInstance will be registered.
-     * @param conn JMX client connection.
+     * @param api The api with which to register configuration-specific endpoints.
      * @return A metric registry instance, initialized based on this configuration.
      * @throws RuntimeException if anything goes wrong during registration, for example the name is already in use.
      */
-    public PushMetricRegistryInstance create(String package_name, EndpointRegistration api) {
-        return create(package_name, () -> DateTime.now(DateTimeZone.UTC), api);
+    public PushMetricRegistryInstance create(EndpointRegistration api) {
+        return create(() -> DateTime.now(DateTimeZone.UTC), api);
     }
 
     private final List<ImportStatement> imports_;
