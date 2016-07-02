@@ -23,7 +23,7 @@ public final class BufferedIterator<T> {
     private final ExecutorService work_queue_;
     private final Iterator<? extends T> iter_;
     private final List<T> queue_;
-    private Throwable t_ = null;
+    private Exception exception = null;
     private boolean at_end_;
     private final int queue_size_;
     private boolean running_ = false;
@@ -76,16 +76,16 @@ public final class BufferedIterator<T> {
     }
 
     public synchronized boolean atEnd() {
-        return at_end_ && queue_.isEmpty() && t_ == null;
+        return at_end_ && queue_.isEmpty() && exception == null;
     }
 
     public synchronized boolean nextAvail() {
-        return !queue_.isEmpty() || t_ != null;
+        return !queue_.isEmpty() || exception != null;
     }
 
     @SneakyThrows
     public synchronized T next() {
-        if (t_ != null) throw t_;
+        if (exception != null) throw exception;
         try {
             final T result = queue_.remove(0);
             fire_();
@@ -113,7 +113,7 @@ public final class BufferedIterator<T> {
     private synchronized void fire_() {
         if (at_end_) return;
         if (queue_.size() >= queue_size_) return;
-        if (t_ != null) return;
+        if (exception != null) return;
 
         if (!running_) {
             running_ = true;
@@ -153,11 +153,11 @@ public final class BufferedIterator<T> {
                 running_ = false;
                 fire_();
             }
-        } catch (Throwable t) {
+        } catch (Exception e) {
             final Optional<Runnable> wakeup;
             synchronized(this) {
                 running_ = false;
-                t_ = t;
+                exception = e;
                 wakeup = wakeup_;
                 wakeup_ = Optional.empty();
             }
