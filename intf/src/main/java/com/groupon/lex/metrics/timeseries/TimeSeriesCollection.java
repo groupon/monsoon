@@ -60,18 +60,8 @@ public interface TimeSeriesCollection extends Cloneable {
     }
 
     public TimeSeriesCollection addMetrics(GroupName group, Map<MetricName, MetricValue> metrics);
-
     public DateTime getTimestamp();
     public boolean isEmpty();
-
-    public static MutableTimeSeriesCollection empty(DateTime timestamp) {
-        return new MutableTimeSeriesCollection(timestamp, Stream.empty());
-    }
-
-    public static MutableTimeSeriesCollection empty() {
-        return empty(now());
-    }
-
     public Set<GroupName> getGroups();
     public Set<SimpleGroupPath> getGroupPaths();
     public TimeSeriesValueSet getTSValues();

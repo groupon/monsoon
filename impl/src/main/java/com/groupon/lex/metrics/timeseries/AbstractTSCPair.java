@@ -55,7 +55,7 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
 
     @Override
     public TimeSeriesCollection getPreviousCollection() {
-        if (previous_.isEmpty()) return TimeSeriesCollection.empty();
+        if (previous_.isEmpty()) return new MutableTimeSeriesCollection();
         return previous_.get(0);
     }
 

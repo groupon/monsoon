@@ -19,7 +19,7 @@ public class AbstractTSCPairTest {
     private static final Logger LOG = Logger.getLogger(AbstractTSCPairTest.class.getName());
 
     private static class Impl extends AbstractTSCPair {
-        public TimeSeriesCollection current = TimeSeriesCollection.empty();
+        public TimeSeriesCollection current = new MutableTimeSeriesCollection();
 
         @Override
         public TimeSeriesCollection getCurrentCollection() {
@@ -43,7 +43,7 @@ public class AbstractTSCPairTest {
         input = unmodifiableList(Stream.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
                 .map(Duration::standardMinutes)
                 .map(now::minus)
-                .map(TimeSeriesCollection::empty)
+                .map(MutableTimeSeriesCollection::new)
                 .collect(Collectors.toList()));
         LOG.log(Level.INFO, "input = {0}", input);
         impl.current = input.get(0);

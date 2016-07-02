@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -34,19 +34,14 @@ package com.groupon.lex.metrics.timeseries;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.Tags;
 import java.util.Collection;
-import java.util.Collections;
-import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import static org.hamcrest.CoreMatchers.allOf;
 import static org.hamcrest.CoreMatchers.hasItem;
-import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.Matchers.hasEntry;
-import static org.hamcrest.Matchers.hasKey;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -167,128 +162,6 @@ public class TimeSeriesMetricDeltaSetTest {
                 hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.TRUE));
         assertThat(opt_empty.asVector().get(),
                 hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.EMPTY));
-    }
-
-    @Test
-    public void empty_empty_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(empty, empty, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertTrue(tsd.isEmpty());
-    }
-
-    @Test
-    public void empty_scalar_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(empty, scalar23, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertTrue(tsd.isEmpty());
-    }
-
-    @Test
-    public void empty_vector_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(empty, vector, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertTrue(tsd.isEmpty());
-    }
-
-    @Test
-    public void scalar_empty_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(scalar23, empty, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertTrue(tsd.isEmpty());
-    }
-
-    @Test
-    public void scalar_scalar_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(scalar23, scalar23, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertEquals(Optional.of(MetricValue.fromIntValue(23 * 23)),
-                tsd.asScalar());
-    }
-
-    @Test
-    public void scalar_vector_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(scalar23, vector, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertThat(tsd.asVector().get(),
-                hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.fromIntValue(23 * 23)));
-    }
-
-    @Test
-    public void vector_empty_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(vector, empty, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertTrue(tsd.isEmpty());
-    }
-
-    @Test
-    public void vector_scalar_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(vector, scalar23, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertThat(tsd.asVector().get(),
-                hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.fromIntValue(23 * 23)));
-    }
-
-    @Test
-    public void vector_vector_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(vector, vector, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertThat(tsd.asVector().get(),
-                hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.fromIntValue(23 * 23)));
-    }
-
-    @Test
-    public void vector_vector_apply_mismatch() {
-        final TimeSeriesMetricDeltaSet other_vector = new TimeSeriesMetricDeltaSet(singletonMap(
-                new Tags(singletonMap("NOT MY", MetricValue.fromStrValue("TAGS"))),
-                MetricValue.fromStrValue("baz")));
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(vector, other_vector, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertThat(tsd.streamAsMap().collect(Collectors.toMap(Entry::getKey, Entry::getValue)),
-                allOf(not(hasKey(new Tags(singletonMap("NOT MY", MetricValue.fromStrValue("TAGS"))))),
-                        not(hasKey(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar")))))));
-        assertTrue("TSD must be empty", tsd.isEmpty());
-    }
-
-    @Test
-    public void vector_immediate_scalar_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(vector, MetricValue.fromIntValue(23), (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertThat(tsd.asVector().get(),
-                hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.fromIntValue(23 * 23)));
-    }
-
-    @Test
-    public void immediate_scalar_vector_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(MetricValue.fromIntValue(23), vector, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertThat(tsd.asVector().get(),
-                hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.fromIntValue(23 * 23)));
-    }
-
-    @Test
-    public void scalar_immediate_scalar_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(scalar23, MetricValue.fromIntValue(23), (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertEquals(MetricValue.fromIntValue(23 * 23), tsd.asScalar().get());
-    }
-
-    @Test
-    public void immediate_scalar_scalar_apply() {
-        TimeSeriesMetricDeltaSet tsd = TimeSeriesMetricDeltaSet.apply(MetricValue.fromIntValue(23), scalar23, (x, y) -> MetricValue.fromIntValue(23 * 23));
-
-        assertEquals(MetricValue.fromIntValue(23 * 23), tsd.asScalar().get());
-    }
-
-    @Test
-    public void filter_tags() {
-        assertThat(vector.filterTags(singleton("foo")).streamAsMap().collect(Collectors.toMap(x -> x.getKey(), x -> x.getValue())),
-                hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.fromStrValue("baz")));
-
-        assertThat(vector.filterTags(singleton("baz")).streamAsMap().collect(Collectors.toMap(x -> x.getKey(), x -> x.getValue())),
-                hasEntry(Tags.EMPTY, MetricValue.fromStrValue("baz")));
-
-        assertThat(vector.filterTags(Collections.EMPTY_SET).streamAsMap().collect(Collectors.toMap(x -> x.getKey(), x -> x.getValue())),
-                hasEntry(Tags.EMPTY, MetricValue.fromStrValue("baz")));
     }
 
     @Test(expected = IllegalStateException.class)

@@ -44,7 +44,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -180,129 +179,6 @@ public class TimeSeriesMetricDeltaSet {
                         opt_scalar -> opt_scalar.map(TimeSeriesMetricDeltaSet::new).orElseGet(() -> new TimeSeriesMetricDeltaSet(MetricValue.EMPTY)),
                         TimeSeriesMetricDeltaSet::new
                 );
-    }
-
-    private static Stream<Entry<Tags, MetricValue>> map_(Stream<Entry<Tags, MetricValue>> s,
-            MetricValue scalar,
-            BiFunction<? super MetricValue, ? super MetricValue, ? extends MetricValue> fn) {
-        return s.map((sval) -> apply_fn_(sval, v -> fn.apply(v, scalar)));
-    }
-    private static Stream<Entry<Tags, MetricValue>> map_optional_(Stream<Entry<Tags, MetricValue>> s,
-            MetricValue scalar,
-            BiFunction<? super MetricValue, ? super MetricValue, Optional<? extends MetricValue>> fn) {
-        return s.map((sval) -> apply_fn_optional_(sval, v -> fn.apply(v, scalar)));
-    }
-
-    private static Stream<Entry<Tags, MetricValue>> map_(MetricValue scalar,
-            Stream<Entry<Tags, MetricValue>> s,
-            BiFunction<? super MetricValue, ? super MetricValue, ? extends MetricValue> fn) {
-        return s.map((sval) -> apply_fn_(sval, v -> fn.apply(scalar, v)));
-    }
-    private static Stream<Entry<Tags, MetricValue>> map_optional_(MetricValue scalar,
-            Stream<Entry<Tags, MetricValue>> s,
-            BiFunction<? super MetricValue, ? super MetricValue, Optional<? extends MetricValue>> fn) {
-        return s.map((sval) -> apply_fn_optional_(sval, v -> fn.apply(scalar, v)));
-    }
-
-    private static Stream<Entry<Tags, MetricValue>> map_(Stream<Entry<Tags, MetricValue>> x,
-            Stream<Entry<Tags, MetricValue>> y,
-            BiFunction<? super MetricValue, ? super MetricValue, ? extends MetricValue> fn) {
-        final Map<Tags, MetricValue> y_map = y.collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-        return x
-                .flatMap((entry) -> {
-                    return Optional.ofNullable(y_map.get(entry.getKey()))
-                            .map(yval -> fn.apply(entry.getValue(), yval))
-                            .map(rv -> SimpleMapEntry.create(entry.getKey(), rv))
-                            .map(Stream::of)
-                            .orElseGet(Stream::empty);
-                });
-    }
-    private static Stream<Entry<Tags, MetricValue>> map_optional_(Stream<Entry<Tags, MetricValue>> x,
-            Stream<Entry<Tags, MetricValue>> y,
-            BiFunction<? super MetricValue, ? super MetricValue, Optional<? extends MetricValue>> fn) {
-        final Map<Tags, MetricValue> y_map = y.collect(Collectors.toMap(Entry::getKey, Entry::getValue));
-        return x
-                .flatMap((entry) -> {
-                    return Optional.ofNullable(y_map.get(entry.getKey()))
-                            .flatMap(yval -> fn.apply(entry.getValue(), yval))
-                            .map(rv -> SimpleMapEntry.create(entry.getKey(), rv))
-                            .map(Stream::of)
-                            .orElseGet(Stream::empty);
-                });
-    }
-
-    /**
-     * Apply a scalar operation to a metric delta set.
-     * @param x The scalar as the first argument to the operation.
-     * @param y The set of metric deltas, upon which to apply the operation.
-     * @param fn The operation to apply.
-     * @return The result of the application.
-     */
-    public static TimeSeriesMetricDeltaSet apply(MetricValue x, TimeSeriesMetricDeltaSet y,
-            BiFunction<? super MetricValue, ? super MetricValue, ? extends MetricValue> fn) {
-        return y.values_
-                .map(
-                        (yval) -> fn.apply(x, yval),
-                        (yval) -> map_(x, yval.entrySet().stream(), fn)
-                )
-                .mapCombine(TimeSeriesMetricDeltaSet::new, TimeSeriesMetricDeltaSet::new);
-    }
-
-    /**
-     * Apply a scalar operation to a metric delta set.
-     * @param x The set of metric deltas, upon which to apply the operation.
-     * @param y The scalar as the second argument to the operation.
-     * @param fn The operation to apply.
-     * @return The result of the application.
-     */
-    public static TimeSeriesMetricDeltaSet apply(TimeSeriesMetricDeltaSet x, MetricValue y,
-            BiFunction<? super MetricValue, ? super MetricValue, ? extends MetricValue> fn) {
-        return x.values_
-                .map(
-                        (xval) -> fn.apply(xval, y),
-                        (xval) -> map_(xval.entrySet().stream(), y, fn)
-                )
-                .mapCombine(TimeSeriesMetricDeltaSet::new, TimeSeriesMetricDeltaSet::new);
-    }
-
-    /**
-     * Apply a 2-argument function to the set.
-     *
-     * Applies only exact matching tags.
-     * @param fn A function that takes 2 TimeSeriesMetricDeltas and returns a TimeSeriesMetricDelta.
-     * @return The mapped TimeSeriesMetricDelta from this set.
-     */
-    public static TimeSeriesMetricDeltaSet apply(TimeSeriesMetricDeltaSet x, TimeSeriesMetricDeltaSet y,
-            BiFunction<? super MetricValue, ? super MetricValue, ? extends MetricValue> fn) {
-        return x.values_
-                .mapCombine(
-                        xval -> y.values_
-                                .map(
-                                        yval -> fn.apply(xval, yval),
-                                        ymap -> map_(xval, ymap.entrySet().stream(), fn)
-                                )
-                                .mapCombine(TimeSeriesMetricDeltaSet::new, TimeSeriesMetricDeltaSet::new),
-                        xmap -> y.values_
-                                .map(
-                                        yval -> map_(xmap.entrySet().stream(), yval, fn),
-                                        ymap -> map_(xmap.entrySet().stream(), ymap.entrySet().stream(), fn)
-                                )
-                                .mapCombine(TimeSeriesMetricDeltaSet::new, TimeSeriesMetricDeltaSet::new)
-                );
-    }
-
-    /**
-     * Reduce the tags to the specified set.
-     * @param tag_names The names to retain.
-     * @return A set with a reduced set of tag names.
-     */
-    public TimeSeriesMetricDeltaSet filterTags(Set<String> tag_names) {
-        return values_
-                .map(
-                        Function.identity(),
-                        map -> map.entrySet().stream().map(entry -> SimpleMapEntry.create(entry.getKey().filter(tag_names), entry.getValue()))
-                )
-                .mapCombine(TimeSeriesMetricDeltaSet::new, TimeSeriesMetricDeltaSet::new);
     }
 
     public Any2<MetricValue, Map<Tags, MetricValue>> getValues() {

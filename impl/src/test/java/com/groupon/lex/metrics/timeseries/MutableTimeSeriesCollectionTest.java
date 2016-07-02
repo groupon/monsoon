@@ -91,7 +91,7 @@ public class MutableTimeSeriesCollectionTest {
     @Test
     public void empty() {
         DateTime t_before = DateTime.now(DateTimeZone.UTC);
-        TimeSeriesCollection empty = TimeSeriesCollection.empty();
+        TimeSeriesCollection empty = new MutableTimeSeriesCollection();
         DateTime t_after = DateTime.now(DateTimeZone.UTC);
 
         assertFalse(t_before.isAfter(empty.getTimestamp()));
@@ -102,7 +102,7 @@ public class MutableTimeSeriesCollectionTest {
 
     @Test
     public void empty_timestamp() {
-        TimeSeriesCollection empty = TimeSeriesCollection.empty(t0);
+        TimeSeriesCollection empty = new MutableTimeSeriesCollection(t0);
 
         assertEquals(t0, empty.getTimestamp());
         assertTrue(empty.getTSValues().isEmpty());

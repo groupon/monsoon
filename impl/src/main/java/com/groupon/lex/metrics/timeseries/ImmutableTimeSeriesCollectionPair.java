@@ -26,14 +26,14 @@ public class ImmutableTimeSeriesCollectionPair implements TimeSeriesCollectionPa
 
     @Override
     public TimeSeriesCollection getCurrentCollection() {
-        if (history_.isEmpty()) return TimeSeriesCollection.empty();
+        if (history_.isEmpty()) return new MutableTimeSeriesCollection();
         return history_.get(0);
     }
 
     @Override
     public TimeSeriesCollection getPreviousCollection() {
-        if (history_.isEmpty()) return TimeSeriesCollection.empty();
-        if (history_.size() == 1) return TimeSeriesCollection.empty(history_.get(0).getTimestamp());
+        if (history_.isEmpty()) return new MutableTimeSeriesCollection();
+        if (history_.size() == 1) return new MutableTimeSeriesCollection(history_.get(0).getTimestamp());
         return history_.get(1);
     }
 

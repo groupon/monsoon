@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.timeseries.expression;
 
 import com.groupon.lex.metrics.timeseries.Alert;
+import com.groupon.lex.metrics.timeseries.MutableTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
 import java.util.Map;
@@ -43,7 +44,7 @@ import java.util.function.Consumer;
  * @author ariane
  */
 public class PreviousContextWrapper implements Context {
-    private static final TimeSeriesCollection empty_tsc_ = TimeSeriesCollection.empty();
+    private static final TimeSeriesCollection empty_tsc_ = new MutableTimeSeriesCollection();
     private final Context ctx_;
     private final TimeSeriesCollectionPair tsdata_;
 

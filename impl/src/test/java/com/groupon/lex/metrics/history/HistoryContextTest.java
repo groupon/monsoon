@@ -6,6 +6,7 @@
 package com.groupon.lex.metrics.history;
 
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
+import com.groupon.lex.metrics.timeseries.MutableTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
@@ -37,9 +38,9 @@ public class HistoryContextTest {
         input = unmodifiableList(Stream.of(10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
                 .map(Duration::standardMinutes)
                 .map(now::minus)
-                .map(TimeSeriesCollection::empty)
+                .map(MutableTimeSeriesCollection::new)
                 .collect(Collectors.toList()));
-        dummy = TimeSeriesCollection.empty(now.minus(Duration.standardDays(7)));
+        dummy = new MutableTimeSeriesCollection(now.minus(Duration.standardDays(7)));
         LOG.log(Level.INFO, "now={0}", now);
         LOG.log(Level.INFO, "input={0}", input);
     }
