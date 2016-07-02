@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -38,17 +38,22 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.stubbing.Answer;
 
 /**
  *
  * @author ariane
  */
 @RunWith(MockitoJUnitRunner.class)
-public class AbstractPushProcessorTest {
+public class PushProcessorPipelineTest {
     @Mock
     private PushMetricRegistryInstance registry;
+    @Mock
+    private PushProcessor processor;
 
     @Before
     public void setup() {
@@ -58,18 +63,7 @@ public class AbstractPushProcessorTest {
 
     @Test
     public void constructor() {
-        class Impl extends AbstractPushProcessor {
-            public Impl(PushMetricRegistryInstance registry, int interval_seconds) {
-                super(registry, interval_seconds);
-            }
-
-            @Override
-            protected void runImplementation() throws Exception {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
-        }
-
-        try (Impl impl = new Impl(registry, 10)) {
+        try (PushProcessorPipeline impl = new PushProcessorPipeline(registry, 10, processor)) {
             assertEquals(10, impl.getIntervalSeconds());
             assertSame(registry, impl.getMetricRegistry());
         }
@@ -78,43 +72,25 @@ public class AbstractPushProcessorTest {
     @Test(timeout = 15000)
     public void run_one_cycle() throws Exception {
         CompletableFuture<Object> run_implementation_called = new CompletableFuture<Object>();
-        class Impl extends AbstractPushProcessor {
-            public Impl(PushMetricRegistryInstance registry, int interval_seconds) {
-                super(registry, interval_seconds);
-            }
 
-            @Override
-            protected void runImplementation() throws Exception {
-                run_implementation_called.complete(this);
-            }
+        Mockito
+                .doAnswer((Answer) (InvocationOnMock invocation) -> {
+                    run_implementation_called.complete(null);
+                    return null;
+                })
+                .when(processor).accept(Mockito.any(), Mockito.any());
 
-            @Override
-            public void close() {
-                run_implementation_called.completeExceptionally(new Exception("Closed before I ran."));
-                super.close();
-            }
-        }
-
-        try (Impl impl = new Impl(registry, 10)) {
+        try (PushProcessorPipeline impl = new PushProcessorPipeline(registry, 10, processor)) {
             impl.start();
             run_implementation_called.get();
         }
+
+        Mockito.verify(processor, Mockito.times(1)).accept(Mockito.any(), Mockito.any());
     }
 
     @Test
     public void get_support() {
-        class Impl extends AbstractPushProcessor {
-            public Impl(PushMetricRegistryInstance registry, int interval_seconds) {
-                super(registry, interval_seconds);
-            }
-
-            @Override
-            protected void runImplementation() throws Exception {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
-        }
-
-        try (Impl impl = new Impl(registry, 10)) {
+        try (PushProcessorPipeline impl = new PushProcessorPipeline(registry, 10, processor)) {
             assertEquals("abracadabra", impl.getSupport().getPackageName());
         }
     }
@@ -122,31 +98,20 @@ public class AbstractPushProcessorTest {
     @Test(timeout = 25000)
     public void keep_running_when_excepting() throws Exception {
         CompletableFuture<Object> run_implementation_called = new CompletableFuture<Object>();
-        class Impl extends AbstractPushProcessor {
-            int run_impl_called_counter = 0;
 
-            public Impl(PushMetricRegistryInstance registry, int interval_seconds) {
-                super(registry, interval_seconds);
-            }
+        Mockito
+                .doThrow(new Exception())
+                .doAnswer((Answer) (InvocationOnMock invocation) -> {
+                    run_implementation_called.complete(null);
+                    return null;
+                })
+                .when(processor).accept(Mockito.any(), Mockito.any());
 
-            @Override
-            protected void runImplementation() throws Exception {
-                if (run_impl_called_counter++ == 0)
-                    throw new Exception("First call fails");
-                else
-                    run_implementation_called.complete(this);
-            }
-
-            @Override
-            public void close() {
-                run_implementation_called.completeExceptionally(new Exception("Closed before I ran."));
-                super.close();
-            }
-        }
-
-        try (Impl impl = new Impl(registry, 10)) {
+        try (PushProcessorPipeline impl = new PushProcessorPipeline(registry, 10, processor)) {
             impl.start();
             run_implementation_called.get();
         }
+
+        Mockito.verify(processor, Mockito.times(2)).accept(Mockito.any(), Mockito.any());
     }
 }
