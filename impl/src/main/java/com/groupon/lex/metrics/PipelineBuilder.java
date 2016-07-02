@@ -35,13 +35,19 @@ import com.groupon.lex.metrics.api.ApiServer;
 import com.groupon.lex.metrics.config.Configuration;
 import com.groupon.lex.metrics.config.ConfigurationException;
 import com.groupon.lex.metrics.history.CollectHistory;
+import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.NonNull;
 
 public class PipelineBuilder {
+    public static interface PushProcessorSupplier {
+        public PushProcessor build(EndpointRegistration epr) throws Exception;
+    }
+
     @NonNull
     private final Configuration cfg_;
     private int api_port_ = 9998;
@@ -77,11 +83,25 @@ public class PipelineBuilder {
         return this;
     }
 
-    public PushProcessorPipeline build(List<PushProcessor> processor) {
-        final ApiServer api = new ApiServer(api_port_);
-        final PushMetricRegistryInstance registry = cfg_.create(api);
-        if (history_ != null)
-            registry.setHistory(history_);
-        return new PushProcessorPipeline(registry, interval_, processor);
+    public PushProcessorPipeline build(List<PushProcessorSupplier> processor_suppliers) throws Exception {
+        ApiServer api = null;
+        PushMetricRegistryInstance registry = null;
+        final List<PushProcessor> processors = new ArrayList<>(processor_suppliers.size());
+        try {
+            api = new ApiServer(api_port_);
+            for (PushProcessorSupplier pps : processor_suppliers)
+                processors.add(pps.build(api));
+
+            registry = cfg_.create(api);
+            if (history_ != null)
+                registry.setHistory(history_);
+            return new PushProcessorPipeline(registry, interval_, processors);
+        } catch (Exception ex) {
+            if (api != null) api.close();
+            if (registry != null) registry.close();
+            for (PushProcessor pp : processors)
+                pp.close();
+            throw ex;
+        }
     }
 }
