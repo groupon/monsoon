@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -31,10 +31,10 @@
  */
 package com.groupon.lex.prometheus;
 
-import com.groupon.lex.metrics.config.Configuration;
 import com.groupon.lex.metrics.config.ConfigurationException;
 import java.io.File;
 import java.io.IOException;
+import java.util.Optional;
 
 /**
  *
@@ -47,14 +47,14 @@ public class PrometheusConfig {
     private String path = "/metrics";
 
     public void setPort(short p) { port = p; }
-    
+
     public short getPort (){ return port; };
-    
+
     public String getPath() { return path; };
-    
-    public void setPath(String p) { path = p; } 
+
+    public void setPath(String p) { path = p; }
     private File config_file_;
-    
+
 
     public synchronized String getConfigFile() { return config_file_.toString(); }
 
@@ -72,19 +72,18 @@ public class PrometheusConfig {
         if (!file.isFile()) throw new IOException("expected a proper file: " + file.toString());
         config_file_ = file.getCanonicalFile();
     }
-    public Configuration getConfiguration() throws IOException, ConfigurationException {
-        if (config_file_ == null) return Configuration.DEFAULT;
-        return Configuration.readFromFile(config_file_).resolve();
+    public Optional<File> getConfiguration() throws IOException, ConfigurationException {
+        return Optional.ofNullable(config_file_);
     }
-    
+
     @Override
-    public String toString() {           
+    public String toString() {
         return new StringBuilder()
             .append("(")
             .append("prometheus_path=").append(getPort()).append(",")
             .append("prometheus_path=").append(getPath())
             .append("config=").append(getConfigFile())
             .append(")")
-            .toString();           
+            .toString();
     }
 }
