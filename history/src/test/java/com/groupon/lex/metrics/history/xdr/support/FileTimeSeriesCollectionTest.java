@@ -115,8 +115,8 @@ public class FileTimeSeriesCollectionTest {
 
     @Test
     public void get_tsvalues() {
-        assertThat(tsc.getTSValuesAsMap(), hasEntry(equalTo(tsv.getGroup().getPath()), contains(tsv)));
-        assertThat(copy.getTSValuesAsMap(), hasEntry(equalTo(tsv.getGroup().getPath()), contains(tsv)));
+        assertThat(tsc.getTSValues(), contains(tsv));
+        assertThat(copy.getTSValues(), contains(tsv));
     }
 
     @Test
