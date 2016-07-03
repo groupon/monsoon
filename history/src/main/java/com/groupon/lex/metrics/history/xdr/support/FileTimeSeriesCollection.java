@@ -100,12 +100,6 @@ public class FileTimeSeriesCollection implements TimeSeriesCollection {
     }
 
     @Override
-    public Map<SimpleGroupPath, Collection<TimeSeriesValue>> getTSValuesAsMap() {
-        return path_map_.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().values()));
-    }
-
-    @Override
     public TimeSeriesValueSet getTSValue(SimpleGroupPath name) {
         return Optional.ofNullable(path_map_.get(name))
                 .map(Map::values)

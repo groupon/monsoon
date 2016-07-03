@@ -35,13 +35,11 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
-import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.singletonMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -75,11 +73,6 @@ public interface TimeSeriesCollection extends Cloneable {
         return get(name)
                 .map(Stream::of)
                 .map(TimeSeriesValueSet::new);
-    }
-
-    public default Map<SimpleGroupPath, Collection<TimeSeriesValue>> getTSValuesAsMap() {
-        return getTSValues().stream()
-                .collect(Collectors.groupingBy(tsv -> tsv.getGroup().getPath(), Collectors.toCollection(ArrayList::new)));
     }
 
     public TimeSeriesCollection clone();
