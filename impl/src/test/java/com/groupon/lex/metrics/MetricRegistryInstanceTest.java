@@ -152,6 +152,18 @@ public class MetricRegistryInstanceTest {
     }
 
     @Test
+    public void collectionContext_handling() throws Exception {
+        try (MetricRegistryInstance mr = create(false)) {
+            mr.updateCollection();
+        }
+
+        verify(cctx, times(1)).alertManager();
+        verify(cctx, times(1)).tsdata();
+        verify(cctx, times(1)).commit();
+        verifyNoMoreInteractions(cctx);
+    }
+
+    @Test
     public void stream_groups() throws Exception {
         when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(new GroupName("test"), Stream.of(new SimpleMetric(new MetricName("x"), 17))))));
 
