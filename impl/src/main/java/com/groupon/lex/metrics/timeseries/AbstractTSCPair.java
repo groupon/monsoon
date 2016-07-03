@@ -4,6 +4,7 @@ import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.lib.ForwardIterator;
 import java.util.ArrayList;
+import java.util.Collection;
 import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.unmodifiableList;
 import java.util.Comparator;
@@ -47,7 +48,7 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
                 .sorted(Comparator.comparing(TimeSeriesCollection::getTimestamp))
                 .distinct()
                 .collect(Collectors.toList())) {
-            prev.merge(tsc.getTimestamp(), tsc.getTSValues().stream());
+            prev.merge(tsc.getTimestamp(), tsc.getTSValues());
             previous_.add(0, prev.clone());
         }
         LOG.log(Level.INFO, "recovered {0} scrapes from history", previous_.size());
@@ -111,7 +112,7 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
         apply_lookback_(lookback);
     }
 
-    protected void update(DateTime ts, Stream<TimeSeriesValue> values, ExpressionLookBack lookback) {
+    protected void update(DateTime ts, Collection<TimeSeriesValue> values, ExpressionLookBack lookback) {
         if (!previous_.isEmpty()) {
             previous_.add(0, previous_.get(0).clone().merge(ts, values));  // Clone into position 0, so scrapes shared among classes remain unaffected.
         } else {
@@ -121,7 +122,7 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
     }
 
     protected void update(TimeSeriesCollection tsc, ExpressionLookBack lookback) {
-        update(tsc.getTimestamp(), tsc.getTSValues().stream(), lookback);
+        update(tsc.getTimestamp(), tsc.getTSValues(), lookback);
     }
 
     private void apply_lookback_(ExpressionLookBack lookback) {
