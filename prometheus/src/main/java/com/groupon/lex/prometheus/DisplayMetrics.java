@@ -30,7 +30,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.groupon.lex.prometheus;
-import com.groupon.lex.metrics.PullMetricRegistryInstance;
+import com.groupon.lex.metrics.PullProcessorPipeline;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -47,8 +47,8 @@ import org.eclipse.jetty.server.handler.AbstractHandler;
  * @author nolofsson
  */
 public class DisplayMetrics extends AbstractHandler {
-    private final PullMetricRegistryInstance registry_;
-    public DisplayMetrics(PullMetricRegistryInstance registry ){
+    private final PullProcessorPipeline registry_;
+    public DisplayMetrics(PullProcessorPipeline registry ){
         registry_ = registry;
     }
 

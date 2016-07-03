@@ -173,7 +173,7 @@ public class PipelineBuilder {
      * @return A PullMetricRegistryInstance that performs a scrape and evaluates rules.
      * @throws Exception indicating construction failed.
      */
-    public PullMetricRegistryInstance build() throws Exception {
+    public PullProcessorPipeline build() throws Exception {
         ApiServer api = null;
         PullMetricRegistryInstance registry = null;
         try {
@@ -186,7 +186,7 @@ public class PipelineBuilder {
             registry = cfg_.create(PullMetricRegistryInstance::new, api);
 
             api.start();
-            return registry;
+            return new PullProcessorPipeline(registry);
         } catch (Exception ex) {
             if (api != null) api.close();
             if (registry != null) registry.close();

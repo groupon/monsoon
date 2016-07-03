@@ -32,7 +32,7 @@
 package com.groupon.lex.prometheus;
 
 import com.groupon.lex.metrics.PipelineBuilder;
-import com.groupon.lex.metrics.PullMetricRegistryInstance;
+import com.groupon.lex.metrics.PullProcessorPipeline;
 import com.groupon.lex.metrics.api.ApiServer;
 import com.groupon.lex.metrics.config.Configuration;
 import java.io.File;
@@ -53,7 +53,7 @@ import org.eclipse.jetty.server.handler.ContextHandler;
 public class PrometheusServer {
     private static final Logger LOG = Logger.getLogger(PrometheusServer.class.getName());
     private final static String _PACKAGE_NAME = PrometheusServer.class.getPackage().getName();
-    private static PullMetricRegistryInstance registry_;
+    private static PullProcessorPipeline registry_;
 
     private final static Map<String, BiConsumer<PrometheusConfig, String>> createPrometheusConfig_ = new HashMap<String, BiConsumer<PrometheusConfig, String>>() {{
             put("config=", (PrometheusConfig, config) -> {

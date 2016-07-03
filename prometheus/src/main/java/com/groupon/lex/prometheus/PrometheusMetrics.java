@@ -34,7 +34,7 @@ package com.groupon.lex.prometheus;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.PullMetricRegistryInstance;
+import com.groupon.lex.metrics.PullProcessorPipeline;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.util.List;
 import java.util.Map;
@@ -59,8 +59,8 @@ public class PrometheusMetrics {
      * It will filter out None values and replace all Characters that
      * Does not confirm to Prometheus Metric Format.
      */
-    public static Stream<PrometheusMetric> filteredMetrics(PullMetricRegistryInstance registry) throws Exception {
-        Stream <PrometheusMetric> m = registry.updateCollection().getTSValues().stream()
+    public static Stream<PrometheusMetric> filteredMetrics(PullProcessorPipeline registry) throws Exception {
+        Stream <PrometheusMetric> m = registry.get().stream()
                 .flatMap((TimeSeriesValue i) -> {
                     Map<MetricName, MetricValue> metrics = i.getMetrics();
                     GroupName group = i.getGroup();
