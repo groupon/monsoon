@@ -7,6 +7,7 @@ package com.groupon.lex.metrics.history.xdr;
 
 import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
+import com.groupon.lex.metrics.history.xdr.support.StreamedCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,7 +24,6 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import org.joda.time.DateTime;
@@ -45,7 +45,8 @@ public class TSDataFileChainTest {
     private final FileSupport file_support = new FileSupport(Const.MAJOR, Const.MINOR);
     private Path tmpdir, emptydir;
     private TSDataFileChain fd;
-    public static final int LARGE_COUNT = 250;
+    public static final int LARGE_COUNT = 500;  // Enough to trigger file roll-over.
+    public static final int CHAIN_WIDTH = 10000;  // Need wide enough scrapes to trigger file roll-over.
 
     @Before
     public void setup() throws Exception {
@@ -53,7 +54,7 @@ public class TSDataFileChainTest {
         tmpdir.toFile().deleteOnExit();
         emptydir = Files.createTempDirectory("monsoon-TSDataFileChainTest-empty");
         emptydir.toFile().deleteOnExit();
-        fd = TSDataFileChain.openDir(tmpdir, 2 * 1024 * 1024);
+        fd = TSDataFileChain.openDir(tmpdir, 1024 * 1024);
     }
 
     @After
@@ -65,6 +66,11 @@ public class TSDataFileChainTest {
                 LOG.log(Level.WARNING, "unable to delete " + f, ex);
             }
         });
+        try {
+            Files.delete(tmpdir);
+        } catch (IOException ex) {
+            LOG.log(Level.WARNING, "unable to delete temp dir " + tmpdir, ex);
+        }
 
         fd = null;
     }
@@ -187,9 +193,9 @@ public class TSDataFileChainTest {
         final int COUNT = LARGE_COUNT;
         fill_(COUNT);
 
-        assertTrue(fd.containsAll(create_tsdata_().limit(COUNT).skip(LARGE_COUNT / 4).limit(10).collect(Collectors.toList())));
-        assertTrue("containsAll() visits old files", fd.containsAll(create_tsdata_().limit(10).collect(Collectors.toList())));
-        assertTrue("containsAll() visits new file", fd.containsAll(create_tsdata_().skip(COUNT - 10).limit(10).collect(Collectors.toList())));
+        assertTrue(fd.containsAll(create_tsdata_().limit(COUNT).skip(LARGE_COUNT / 4).limit(10)));
+        assertTrue("containsAll() visits old files", fd.containsAll(create_tsdata_().limit(10)));
+        assertTrue("containsAll() visits new file", fd.containsAll(create_tsdata_().skip(COUNT - 10).limit(10)));
         assertTrue("containsAll() on empty set", fd.containsAll(EMPTY_LIST));
         assertFalse("containsAll() handles wrong types", fd.containsAll(Arrays.asList(new Object(), new Integer(16))));
     }
@@ -258,9 +264,9 @@ public class TSDataFileChainTest {
         final int COUNT = 7;
         fill_(COUNT);
 
-        final List<TimeSeriesCollection> tsdata = create_tsdata_().skip(COUNT + 1).limit(20).collect(Collectors.toList());
+        final StreamedCollection<TimeSeriesCollection> tsdata = create_tsdata_().skip(COUNT + 1).limit(20);
 
-        assertTrue(tsdata.stream().noneMatch(fd::contains));
+        assertTrue(tsdata.noneMatch(fd::contains));
         fd.addAll(tsdata);
         assertTrue(fd.containsAll(tsdata));
     }
@@ -307,8 +313,8 @@ public class TSDataFileChainTest {
     }
 
     /** Generates an endless stream of TimeSeriesCollections. */
-    private Stream<TimeSeriesCollection> create_tsdata_() {
-        return file_support.create_tsdata(500);
+    private StreamedCollection<TimeSeriesCollection> create_tsdata_() {
+        return file_support.create_tsdata(CHAIN_WIDTH);
     }
 
     private void fill_(int count) {
