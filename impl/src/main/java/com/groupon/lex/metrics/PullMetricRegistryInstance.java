@@ -29,38 +29,42 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.timeseries;
+package com.groupon.lex.metrics;
 
+import com.groupon.lex.metrics.httpd.EndpointRegistration;
+import com.groupon.lex.metrics.timeseries.Alert;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPairInstance;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.joda.time.DateTime;
 
-/**
- *
- * @author ariane
- */
-public class TimeSeriesCollectionPairInstance extends AbstractTSCPair {
-    private final MutableTimeSeriesCollection current_;
-
-    public TimeSeriesCollectionPairInstance() {
-        current_ = new MutableTimeSeriesCollection();
+public class PullMetricRegistryInstance extends MetricRegistryInstance {
+    public PullMetricRegistryInstance(boolean has_config, EndpointRegistration api) {
+        super(has_config, api);
     }
 
-    public TimeSeriesCollectionPairInstance(DateTime now) {
-        current_ = new MutableTimeSeriesCollection(now);
+    public PullMetricRegistryInstance(Supplier<DateTime> now, boolean has_config, EndpointRegistration api) {
+        super(now, has_config, api);
     }
 
     @Override
-    public TimeSeriesCollection getCurrentCollection() {
-        return current_;
-    }
+    protected CollectionContext beginCollection(DateTime now) {
+        return new CollectionContext() {
+            private final TimeSeriesCollectionPairInstance tsdata = new TimeSeriesCollectionPairInstance(now);
 
-    public TimeSeriesCollectionPairInstance startNewCycle(DateTime timestamp, ExpressionLookBack lookback) {
-        update(current_, lookback);
-        current_.clear(timestamp);
-        return this;
-    }
+            @Override
+            public Consumer<Alert> alertManager() {
+                return (Alert alert) -> {};
+            }
 
-    @Override
-    public String toString() {
-        return "TimeSeriesCollectionPairInstance{current_=" + current_ + ", " + super.toString() + '}';
+            @Override
+            public TimeSeriesCollectionPair tsdata() {
+                return tsdata;
+            }
+
+            @Override
+            public void commit() {}
+        };
     }
 }

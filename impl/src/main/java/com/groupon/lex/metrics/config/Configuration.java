@@ -32,7 +32,6 @@
 package com.groupon.lex.metrics.config;
 
 import com.groupon.lex.metrics.MetricRegistryInstance;
-import com.groupon.lex.metrics.PushMetricRegistryInstance;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import java.util.Collection;
 import java.util.Objects;
@@ -84,6 +83,10 @@ public class Configuration {
     private final static String PARAGRAPH_SEP = "\n\n";
     private boolean has_config_ = true;
 
+    public static interface MetricRegistryConstructor<T extends MetricRegistryInstance> {
+        public T construct(Supplier<DateTime> now, boolean has_config, EndpointRegistration api);
+    }
+
     /**
      * Creates a new MetricRegistryInstance.
      * @param now A function returning DateTime.now(DateTimeZone.UTC).  Allowing specifying it, for the benefit of unit tests.
@@ -91,10 +94,10 @@ public class Configuration {
      * @return A metric registry instance, initialized based on this configuration.
      * @throws RuntimeException if anything goes wrong during registration, for example the name is already in use.
      */
-    public synchronized PushMetricRegistryInstance create(Supplier<DateTime> now, EndpointRegistration api) {
+    public synchronized <T extends MetricRegistryInstance> T create(MetricRegistryConstructor<T> constructor, Supplier<DateTime> now, EndpointRegistration api) {
         if (needsResolve()) throw new IllegalStateException("Configuration.create invoked on unresolved configuration");
 
-        PushMetricRegistryInstance spawn = PushMetricRegistryInstance.create(now, has_config_, api);
+        T spawn = constructor.construct(now, has_config_, api);
         Logger.getLogger(MetricRegistryInstance.class.getName()).log(Level.INFO, "Using configuration:\n{0}", this);
         try {
             getMonitors().forEach((MonitorStatement mon) -> {
@@ -115,13 +118,13 @@ public class Configuration {
     }
 
     /**
-     * Creates a new MetricRegistryInstance and exposes it using JMX.
+     * Creates a new MetricRegistryInstance.
      * @param api The api with which to register configuration-specific endpoints.
      * @return A metric registry instance, initialized based on this configuration.
      * @throws RuntimeException if anything goes wrong during registration, for example the name is already in use.
      */
-    public PushMetricRegistryInstance create(EndpointRegistration api) {
-        return create(() -> DateTime.now(DateTimeZone.UTC), api);
+    public <T extends MetricRegistryInstance> T create(MetricRegistryConstructor<T> constructor, EndpointRegistration api) {
+        return create(constructor, () -> DateTime.now(DateTimeZone.UTC), api);
     }
 
     private final List<ImportStatement> imports_;

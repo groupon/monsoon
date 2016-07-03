@@ -34,33 +34,21 @@ package com.groupon.lex.metrics;
 import com.groupon.lex.metrics.api.endpoints.ExprEval;
 import com.groupon.lex.metrics.api.endpoints.ExprEvalGraphServlet;
 import com.groupon.lex.metrics.api.endpoints.ExprValidate;
-import com.groupon.lex.metrics.api.endpoints.ListMetrics;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
-import com.groupon.lex.metrics.misc.MonitorMonitor;
 import com.groupon.lex.metrics.timeseries.Alert;
-import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPairInstance;
-import com.groupon.lex.metrics.timeseries.TimeSeriesTransformer;
-import com.groupon.lex.metrics.timeseries.expression.Context;
-import com.groupon.lex.metrics.timeseries.expression.MutableContext;
-import java.util.ArrayList;
-import java.util.Collection;
 import static java.util.Collections.unmodifiableMap;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
-import static java.util.Objects.requireNonNull;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.joda.time.Duration;
 
 /**
  *
@@ -70,22 +58,14 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
     private static final Logger logger = Logger.getLogger(PushMetricRegistryInstance.class.getName());
     private final TimeSeriesCollectionPairInstance data_ = new TimeSeriesCollectionPairInstance();
     private Map<GroupName, Alert> alerts_ = new HashMap<>();
-    private final Collection<TimeSeriesTransformer> decorators_ = new ArrayList<>();
-    private Supplier<DateTime> now_;
-    private Optional<Duration> rule_eval_duration_ = Optional.empty();
     private Optional<CollectHistory> history_ = Optional.empty();
-    private final ListMetrics list_metrics_;
 
     public PushMetricRegistryInstance(boolean has_config, EndpointRegistration api) {
-        this(() -> DateTime.now(DateTimeZone.UTC), has_config, api);
+        super(has_config, api);
     }
 
     public PushMetricRegistryInstance(Supplier<DateTime> now, boolean has_config, EndpointRegistration api) {
-        super(has_config, api);
-        now_ = requireNonNull(now);
-        decorators_.add(new MonitorMonitor(this));
-        list_metrics_ = new ListMetrics();
-        getApi().addEndpoint("/monsoon/metrics", list_metrics_);
+        super(now, has_config, api);
     }
 
     /** Set the history module that the push processor is to use. */
@@ -94,21 +74,15 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
         getApi().addEndpoint("/monsoon/eval", new ExprEval(history_.get()));
         getApi().addEndpoint("/monsoon/eval/validate", new ExprValidate());
         getApi().addEndpoint("/monsoon/eval/gchart", new ExprEvalGraphServlet(history_.get()));
-        data_.initWithHistoricalData(history, ExpressionLookBack.EMPTY.andThen(decorators_.stream().map(TimeSeriesTransformer::getLookBack)));
+        data_.initWithHistoricalData(history, getDecoratorLookBack());
     }
     /** Clear the history module. */
     public synchronized void clearHistory() { history_ = Optional.empty(); }
     /** Retrieve the history module that the collector uses. */
     public synchronized Optional<CollectHistory> getHistory() { return history_; }
 
-    public synchronized void decorate(TimeSeriesTransformer decorator) {
-        decorators_.add(Objects.requireNonNull(decorator));
-    }
-
     public TimeSeriesCollection getCollectionData() { return data_.getCurrentCollection(); }
     public Map<GroupName, Alert> getCollectionAlerts() { return alerts_; }
-    @Override
-    public Optional<Duration> getRuleEvalDuration() { return rule_eval_duration_; }
 
     /**
      * Begin a new collection cycle.
@@ -116,28 +90,35 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
      * Note that the cycle isn't stored (a call to commitCollection is required).
      * @return A new collection cycle.
      */
-    private synchronized void beginCollection() {
-        final DateTime now = requireNonNull(now_.get());
-        data_.startNewCycle(now, ExpressionLookBack.EMPTY.andThen(decorators_.stream().map(TimeSeriesTransformer::getLookBack)));
-        streamGroups(now).forEachOrdered(data_.getCurrentCollection()::add);
-    }
+    @Override
+    protected synchronized CollectionContext beginCollection(DateTime now) {
+        data_.startNewCycle(now, getDecoratorLookBack());
 
-    /**
-     * Store a newly completed collection cycle.
-     * @param data The collection cycle to store.
-     */
-    private synchronized void commitCollection(Map<GroupName, Alert> alerts) {
-        alerts_ = unmodifiableMap(alerts);
-        getHistory().ifPresent(history -> history.add(getCollectionData()));
-        list_metrics_.update(data_.getCurrentCollection());
-    }
+        return new CollectionContext() {
+            final Map<GroupName, Alert> alerts = new HashMap<>();
 
-    /**
-     * Apply all timeseries decorators.
-     * @param ctx Input timeseries.
-     */
-    private void apply_rules_and_decorators_(Context ctx) {
-        decorators_.forEach(tf -> tf.transform(ctx));
+            @Override
+            public Consumer<Alert> alertManager() {
+                return (Alert alert) -> {
+                    Alert combined = combine_alert_with_past_(alert, alerts_);
+                    alerts.put(combined.getName(), combined);
+                };
+            }
+
+            @Override
+            public TimeSeriesCollectionPair tsdata() {
+                return data_;
+            }
+
+            /**
+             * Store a newly completed collection cycle.
+             */
+            @Override
+            public void commit() {
+                alerts_ = unmodifiableMap(alerts);
+                getHistory().ifPresent(history -> history.add(getCollectionData()));
+            }
+        };
     }
 
     /**
@@ -162,21 +143,10 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
      * - applying decorators against the current and previous values
      * - storing the collection values as the most recent capture
      */
-    public synchronized void updateCollection() {
-        final Map<GroupName, Alert> alerts = new HashMap<>();
-        final Map<GroupName, Alert> previous_alerts = alerts_;
-        final Consumer<Alert> alert_manager = (Alert alert) -> {
-            Alert combined = combine_alert_with_past_(alert, previous_alerts);
-            alerts.put(combined.getName(), combined);
-        };
-        beginCollection();
-        final Context ctx = new MutableContext(data_, alert_manager);
-
-        final long t0 = System.nanoTime();
-        apply_rules_and_decorators_(ctx);
-        final long t_rule_eval = System.nanoTime();
-        rule_eval_duration_ = Optional.of(Duration.millis(TimeUnit.NANOSECONDS.toMillis(t_rule_eval - t0)));
-        commitCollection(alerts);
+    @Override
+    public synchronized TimeSeriesCollection updateCollection() {
+        // We override, so we can ensure only one runs at any given moment.
+        return super.updateCollection();
     }
 
     /**

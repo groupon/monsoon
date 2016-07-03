@@ -31,7 +31,10 @@
  */
 package com.groupon.lex.metrics;
 
+import com.groupon.lex.metrics.timeseries.Alert;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPairInstance;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.io.IOException;
 import static java.util.Collections.singleton;
@@ -49,14 +52,18 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.stubbing.Answer;
 
 /**
  *
@@ -66,17 +73,48 @@ import org.mockito.runners.MockitoJUnitRunner;
 public class MetricRegistryInstanceTest {
     @Mock
     private GroupGenerator generator, extra_generator;
+    @Mock
+    private MetricRegistryInstance.CollectionContext cctx;
+
+    @Before
+    public void setup() {
+        when(cctx.alertManager()).thenReturn((Alert alert) -> {});
+        when(cctx.tsdata()).thenAnswer(new Answer<TimeSeriesCollectionPair>() {
+            @Override
+            public TimeSeriesCollectionPair answer(InvocationOnMock invocation) throws Throwable {
+                return new TimeSeriesCollectionPairInstance(invocation.getArgumentAt(0, DateTime.class));
+            }
+        });
+    }
+
+    private MetricRegistryInstance create(boolean has_config) {
+        return new MetricRegistryInstance(has_config, (pattern, handler) -> {}) {
+            @Override
+            protected MetricRegistryInstance.CollectionContext beginCollection(DateTime now) {
+                return cctx;
+            }
+        };
+    }
+
+    private MetricRegistryInstance create(boolean has_config, DateTime now) {
+        return new MetricRegistryInstance(() -> now, has_config, (pattern, handler) -> {}) {
+            @Override
+            protected MetricRegistryInstance.CollectionContext beginCollection(DateTime now) {
+                return cctx;
+            }
+        };
+    }
 
     @Test
     public void constructor() {
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create(true, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = create(true)) {
             assertTrue(mr.hasConfig());
 
             assertEquals(Optional.empty(), mr.getRuleEvalDuration());
             assertEquals(Optional.empty(), mr.getProcessorDuration());
         }
 
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = create(false)) {
             assertFalse(mr.hasConfig());
 
             assertEquals(Optional.empty(), mr.getRuleEvalDuration());
@@ -86,7 +124,7 @@ public class MetricRegistryInstanceTest {
 
     @Test
     public void processor_duration_is_remembered() {
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = create(false)) {
             mr.updateProcessorDuration(Duration.standardSeconds(17));
             assertEquals(Optional.of(Duration.standardSeconds(17)), mr.getProcessorDuration());
         }
@@ -97,9 +135,9 @@ public class MetricRegistryInstanceTest {
         when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(new GroupName("test"), Stream.of(new SimpleMetric(new MetricName("x"), 17))))));
         final DateTime now = DateTime.now(DateTimeZone.UTC);
 
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = create(false, now)) {
             mr.add(generator);
-            List<TimeSeriesValue> sgroups = mr.streamGroups(now).collect(Collectors.toList());
+            List<TimeSeriesValue> sgroups = mr.updateCollection().getTSValues().stream().collect(Collectors.toList());
 
             assertThat(sgroups,
                     hasItem(new MutableTimeSeriesValue(now, new GroupName("test"), singletonMap(new MetricName("x"), MetricValue.fromIntValue(17)))));
@@ -113,20 +151,21 @@ public class MetricRegistryInstanceTest {
     public void stream_groups() throws Exception {
         when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(new GroupName("test"), Stream.of(new SimpleMetric(new MetricName("x"), 17))))));
 
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = create(false)) {
             mr.add(generator);
-            mr.streamGroups().collect(Collectors.toList());
+            mr.updateCollection();
         }
 
         verify(generator, times(1)).getGroups();
         verify(generator, times(1)).close();
+        verifyNoMoreInteractions(generator);
     }
 
     @Test
     public void group_names_resolution() throws Exception {
         when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(new GroupName("test"), Stream.of(new SimpleMetric(new MetricName("x"), 17))))));
 
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = create(false)) {
             mr.add(generator);
             assertThat(mr.getGroupNames(),
                     arrayContaining(new GroupName("test")));
@@ -138,12 +177,13 @@ public class MetricRegistryInstanceTest {
         Mockito.doThrow(IOException.class).when(generator).close();
         Mockito.doThrow(IOException.class).when(extra_generator).close();
 
-        try (MetricRegistryInstance mr = MetricRegistryInstance.create(false, (pattern, servlet) -> {})) {
+        try (MetricRegistryInstance mr = create(false)) {
             mr.add(generator);
             mr.add(extra_generator);
         }
 
         verify(generator, times(1)).close();
         verify(generator, times(1)).close();
+        verifyNoMoreInteractions(generator);
     }
 }
