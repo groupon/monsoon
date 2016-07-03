@@ -52,7 +52,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -76,21 +75,18 @@ public class MetricRegistryInstanceTest {
     @Mock
     private MetricRegistryInstance.CollectionContext cctx;
 
-    @Before
-    public void setup() {
-        when(cctx.alertManager()).thenReturn((Alert alert) -> {});
-        when(cctx.tsdata()).thenAnswer(new Answer<TimeSeriesCollectionPair>() {
-            @Override
-            public TimeSeriesCollectionPair answer(InvocationOnMock invocation) throws Throwable {
-                return new TimeSeriesCollectionPairInstance(invocation.getArgumentAt(0, DateTime.class));
-            }
-        });
-    }
-
     private MetricRegistryInstance create(boolean has_config) {
         return new MetricRegistryInstance(has_config, (pattern, handler) -> {}) {
             @Override
             protected MetricRegistryInstance.CollectionContext beginCollection(DateTime now) {
+                when(cctx.alertManager()).thenReturn((Alert alert) -> {});
+                when(cctx.tsdata()).thenAnswer(new Answer<TimeSeriesCollectionPair>() {
+                    @Override
+                    public TimeSeriesCollectionPair answer(InvocationOnMock invocation) throws Throwable {
+                        return new TimeSeriesCollectionPairInstance(now);
+                    }
+                });
+
                 return cctx;
             }
         };
@@ -100,6 +96,14 @@ public class MetricRegistryInstanceTest {
         return new MetricRegistryInstance(() -> now, has_config, (pattern, handler) -> {}) {
             @Override
             protected MetricRegistryInstance.CollectionContext beginCollection(DateTime now) {
+                when(cctx.alertManager()).thenReturn((Alert alert) -> {});
+                when(cctx.tsdata()).thenAnswer(new Answer<TimeSeriesCollectionPair>() {
+                    @Override
+                    public TimeSeriesCollectionPair answer(InvocationOnMock invocation) throws Throwable {
+                        return new TimeSeriesCollectionPairInstance(now);
+                    }
+                });
+
                 return cctx;
             }
         };
