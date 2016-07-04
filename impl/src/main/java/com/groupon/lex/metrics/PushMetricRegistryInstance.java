@@ -74,6 +74,7 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
     private Supplier<DateTime> now_;
     private Optional<Duration> rule_eval_duration_ = Optional.empty();
     private Optional<CollectHistory> history_ = Optional.empty();
+    private final ListMetrics list_metrics_;
 
     public PushMetricRegistryInstance(boolean has_config, EndpointRegistration api) {
         this(() -> DateTime.now(DateTimeZone.UTC), has_config, api);
@@ -83,6 +84,8 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
         super(has_config, api);
         now_ = requireNonNull(now);
         decorators_.add(new MonitorMonitor(this));
+        list_metrics_ = new ListMetrics();
+        getApi().addEndpoint("/monsoon/metrics", list_metrics_);
     }
 
     /** Set the history module that the push processor is to use. */
@@ -126,7 +129,7 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
     private synchronized void commitCollection(Map<GroupName, Alert> alerts) {
         alerts_ = unmodifiableMap(alerts);
         getHistory().ifPresent(history -> history.add(getCollectionData()));
-        ListMetrics.update(data_.getCurrentCollection());
+        list_metrics_.update(data_.getCurrentCollection());
     }
 
     /**
