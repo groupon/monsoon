@@ -127,12 +127,10 @@ public class PipelineBuilder {
         final List<PushProcessor> processors = new ArrayList<>(processor_suppliers.size());
         try {
             final EndpointRegistration epr;
-            if (epr_ == null) {
-                api = new ApiServer(api_sockaddr_);
-                epr = api;
-            } else {
+            if (epr_ == null)
+                epr = api = new ApiServer(api_sockaddr_);
+            else
                 epr = epr_;
-            }
 
             registry = cfg_.create(epr);
             for (PushProcessorSupplier pps : processor_suppliers)
