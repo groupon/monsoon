@@ -41,6 +41,7 @@ import static java.net.InetAddress.getLoopbackAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.Charset;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -64,7 +65,7 @@ public class WavefrontPushProcessor implements PushProcessor {
     }
 
     @Override
-    public void accept(TimeSeriesCollection tsdata, Map<GroupName, Alert> alerts, long failed_collections) {
+    public void accept(TimeSeriesCollection tsdata, Map<GroupName, Alert> alerts, long failed_collections) throws IOException {
         /*
          * Write a line for each metric out to wavefront.
          * Since the documentation for wavefront doesn't claim to reply, we don't bother reading the reply either.
@@ -73,21 +74,16 @@ public class WavefrontPushProcessor implements PushProcessor {
             socket.connect(getHost(), CONNECT_TIMEOUT_SECONDS * 1000);
 
             try (OutputStreamWriter out = new OutputStreamWriter(socket.getOutputStream(), CHARSET)) {
-                tsdata.getTSValues().stream()
+                final Iterator<String> wavefrontStrings = tsdata.getTSValues().stream()
                         .flatMap(WavefrontStrings::wavefrontLine)
-                        .forEach(s -> {
-                            try {
-                                out.write(s);
-                                out.write('\n');
-                            } catch (IOException ex) {
-                                LOG.log(Level.SEVERE, "error while writing to wavefront socket", ex);
-                                throw new RuntimeException("error while writing metrics to wavefront", ex);
-                            }
-                        });
+                        .iterator();
+                while (wavefrontStrings.hasNext()) {
+                    final String line = wavefrontStrings.next();
+                    LOG.log(Level.FINE, "sending line: {0}", line);
+                    out.write(line);
+                    out.write('\n');
+                }
             }
-        } catch (IOException ex) {
-            LOG.log(Level.SEVERE, "IO error with wavefront socket", ex);
-            throw new RuntimeException(ex);
         }
     }
 }
