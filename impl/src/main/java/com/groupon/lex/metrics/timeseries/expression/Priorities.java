@@ -38,21 +38,21 @@ package com.groupon.lex.metrics.timeseries.expression;
 public class Priorities {
     // See `man operators` for the full list of operators and their precedence.
 
-    public static int COMMA = 1;
-    public static int ASSIGNMENT = 2;
-    public static int SELECT = 3;
-    public static int LOGICAL_OR = 4;
-    public static int LOGICAL_AND = 5;
-    public static int BITWISE_OR = 6;
-    public static int BITWISE_XOR = 7;
-    public static int BITWISE_AND = 8;
-    public static int EQUALITY = 9;
-    public static int INEQUALITY = 10;
-    public static int SHIFT = 11;
-    public static int ADDITION = 12;
-    public static int MULTIPLICATION = 13;
-    public static int UNARY = 14;
-    public static int BRACKETS = 15;
+    public static final int COMMA = 1;
+    public static final int ASSIGNMENT = 2;
+    public static final int SELECT = 3;
+    public static final int LOGICAL_OR = 4;
+    public static final int LOGICAL_AND = 5;
+    public static final int BITWISE_OR = 6;
+    public static final int BITWISE_XOR = 7;
+    public static final int BITWISE_AND = 8;
+    public static final int EQUALITY = 9;
+    public static final int INEQUALITY = 10;
+    public static final int SHIFT = 11;
+    public static final int ADDITION = 12;
+    public static final int MULTIPLICATION = 13;
+    public static final int UNARY = 14;
+    public static final int BRACKETS = 15;
 
     private Priorities() {}  // Prevent instantiation.
 }
