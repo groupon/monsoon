@@ -36,7 +36,7 @@ Please refer to the [configuration documentation](doc/config.md).
 Prometheus Integration
 ----
 
-The Prometheus exporter will take all jmx metrics and convert them to a format that Prometheus can scrap
+The Prometheus exporter will take all jmx metrics and convert them to a format that Prometheus can scrape
 [prometheus.jar](doc/prometheus/README.md).
 
 
