@@ -5,7 +5,9 @@
  */
 package com.groupon.lex.metrics.history.xdr;
 
+import static com.groupon.lex.metrics.history.xdr.TSDataFileChainTest.CHAIN_WIDTH;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
+import com.groupon.lex.metrics.history.xdr.support.StreamedCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,8 +31,8 @@ import org.junit.Test;
  * @author ariane
  */
 public class DirCollectHistoryTest {
-    private static final long LIMIT = 16l * 1024 * 1024;
-    private static final long MAX_FILESIZE = 4l * 1024 * 1024;
+    private static final long LIMIT = 4l * 1024 * 1024;
+    private static final long MAX_FILESIZE = 1l * 1024 * 1024;
     private final FileSupport file_support = new FileSupport(Const.MAJOR, Const.MINOR);
     private Path tmpdir;
     private DirCollectHistory hist;
@@ -63,10 +65,8 @@ public class DirCollectHistoryTest {
         // First, grow until 90%, to get an estimate of file size usage.
         int count_until_90_percent = 0;
         while (getTmpdirSize() < 9 * LIMIT / 10) {
-            for (int i = 0; i < TSDataFileChainTest.LARGE_COUNT; ++i) {
-                ++count_until_90_percent;
-                hist.add(iter.next());
-            }
+            ++count_until_90_percent;
+            hist.add(iter.next());
         }
         System.out.println("90% threshold = " + count_until_90_percent);
         // Secondly, add the same amount again.
@@ -85,10 +85,10 @@ public class DirCollectHistoryTest {
 
     @Test
     public void add_all() throws Exception {
-        List<TimeSeriesCollection> tsdata = create_tsdata_().limit(100).collect(Collectors.toList());
+        StreamedCollection<TimeSeriesCollection> tsdata = create_tsdata_().limit(100);
         hist.addAll(tsdata);
 
-        assertEquals(hist.stream().collect(Collectors.toList()), tsdata);
+        assertEquals(tsdata, new StreamedCollection<>(hist::stream));
     }
 
     @Test
@@ -97,7 +97,7 @@ public class DirCollectHistoryTest {
         hist.addAll(tsdata);
         reverse(tsdata);
 
-        assertEquals(hist.streamReversed().collect(Collectors.toList()), tsdata);
+        assertEquals(tsdata, hist.streamReversed().collect(Collectors.toList()));
     }
 
     /** Get the size of all files in tmpdir. */
@@ -115,7 +115,7 @@ public class DirCollectHistoryTest {
         }
     }
 
-    private Stream<TimeSeriesCollection> create_tsdata_() {
-        return file_support.create_tsdata(10000);
+    private StreamedCollection<TimeSeriesCollection> create_tsdata_() {
+        return file_support.create_tsdata(CHAIN_WIDTH);
     }
 }
