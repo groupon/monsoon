@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -37,41 +37,41 @@ import com.groupon.lex.metrics.timeseries.Alert;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import static java.net.InetAddress.getLoopbackAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.Charset;
 import java.util.Map;
-import static java.util.Objects.requireNonNull;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import lombok.Getter;
+import lombok.NonNull;
 
 public class WavefrontPushProcessor implements PushProcessor {
     private static final Logger LOG = Logger.getLogger(WavefrontPushProcessor.class.getName());
     public static final Charset CHARSET = Charset.forName("UTF-8");
     public static final int DEFAULT_PORT = 2878;
-    private final int port_;
-    private final String host_;
+    public static final int CONNECT_TIMEOUT_SECONDS = 15;
+    @Getter
+    private final InetSocketAddress host;
 
     public WavefrontPushProcessor() {
-        this("localhost", DEFAULT_PORT);
+        this(new InetSocketAddress(getLoopbackAddress(), DEFAULT_PORT));
     }
 
-    public WavefrontPushProcessor(String host, int port) {
-        host_ = requireNonNull(host);
-        port_ = port;
-        if (port <= 0 || port > 65535)
-            throw new IllegalArgumentException("invalid TCP port");
+    public WavefrontPushProcessor(@NonNull InetSocketAddress host) {
+        this.host = host;
     }
-
-    public String getHost() { return host_; }
-    public int getPort() { return port_; }
 
     @Override
-    public void accept(TimeSeriesCollection tsdata, Map<GroupName, Alert> alerts) {
+    public void accept(TimeSeriesCollection tsdata, Map<GroupName, Alert> alerts, long failed_collections) {
         /*
          * Write a line for each metric out to wavefront.
          * Since the documentation for wavefront doesn't claim to reply, we don't bother reading the reply either.
          */
-        try (Socket socket = new Socket(host_, port_)) {
+        try (Socket socket = new Socket()) {
+            socket.connect(getHost(), CONNECT_TIMEOUT_SECONDS * 1000);
+
             try (OutputStreamWriter out = new OutputStreamWriter(socket.getOutputStream(), CHARSET)) {
                 tsdata.getTSValues().stream()
                         .flatMap(WavefrontStrings::wavefrontLine)
