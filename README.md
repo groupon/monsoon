@@ -1,5 +1,6 @@
 <img src="Monsoon-Logo.png" Monsoon-Logo.png width="200">
-====
+
+
 Mon-soon
 ====
 
@@ -35,7 +36,7 @@ Please refer to the [configuration documentation](doc/config.md).
 Prometheus Integration
 ----
 
-The Prometheus exporter will take all jmx metrics and convert them to a format that Prometheus can scrap
+The Prometheus exporter will take all jmx metrics and convert them to a format that Prometheus can scrape
 [prometheus.jar](doc/prometheus/README.md).
 
 
@@ -44,3 +45,5 @@ Development
 ----
 
 Development documentation has its [own section](doc/dev/README.md).
+
+[![Build Status](https://travis-ci.org/groupon/monsoon.svg?branch=master)](https://travis-ci.org/groupon/monsoon)

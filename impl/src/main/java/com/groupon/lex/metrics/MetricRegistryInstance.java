@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -57,7 +57,6 @@ import org.joda.time.Duration;
  */
 public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
     private static final Logger logger = Logger.getLogger(MetricRegistryInstance.class.getName());
-    private final String package_name_;
     private final Collection<GroupGenerator> generators_ = new ArrayList<>();
     private long failed_collections_ = 0;
     private final boolean has_config_;
@@ -65,8 +64,7 @@ public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
     private Optional<Duration> processor_duration_ = Optional.empty();
     private final EndpointRegistration api_;
 
-    protected MetricRegistryInstance(String package_name, boolean has_config, EndpointRegistration api) {
-        package_name_ = requireNonNull(package_name);
+    protected MetricRegistryInstance(boolean has_config, EndpointRegistration api) {
         api_ = requireNonNull(api);
         has_config_ = has_config;
         api_.addEndpoint("/monsoon/metrics", new ListMetrics());
@@ -148,12 +146,11 @@ public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
      * Create a plain, uninitialized metric registry.
      *
      * The metric registry is registered under its mbeanObjectName(package_name).
-     * @param package_name The name of the package that owns this registry.
      * @param has_config True if the metric registry will be configured.
      * @return An empty metric registry.
      */
-    public static synchronized MetricRegistryInstance create(String package_name, boolean has_config, EndpointRegistration api) {
-        return new MetricRegistryInstance(package_name, has_config, api);
+    public static synchronized MetricRegistryInstance create(boolean has_config, EndpointRegistration api) {
+        return new MetricRegistryInstance(has_config, api);
     }
 
     /**
@@ -164,23 +161,17 @@ public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
         generators_.forEach((g) -> {
                     try {
                         g.close();
-                    } catch (Throwable t) {
-                        logger.log(Level.SEVERE, "failed to close group generator " + g, t);
+                    } catch (Exception e) {
+                        logger.log(Level.SEVERE, "failed to close group generator " + g, e);
                     }
                 });
-    }
-
-    /**
-     * Returns a support instance, that will manage registrations under the package configured for this MetricRegistry.
-     * @return A supporting class, that helps with registering metrics and groups in the JMX context.
-     */
-    public Support getSupport() {
-        return new Support(package_name_);
-    }
-
-    @Override
-    public String getPackageName() {
-        return package_name_;
+        if (api_ instanceof AutoCloseable) {
+            try {
+                ((AutoCloseable)api_).close();
+            } catch (Exception ex) {
+                logger.log(Level.SEVERE, "unable to close API " + api_.getClass(), ex);
+            }
+        }
     }
 
     @Override

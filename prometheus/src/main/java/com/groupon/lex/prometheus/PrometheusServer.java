@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.api.ApiServer;
 import com.groupon.lex.metrics.config.Configuration;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -84,11 +85,11 @@ public class PrometheusServer {
     }
 
     public static void main(String[] args) throws Exception {
-        final ApiServer api = new ApiServer();
+        final ApiServer api = new ApiServer(new InetSocketAddress(9998));
 
         PrometheusConfig cfg = createPrometheusConfig(args);
         Configuration _cfg = cfg.getConfiguration();
-        registry_ = _cfg.create(_PACKAGE_NAME, api);
+        registry_ = _cfg.create(api);
 
         api.start();
         Runtime.getRuntime().addShutdownHook(new Thread(api::close));
