@@ -44,7 +44,9 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.SimpleMetric;
 import com.groupon.lex.metrics.SimpleMetricGroup;
 import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.collector.httpget.grammar.CollectdTags;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
+import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -54,87 +56,70 @@ import static java.util.Collections.EMPTY_MAP;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
+import static java.util.Collections.unmodifiableMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import static java.util.Objects.requireNonNull;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
+import lombok.NonNull;
 
 /**
  *
  * @author ariane
  */
 public class CollectdPushCollector implements GroupGenerator {
-    private static final Logger LOG = Logger.getLogger(CollectdPushCollector.class.getName());
     public static final String API_ENDPOINT_BASE = "/collectd/jsonpush/";
-    private final static Type collectd_type_ = new TypeToken<List<CollectdMessage>>(){}.getType();
-    private Map<String, DateTime> known_hosts_ = EMPTY_MAP;  // Replaced on each collection.
-    public final static Duration DROP_DURATION = Duration.standardHours(1);
-    private final static Metric UP_METRIC = new SimpleMetric(MetricName.valueOf("up"), Boolean.TRUE);
-    private final static Metric DOWN_METRIC = new SimpleMetric(MetricName.valueOf("up"), Boolean.FALSE);
+    public static final Duration DROP_DURATION = Duration.standardHours(1);
+    private static final Type COLLECTD_TYPE = new TypeToken<List<CollectdMessage>>(){}.getType();
+    private static final Metric UP_METRIC = new SimpleMetric(MetricName.valueOf("up"), Boolean.TRUE);
+    private static final Metric DOWN_METRIC = new SimpleMetric(MetricName.valueOf("up"), Boolean.FALSE);
 
+    private Map<String, DateTime> knownHosts = EMPTY_MAP;  // Replaced on each collection.
+    private final ReadWriteLock messagesGuard = new ReentrantReadWriteLock();  // Protects messages.
+    private final Map<CollectdKey, CollectdMessage> messages = new ConcurrentHashMap<>();
+    @Getter
+    private final SimpleGroupPath basePath;
+
+    @EqualsAndHashCode
     public static class CollectdKey {
         public final String host, plugin, plugin_instance, type, type_instance;
+        public final Map<String, Any2<String, Number>> tags;
 
         public CollectdKey(String host, String plugin, String plugin_instance, String type, String type_instance) {
+            final Map<String, Any2<String, Number>> tags = new HashMap<>();
             this.host = host;
-            this.plugin = plugin;
-            this.plugin_instance = plugin_instance;
+            this.plugin = remove_tags_(plugin, tags);
+            this.plugin_instance = remove_tags_(plugin_instance, tags);
             this.type = type;
             this.type_instance = type_instance;
+            this.tags = unmodifiableMap(tags);
         }
 
-        @Override
-        public int hashCode() {
-            int hash = 5;
-            hash = 43 * hash + Objects.hashCode(this.host);
-            hash = 43 * hash + Objects.hashCode(this.plugin);
-            hash = 43 * hash + Objects.hashCode(this.plugin_instance);
-            hash = 43 * hash + Objects.hashCode(this.type);
-            hash = 43 * hash + Objects.hashCode(this.type_instance);
-            return hash;
-        }
+        private static String remove_tags_(String s, Map<String, Any2<String, Number>> out_tagmap) {
+            final int tags_brace_open = s.indexOf('[');
+            if (tags_brace_open == -1 || !s.endsWith("]"))
+                return s;
 
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final CollectdKey other = (CollectdKey) obj;
-            if (!Objects.equals(this.host, other.host)) {
-                return false;
-            }
-            if (!Objects.equals(this.plugin, other.plugin)) {
-                return false;
-            }
-            if (!Objects.equals(this.plugin_instance, other.plugin_instance)) {
-                return false;
-            }
-            if (!Objects.equals(this.type, other.type)) {
-                return false;
-            }
-            if (!Objects.equals(this.type_instance, other.type_instance)) {
-                return false;
-            }
-            return true;
+            final String tag_string = s.substring(tags_brace_open + 1, s.length() - 1);
+            if (!tag_string.isEmpty()) out_tagmap.putAll(CollectdTags.parse(tag_string));
+
+            return s.substring(0, tags_brace_open);
         }
     }
 
@@ -190,14 +175,23 @@ public class CollectdPushCollector implements GroupGenerator {
         }
 
         public MetricGroup toMetricGroup(SimpleGroupPath base_path) {
+            final CollectdKey key = getKey();  // Use key, as it parses the tags for us.
+            final Map<String, MetricValue> tag_map = new HashMap<String, MetricValue>() {{
+                put("host", MetricValue.fromStrValue(host));
+                putAll(key.tags.entrySet().stream()
+                        .collect(Collectors.toMap(
+                                Map.Entry::getKey,
+                                (entry -> entry.getValue().mapCombine(MetricValue::fromStrValue, MetricValue::fromNumberValue)))));
+            }};
+
             final GroupName group = GroupName.valueOf(
                     SimpleGroupPath.valueOf(Stream.concat(
                             base_path.getPath().stream(),
-                            Stream.of(plugin, plugin_instance)
+                            Stream.of(key.plugin, key.plugin_instance)
                                     .filter(x -> x != null)
                                     .filter(s -> !s.isEmpty()))
                             .collect(Collectors.toList())),
-                    Tags.valueOf(singletonMap("host", MetricValue.fromStrValue(host))));
+                    Tags.valueOf(tag_map));
 
             final List<SimpleMetric> entries = new ArrayList<>(metricCount());
             for (int i = 0; i < metricCount(); ++i)
@@ -212,12 +206,12 @@ public class CollectdPushCollector implements GroupGenerator {
 
         @Override
         protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-            final List<CollectdMessage> msgs = gson.fromJson(req.getReader(), collectd_type_);
+            final List<CollectdMessage> msgs = gson.fromJson(req.getReader(), COLLECTD_TYPE);
 
-            final Lock lck = messages_guard_.readLock();
+            final Lock lck = messagesGuard.readLock();
             lck.lock();
             try {
-                msgs.forEach(msg -> messages_.put(msg.getKey(), msg));
+                msgs.forEach(msg -> messages.put(msg.getKey(), msg));
             } finally {
                 lck.unlock();
             }
@@ -227,16 +221,11 @@ public class CollectdPushCollector implements GroupGenerator {
         }
     }
 
-    private final ReadWriteLock messages_guard_ = new ReentrantReadWriteLock();  // Protects messages_
-    private final Map<CollectdKey, CollectdMessage> messages_ = new ConcurrentHashMap<>();
-    private final SimpleGroupPath base_path_;
-
-    public CollectdPushCollector(EndpointRegistration er, SimpleGroupPath base_path, String name) {
-        requireNonNull(name);
+    public CollectdPushCollector(@NonNull EndpointRegistration er, @NonNull SimpleGroupPath base_path, @NonNull String name) {
         if (name.isEmpty()) throw new IllegalArgumentException("empty endpoint name");
 
         er.addEndpoint(API_ENDPOINT_BASE + name, new Endpoint());
-        base_path_ = requireNonNull(base_path);
+        basePath = base_path;
     }
 
     @Override
@@ -244,24 +233,24 @@ public class CollectdPushCollector implements GroupGenerator {
         final DateTime now = new DateTime(DateTimeZone.UTC);
         final DateTime drop = now.minus(DROP_DURATION);
 
-        Lock lck = messages_guard_.writeLock();
+        Lock lck = messagesGuard.writeLock();
         lck.lock();
         try {
             // Transform all messages into metrics.
-            final Stream<MetricGroup> msg_stream = messages_.values().stream()
-                    .map(cm -> cm.toMetricGroup(base_path_))
+            final Stream<MetricGroup> msg_stream = messages.values().stream()
+                    .map(cm -> cm.toMetricGroup(basePath))
                     .flatMap(mg -> Arrays.stream(mg.getMetrics()).map(m -> SimpleMapEntry.create(mg.getName(), m)))
                     .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.mapping(Map.Entry::getValue, Collectors.toList())))
                     .entrySet()
                     .stream()
                     .map((Map.Entry<GroupName, List<Metric>> entry) -> new SimpleMetricGroup(entry.getKey(), entry.getValue()));
             // Collect the set of hosts that are 'up'.
-            final Set<String> up_hosts = messages_.values().stream()
+            final Set<String> up_hosts = messages.values().stream()
                     .map(msg -> msg.host)
                     .distinct()
                     .collect(Collectors.toSet());
             // Collect the set of hosts that are 'down'.
-            final Map<String, DateTime> down_hosts = known_hosts_.entrySet().stream()
+            final Map<String, DateTime> down_hosts = knownHosts.entrySet().stream()
                     .filter(entry -> entry.getValue().isAfter(drop))  // Don't remember host names for ever.
                     .filter(entry -> !up_hosts.contains(entry.getKey())) // No need to remember hosts that emitted metrics.
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
@@ -271,7 +260,7 @@ public class CollectdPushCollector implements GroupGenerator {
             final Stream<MetricGroup> down_hosts_stream = down_hosts.keySet().stream()
                     .map(host -> up_down_host_(host, false));
             // Replace the map of known hosts.
-            known_hosts_ = Stream.concat(down_hosts.entrySet().stream(), up_hosts.stream().map(host -> SimpleMapEntry.create(host, now)))
+            knownHosts = Stream.concat(down_hosts.entrySet().stream(), up_hosts.stream().map(host -> SimpleMapEntry.create(host, now)))
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
             // Done, return result.
@@ -280,7 +269,7 @@ public class CollectdPushCollector implements GroupGenerator {
                             .flatMap(Function.identity())
                             .collect(Collectors.toList()));
         } finally {
-            messages_.clear();
+            messages.clear();
             lck.unlock();
         }
     }
@@ -292,6 +281,4 @@ public class CollectdPushCollector implements GroupGenerator {
                 Tags.valueOf(singletonMap("host", MetricValue.fromStrValue(host))));
         return new SimpleMetricGroup(group, singleton(up ? UP_METRIC : DOWN_METRIC));
     }
-
-    public SimpleGroupPath getBasePath() { return base_path_; }
 }
