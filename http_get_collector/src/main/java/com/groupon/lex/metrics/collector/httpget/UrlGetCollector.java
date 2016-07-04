@@ -80,6 +80,7 @@ import org.joda.time.Interval;
 public class UrlGetCollector implements GroupGenerator {
     private static final Logger LOG = Logger.getLogger(UrlGetCollector.class.getName());
     public static final int TIMEOUT_SECONDS = 10;
+    public static final int OVERALL_TIMEOUT_SECONDS = 30;
     private final SimpleGroupPath base_group_name_;
     private final UrlPattern patterns_;
     private final RequestConfig request_config_ = RequestConfig.custom()
@@ -302,7 +303,7 @@ public class UrlGetCollector implements GroupGenerator {
         return successResult(urls.stream()
                 .map(f -> {
                     try {
-                        return Optional.of(f.get(5, TimeUnit.SECONDS));
+                        return Optional.of(f.get(OVERALL_TIMEOUT_SECONDS, TimeUnit.SECONDS));
                     } catch (TimeoutException ex) {
                         LOG.log(Level.SEVERE, "Http Request never completed", ex);
                         f.cancel(true);
