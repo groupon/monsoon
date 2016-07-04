@@ -25,12 +25,16 @@ import java.util.stream.StreamSupport;
  */
 public class HistoryContext implements Context {
     private static class TSCPair extends AbstractTSCPair {
-        private TimeSeriesCollection current_;
-        private final Iterator<TimeSeriesCollection> iter_;
+        private final TimeSeriesCollection current_;
 
-        public TSCPair(Iterator<TimeSeriesCollection> iter) {
-            iter_ = requireNonNull(iter);
+        public TSCPair() {
             current_ = null;
+        }
+
+        private TSCPair(TSCPair origin, TimeSeriesCollection next, ExpressionLookBack lookback) {
+            super(origin);
+            if (origin.current_ != null) update(origin.current_, lookback);
+            current_ = next;
         }
 
         @Override
@@ -39,37 +43,39 @@ public class HistoryContext implements Context {
             return current_;
         }
 
-        public boolean hasNext() { return iter_.hasNext(); }
-
-        public void advance(ExpressionLookBack lookback) {
-            if (current_ != null) update(current_, lookback);
-            current_ = iter_.next();
+        public TSCPair advance(TimeSeriesCollection next, ExpressionLookBack lookback) {
+            return new TSCPair(this, next, lookback);
         }
     }
 
-    private class IteratorImpl implements Iterator<Context> {
+    private static class IteratorImpl implements Iterator<Context> {
         private final ExpressionLookBack lookback_;
+        private final Iterator<TimeSeriesCollection> tsdata_iter_;
+        private TSCPair previous_;
 
-        public IteratorImpl(ExpressionLookBack lookback) {
+        public IteratorImpl(Iterator<TimeSeriesCollection> tsdata_iter, ExpressionLookBack lookback) {
             lookback_ = requireNonNull(lookback);
+            tsdata_iter_ = requireNonNull(tsdata_iter);
+            previous_ = new TSCPair();
         }
 
         @Override
         public boolean hasNext() {
-            return tsdata_.hasNext();
+            return tsdata_iter_.hasNext();
         }
 
         @Override
         public Context next() {
-            advance(lookback_);
-            return HistoryContext.this;
+            final TSCPair next = previous_.advance(tsdata_iter_.next(), lookback_);
+            previous_ = next;
+            return new HistoryContext(next);
         }
     }
 
     private final TSCPair tsdata_;
 
-    private HistoryContext(Iterator<TimeSeriesCollection> tsdata_iter) {
-        tsdata_ = new TSCPair(tsdata_iter);
+    private HistoryContext(TSCPair tsdata) {
+        tsdata_ = requireNonNull(tsdata);
     }
 
     @Override
@@ -87,14 +93,6 @@ public class HistoryContext implements Context {
         return EMPTY_MAP;
     }
 
-    public void advance(ExpressionLookBack lookback) {
-        tsdata_.advance(lookback);
-    }
-
-    private Iterator<Context> as_iterator_(ExpressionLookBack lookback) {
-        return new IteratorImpl(lookback);
-    }
-
     public static Iterator<Context> asIterator(Stream<TimeSeriesCollection> tsdata_stream, ExpressionLookBack lookback) {
         return asIterator(tsdata_stream.iterator(), lookback);
     }
@@ -104,7 +102,7 @@ public class HistoryContext implements Context {
     }
 
     public static Iterator<Context> asIterator(Iterator<TimeSeriesCollection> tsdata_stream, ExpressionLookBack lookback) {
-        return new HistoryContext(tsdata_stream).as_iterator_(lookback);
+        return new IteratorImpl(tsdata_stream, lookback);
     }
 
     public static Stream<Context> stream(Stream<TimeSeriesCollection> tsdata_stream, ExpressionLookBack lookback) {
