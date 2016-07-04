@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -37,6 +37,7 @@ import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import static java.util.Collections.EMPTY_MAP;
 import static java.util.Collections.singletonMap;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import static org.hamcrest.CoreMatchers.hasItem;
@@ -103,7 +104,7 @@ public class TimeSeriesCollectionPairInstanceTest {
         collection0.getData().values().forEach(ts_data.getCurrentCollection()::add);
 
         assertEquals(collection1.getTimestamp(), ts_data.getPreviousCollection().getTimestamp());
-        assertEquals(collection1.getTSValues(), ts_data.getPreviousCollection().getTSValues());
+        assertEquals(new HashSet<>(collection1.getTSValues()), new HashSet<>(ts_data.getPreviousCollection().getTSValues()));
         assertEquals(collection0, ts_data.getCurrentCollection());
     }
 

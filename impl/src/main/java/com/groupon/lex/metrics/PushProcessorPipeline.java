@@ -36,6 +36,7 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.util.ArrayList;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.unmodifiableMap;
 import java.util.List;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
@@ -80,7 +81,7 @@ public class PushProcessorPipeline extends AbstractProcessor<PushMetricRegistryI
     private void run_implementation_(PushProcessor p) throws Exception {
         final Map<GroupName, Alert> alerts = registry_.getCollectionAlerts();
         final TimeSeriesCollection tsdata = registry_.getCollectionData();
-        p.accept(tsdata, alerts);
+        p.accept(tsdata, unmodifiableMap(alerts), registry_.getFailedCollections());
     }
 
     /**

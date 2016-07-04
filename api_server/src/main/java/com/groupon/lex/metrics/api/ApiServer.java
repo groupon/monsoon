@@ -10,9 +10,11 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
@@ -31,7 +33,23 @@ public class ApiServer implements AutoCloseable, EndpointRegistration {
     private final ServletContextHandler servlet_handler;
 
     public ApiServer(InetSocketAddress address) {
-        server_ = new Server(address);
+        server_ = new Server();
+        /* Handle address logic. */ {
+            final ServerConnector server_connector_ = new ServerConnector(server_);
+            server_connector_.setReuseAddress(true);
+            if (address.getAddress() != null) {
+                if (!address.getAddress().isAnyLocalAddress()) {
+                    LOG.log(Level.INFO, "Binding API server address: {0}", address.getAddress().getHostAddress());
+                    server_connector_.setHost(address.getAddress().getHostAddress());
+                }
+            } else if (address.getHostString() != null) {
+                LOG.log(Level.INFO, "Binding API server address name: {0}", address.getHostString());
+                server_connector_.setHost(address.getHostString());
+            }
+            LOG.log(Level.INFO, "Binding API server port: {0}", address.getPort());
+            server_connector_.setPort(address.getPort());
+            server_.setConnectors(new Connector[]{ server_connector_ });
+        }
 
         final HandlerList chain = new HandlerList();
         {
@@ -77,6 +95,7 @@ public class ApiServer implements AutoCloseable, EndpointRegistration {
     }
 
     public void start() throws Exception {
+        LOG.log(Level.INFO, "starting API server");
         server_.start();
     }
 
@@ -92,6 +111,7 @@ public class ApiServer implements AutoCloseable, EndpointRegistration {
 
     @Override
     public void addEndpoint(String pattern, HttpServlet servlet) {
+        LOG.log(Level.INFO, "registering API endpoint {0} => {1}", new Object[]{pattern, servlet});
         servlet_handler.addServlet(new ServletHolder(servlet), pattern);
     }
 }

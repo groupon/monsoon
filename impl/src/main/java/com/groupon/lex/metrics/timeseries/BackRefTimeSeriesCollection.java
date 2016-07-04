@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -38,6 +38,7 @@ import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import gnu.trove.map.hash.THashMap;
 import java.util.Collection;
+import static java.util.Collections.unmodifiableCollection;
 import static java.util.Collections.unmodifiableSet;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -45,7 +46,6 @@ import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Stream;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
@@ -135,8 +135,8 @@ public class BackRefTimeSeriesCollection implements TimeSeriesCollection {
     }
 
     @Override
-    public TimeSeriesValueSet getTSValues() {
-        return new TimeSeriesValueSet(data_.values().stream());
+    public Collection<TimeSeriesValue> getTSValues() {
+        return unmodifiableCollection(data_.values());
     }
 
     @Override
@@ -158,7 +158,7 @@ public class BackRefTimeSeriesCollection implements TimeSeriesCollection {
         return Optional.ofNullable(data_.get(name));
     }
 
-    public BackRefTimeSeriesCollection merge(DateTime timestamp, Stream<TimeSeriesValue> values) {
+    public BackRefTimeSeriesCollection merge(DateTime timestamp, Collection<TimeSeriesValue> values) {
         requireNonNull(values);
         timestamp_ = requireNonNull(timestamp);
 
@@ -179,7 +179,7 @@ public class BackRefTimeSeriesCollection implements TimeSeriesCollection {
     }
 
     public BackRefTimeSeriesCollection merge(MutableTimeSeriesCollection c) {
-        return merge(c.getTimestamp(), c.getData().values().stream());
+        return merge(c.getTimestamp(), c.getData().values());
     }
 
     @Override

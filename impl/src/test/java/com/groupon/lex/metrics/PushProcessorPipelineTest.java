@@ -70,14 +70,14 @@ public class PushProcessorPipelineTest {
                     run_implementation_called.complete(null);
                     return null;
                 })
-                .when(processor).accept(Mockito.any(), Mockito.any());
+                .when(processor).accept(Mockito.any(), Mockito.any(), Mockito.anyLong());
 
         try (PushProcessorPipeline impl = new PushProcessorPipeline(registry, 10, processor)) {
             impl.start();
             run_implementation_called.get();
         }
 
-        Mockito.verify(processor, Mockito.times(1)).accept(Mockito.any(), Mockito.any());
+        Mockito.verify(processor, Mockito.times(1)).accept(Mockito.any(), Mockito.any(), Mockito.anyLong());
     }
 
     @Test(timeout = 25000)
@@ -90,13 +90,13 @@ public class PushProcessorPipelineTest {
                     run_implementation_called.complete(null);
                     return null;
                 })
-                .when(processor).accept(Mockito.any(), Mockito.any());
+                .when(processor).accept(Mockito.any(), Mockito.any(), Mockito.anyLong());
 
         try (PushProcessorPipeline impl = new PushProcessorPipeline(registry, 10, processor)) {
             impl.start();
             run_implementation_called.get();
         }
 
-        Mockito.verify(processor, Mockito.times(2)).accept(Mockito.any(), Mockito.any());
+        Mockito.verify(processor, Mockito.times(2)).accept(Mockito.any(), Mockito.any(), Mockito.anyLong());
     }
 }

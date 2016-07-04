@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -57,7 +57,7 @@ public class ListMetrics extends HttpServlet {
     private static final Logger LOG = Logger.getLogger(ListMetrics.class.getName());
     private final static Charset UTF8 = Charset.forName("UTF-8");
     private final static String INDENT = "    ";
-    private final static AtomicReference<List<TimeSeriesValue>> ts_data_ = new AtomicReference<>(EMPTY_LIST);
+    private final AtomicReference<List<TimeSeriesValue>> ts_data_ = new AtomicReference<>(EMPTY_LIST);
 
     private static void render_(StringBuilder out, String indent, List<TimeSeriesValue> ts_data) {
         ts_data.stream()
@@ -104,11 +104,11 @@ public class ListMetrics extends HttpServlet {
         return buf;
     }
 
-    private static StringBuilder render_() {
+    private StringBuilder render_() {
         return render_(ts_data_.get());
     }
 
-    public static void update(TimeSeriesCollection ts_data) {
+    public void update(TimeSeriesCollection ts_data) {
         ts_data_.set(ts_data.getTSValues().stream().collect(Collectors.toList()));
     }
 

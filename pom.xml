@@ -119,11 +119,16 @@
                     <forkCount>1</forkCount>
                     <perCoreThreadCount>true</perCoreThreadCount>
                     <threadCount>1</threadCount>
-                    <argLine>${surefireArgLine} -Xms2G -Xmx6G -XX:NewRatio=2 -XX:SurvivorRatio=2 -XX:MaxNewSize=2G</argLine>
+                    <argLine>${surefireArgLine} -Xmx2G</argLine>
                     <enableAssertions>true</enableAssertions>
                     <reuseForks>true</reuseForks>
                     <parallel>all</parallel>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>3.0.2</version>
             </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>

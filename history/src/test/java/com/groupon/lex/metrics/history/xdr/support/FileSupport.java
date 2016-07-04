@@ -3,12 +3,13 @@ package com.groupon.lex.metrics.history.xdr.support;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.io.IOException;
+import static java.lang.Math.sqrt;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
@@ -20,9 +21,9 @@ import static java.nio.file.StandardOpenOption.READ;
 import static java.nio.file.StandardOpenOption.WRITE;
 import static java.util.Collections.singletonMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 import org.joda.time.DateTime;
@@ -49,7 +50,7 @@ public class FileSupport {
         this.minor = minor;
     }
 
-    /** Create a 0.0 file. */
+    /** Create a file. */
     public void create_file(Path file, List<? extends TimeSeriesCollection> tsdata) throws IOException {
         final Writer writer;
         switch(major) {
@@ -90,40 +91,40 @@ public class FileSupport {
     }
 
     /** Generates an endless stream of TimeSeriesCollections. */
-    public Stream<TimeSeriesCollection> create_tsdata(int width) {
-        SimpleGroupPath base_path = new SimpleGroupPath("foo", "bar");
+    public StreamedCollection<TimeSeriesCollection> create_tsdata(int width) {
+        int metric_width = (int)sqrt(width) + 1;
+        int group_width = (width + metric_width - 1) / metric_width;
 
-        return Stream.generate(
-                new Supplier<Integer>() {
-                    private int idx = 0;
+        final SimpleGroupPath base_path = NameCache.singleton.newSimpleGroupPath("foo", "bar");
+        final List<GroupName> group_names = Stream.generate(new CounterSupplier())
+                .limit(group_width)
+                .map(idx -> NameCache.singleton.newTags(singletonMap("instance", MetricValue.fromIntValue(idx))))
+                .map(tags -> NameCache.singleton.newGroupName(base_path, tags))
+                .collect(Collectors.toList());
+        final List<MetricName> metric_names = Stream.generate(new CounterSupplier())
+                .limit(metric_width)
+                .map(i -> (new MetricName("x", String.valueOf(i))))
+                .collect(Collectors.toList());
 
-                    @Override
-                    public Integer get() {
-                        return idx++;
-                    }
-                })
-                .map(new Function<Integer, TimeSeriesCollection>() {
-                    public FileTimeSeriesCollection apply(Integer i) {
-                        final DateTime now = NOW.plusMinutes(i);
-                        Map<MetricName, MetricValue> metrics = singletonMap(new MetricName("x"), MetricValue.fromIntValue(i));
+        return new StreamedCollection<>(() -> Stream.generate(new CounterSupplier()))
+                .map((Integer i) -> {
+                    final DateTime now = NOW.plusMinutes(i);
+                    final MetricValue value = MetricValue.fromIntValue(i);
 
-                        final Stream<TimeSeriesValue> tsv_stream = Stream.generate(
-                                new Supplier<Integer>() {
-                                    private int idx = 0;
+                    final Stream<TimeSeriesValue> tsv_stream = group_names.stream()
+                            .map(name -> new MutableTimeSeriesValue(now, name, metric_names.stream(), Function.identity(), (ignored) -> value));
 
-                                    @Override
-                                    public Integer get() {
-                                        return idx++;
-                                    }
-                                })
-                                .map(idx -> {
-                                    return new MutableTimeSeriesValue(now,
-                                            new GroupName(base_path, new Tags(singletonMap("instance", MetricValue.fromIntValue(idx)))),
-                                            metrics);
-                                });
-
-                        return new FileTimeSeriesCollection(now, tsv_stream.limit(width));
-                    }
+                    return new FileTimeSeriesCollection(now, tsv_stream);
                 });
     }
+
+    private static class CounterSupplier implements Supplier<Integer> {
+        private int idx = 0;
+
+        @Override
+        public Integer get() {
+            return idx++;
+        }
+    }
+
 }

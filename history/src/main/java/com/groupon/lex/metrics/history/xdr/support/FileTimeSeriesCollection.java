@@ -10,6 +10,7 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
 import gnu.trove.map.hash.THashMap;
 import java.util.Collection;
+import static java.util.Collections.unmodifiableCollection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -91,10 +92,11 @@ public class FileTimeSeriesCollection implements TimeSeriesCollection {
     }
 
     @Override
-    public TimeSeriesValueSet getTSValues() {
-        return new TimeSeriesValueSet(path_map_.values().stream()
+    public Collection<TimeSeriesValue> getTSValues() {
+        return unmodifiableCollection(path_map_.values().stream()
                 .map(Map::values)
-                .flatMap(Collection::stream));
+                .flatMap(Collection::stream)
+                .collect(Collectors.toList()));
     }
 
     @Override

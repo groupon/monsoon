@@ -46,3 +46,10 @@ Advanced Development
 
 To change the inner guts of the project is quite a bit more advanced.
 I should also really document this...
+
+Code Quality
+------------
+
+Preliminary support for Sonarqube has been added to this project. To receive a
+Sonarqube report, run `mvn sonar:sonar`. This assumes that you are running Sonar
+locally.

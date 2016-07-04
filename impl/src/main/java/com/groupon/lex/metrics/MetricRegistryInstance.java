@@ -31,7 +31,6 @@
  */
 package com.groupon.lex.metrics;
 
-import com.groupon.lex.metrics.api.endpoints.ListMetrics;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -67,7 +66,6 @@ public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
     protected MetricRegistryInstance(boolean has_config, EndpointRegistration api) {
         api_ = requireNonNull(api);
         has_config_ = has_config;
-        api_.addEndpoint("/monsoon/metrics", new ListMetrics());
     }
 
     @Override
