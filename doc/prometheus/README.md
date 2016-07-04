@@ -15,6 +15,6 @@ It is recommended that 5 seconds be the minimum that the scrape interval is set 
 Invocation
 ----
 
-    java -jar prometheus.jar prometheus_port=9001 prometheus_path=/metrics
+    java -jar prometheus.jar prometheus_port=9001 prometheus_path=/metrics config=/config.cfg
     
     If there is no port set it will default to port 9001 and if there is no path set it will default to /metrics 
