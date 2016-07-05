@@ -32,10 +32,8 @@
 package com.groupon.lex.metrics.processors.wavefront;
 
 import com.groupon.lex.metrics.GroupName;
-import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
@@ -83,26 +81,44 @@ public class WavefrontStrings {
                 .collect(Collectors.joining(".")));
     }
 
-    /** Create a map of tags for wavefront. */
+    /**
+     * Transform a tag entry into a wavefront tag.
+     *
+     * Double quotes in the tag value will be escaped.
+     */
+    private static Optional<Map.Entry<String, String>> createTagEntry(Map.Entry<String, MetricValue> tag_entry) {
+        final Optional<String> opt_tag_value = tag_entry.getValue().asString();
+        return opt_tag_value
+                .map(tag_value -> SimpleMapEntry.create(name(tag_entry.getKey()), tag_value.replace("\"", "\\\"")));
+    }
+
+    /**
+     * Truncate tag keys and values, to prevent them from exceeding the max length of a tag entry.
+     */
+    private static Map.Entry<String, String> maybeTruncateTagEntry(Map.Entry<String, String> tag_entry) {
+        String k = tag_entry.getKey();
+        String v = tag_entry.getValue();
+        if (k.length() + v.length() <= MAX_TAG_KEY_VAL_CHARS - 2)  // 2 chars for the quotes around the value
+            return tag_entry;
+
+        if (k.length() > TRUNCATE_TAG_NAME)
+            k = k.substring(0, TRUNCATE_TAG_NAME);
+        if (k.length() + v.length() > MAX_TAG_KEY_VAL_CHARS - 2)
+            v = v.substring(0, MAX_TAG_KEY_VAL_CHARS - 2 - k.length());
+        return SimpleMapEntry.create(k, v);
+    }
+
+    /**
+     * Create a map of tags for wavefront.
+     *
+     * The tag values are escaped and should be surrounded by double quotes.
+     * This function does not put the surrounding quotes around the tag values.
+     */
     public static Map<String, String> tags(Tags tags) {
         return tags.stream()
-                .map(tag -> {
-                    return tag.getValue().asString()
-                            .map(v -> v.replace('"', '\''))
-                            .map(s -> SimpleMapEntry.create(name(tag.getKey()), s));
-                })
+                .map(WavefrontStrings::createTagEntry)
                 .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
-                .map(entry -> {
-                    String k = entry.getKey();
-                    String v = entry.getValue();
-                    if (k.length() + v.length() > MAX_TAG_KEY_VAL_CHARS - 2) {  // 2 chars for the quotes around the value
-                        if (k.length() > TRUNCATE_TAG_NAME) k = k.substring(0, TRUNCATE_TAG_NAME);
-                        if (k.length() + v.length() > MAX_TAG_KEY_VAL_CHARS)
-                            v = v.substring(0, MAX_TAG_KEY_VAL_CHARS - 2 - k.length());
-                    }
-
-                    return SimpleMapEntry.create(k, '"' + v + '"');
-                })
+                .map(WavefrontStrings::maybeTruncateTagEntry)
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
@@ -149,51 +165,11 @@ public class WavefrontStrings {
                             .append("source=").append(source)
                             .append(' ')
                             .append(tag_map.entrySet().stream()
-                                    .map(entry -> entry.getKey() + "=" + entry.getValue())
+                                    .map(entry -> entry.getKey() + "=\"" + entry.getValue() + '\"')
                                     .collect(Collectors.joining(" "))
                             )
                             .toString();
                 });
-    }
-
-    /**
-     * Emits a series of histogram metrics, based on an input metric value.
-     *
-     * If the metric value does not hold a histogram, an empty Stream is returned.
-     */
-    public static Stream<Map.Entry<String, MetricValue>> expandHistogram(MetricValue v) {
-        return v.histogram()
-                .map(h -> {
-                    /** hne: histogram, not empty. */
-                    final Optional<Histogram> hne = Optional.of(h)
-                            .filter(hh -> !hh.isEmpty());
-
-                    final Stream<Map.Entry<String, Optional<Double>>> extra = Stream.of(
-                            SimpleMapEntry.create("min", h.min()),
-                            SimpleMapEntry.create("max", h.max()),
-                            SimpleMapEntry.create("avg", h.avg()),
-                            SimpleMapEntry.create("sum", Optional.of(h.sum())),
-                            SimpleMapEntry.create("count", Optional.of(h.getEventCount())),
-                            SimpleMapEntry.create("p50", hne.map(hh -> hh.percentile(50))),
-                            SimpleMapEntry.create("p75", hne.map(hh -> hh.percentile(75))),
-                            SimpleMapEntry.create("p85", hne.map(hh -> hh.percentile(85))),
-                            SimpleMapEntry.create("p90", hne.map(hh -> hh.percentile(90))),
-                            SimpleMapEntry.create("p95", hne.map(hh -> hh.percentile(95))),
-                            SimpleMapEntry.create("p99", hne.map(hh -> hh.percentile(99))),
-                            SimpleMapEntry.create("p995", hne.map(hh -> hh.percentile(99.5))),
-                            SimpleMapEntry.create("p999", hne.map(hh -> hh.percentile(99.9))),
-                            SimpleMapEntry.create("p9995", hne.map(hh -> hh.percentile(99.95))),
-                            SimpleMapEntry.create("p9999", hne.map(hh -> hh.percentile(99.99))),
-                            SimpleMapEntry.create("p99995", hne.map(hh -> hh.percentile(99.995))),
-                            SimpleMapEntry.create("p99999", hne.map(hh -> hh.percentile(99.999))),
-                            SimpleMapEntry.create("p999995", hne.map(hh -> hh.percentile(99.9995))),
-                            SimpleMapEntry.create("p999999", hne.map(hh -> hh.percentile(99.9999))));
-                    return extra;
-                })
-                .orElseGet(Stream::empty)
-                .map(entry -> SimpleMapEntry.create(entry.getKey(), entry.getValue().map(MetricValue::fromDblValue)))
-                .map(entry -> entry.getValue().map(val -> SimpleMapEntry.create(entry.getKey(), val)))
-                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty));
     }
 
     /**
@@ -203,18 +179,6 @@ public class WavefrontStrings {
      */
     public static Stream<String> wavefrontLine(TimeSeriesValue tsv) {
         return tsv.getMetrics().entrySet().stream()
-                .flatMap(metric_entry -> {
-                    return Stream.concat(
-                            expandHistogram(metric_entry.getValue())
-                                    .map(v -> {
-                                        final MetricName mname = NameCache.singleton.newMetricName(Stream.concat(
-                                                        metric_entry.getKey().getPath().stream(),
-                                                        Stream.of(v.getKey()))
-                                                .collect(Collectors.toList()));
-                                        return SimpleMapEntry.create(mname, v.getValue());
-                                    }),
-                            Stream.of(metric_entry));
-                })
                 .map(metric_entry -> wavefrontLine(tsv.getTimestamp(), tsv.getGroup(), metric_entry.getKey(), metric_entry.getValue()))
                 .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty));
     }

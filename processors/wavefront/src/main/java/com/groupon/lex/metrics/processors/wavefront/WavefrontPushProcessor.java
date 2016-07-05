@@ -48,12 +48,12 @@ import java.util.logging.Logger;
 import lombok.Getter;
 import lombok.NonNull;
 
+@Getter
 public class WavefrontPushProcessor implements PushProcessor {
     private static final Logger LOG = Logger.getLogger(WavefrontPushProcessor.class.getName());
     public static final Charset CHARSET = Charset.forName("UTF-8");
     public static final int DEFAULT_PORT = 2878;
     public static final int CONNECT_TIMEOUT_SECONDS = 15;
-    @Getter
     private final InetSocketAddress host;
 
     public WavefrontPushProcessor() {
@@ -80,8 +80,7 @@ public class WavefrontPushProcessor implements PushProcessor {
                 while (wavefrontStrings.hasNext()) {
                     final String line = wavefrontStrings.next();
                     LOG.log(Level.FINE, "sending line: {0}", line);
-                    out.write(line);
-                    out.write('\n');
+                    out.write(line + '\n');
                 }
             }
         }
