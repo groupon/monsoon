@@ -129,7 +129,7 @@ public class WavefrontStrings {
      */
     public static Optional<String> wavefrontValue(MetricValue mv) {
         // Omit NaN and Inf.
-        if (mv.getFltValue() != null && (mv.getFltValue().isInfinite() || mv.getFltValue().isNaN())) return Optional.empty();
+        if (mv.isInfiniteOrNaN()) return Optional.empty();
         return mv.value().map(Number::toString);
     }
 
