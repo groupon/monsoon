@@ -27,6 +27,12 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
     private static final Logger LOG = Logger.getLogger(AbstractTSCPair.class.getName());
     private List<BackRefTimeSeriesCollection> previous_ = new ArrayList<>();
 
+    protected AbstractTSCPair() {}
+
+    protected AbstractTSCPair(AbstractTSCPair original) {
+        original.previous_.forEach(previous_::add);
+    }
+
     public void initWithHistoricalData(CollectHistory history, ExpressionLookBack lookback) {
         if (!previous_.isEmpty()) {
             LOG.log(Level.WARNING, "skipping historical data initialization, as data is already present");
