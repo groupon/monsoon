@@ -23,11 +23,6 @@
         <project.build.targetJdk>1.8</project.build.targetJdk>
     </properties>
 
-<!--
-    <dependencies>
-    </dependencies>
-  -->
-
     <build>
         <finalName>${project.artifactId}</finalName>
         <plugins>
