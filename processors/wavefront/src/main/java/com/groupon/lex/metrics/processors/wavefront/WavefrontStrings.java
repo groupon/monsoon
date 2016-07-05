@@ -82,6 +82,15 @@ public class WavefrontStrings {
     }
 
     /**
+     * Does the escaping of tag values.
+     *
+     * This function assumes you'll put double quotes ('"') around your tag value.
+     */
+    private static String escapeTagValue(String tag_value) {
+        return tag_value.replace("\"", "\\\"");
+    }
+
+    /**
      * Transform a tag entry into a wavefront tag.
      *
      * Double quotes in the tag value will be escaped.
@@ -89,7 +98,7 @@ public class WavefrontStrings {
     private static Optional<Map.Entry<String, String>> createTagEntry(Map.Entry<String, MetricValue> tag_entry) {
         final Optional<String> opt_tag_value = tag_entry.getValue().asString();
         return opt_tag_value
-                .map(tag_value -> SimpleMapEntry.create(name(tag_entry.getKey()), tag_value.replace("\"", "\\\"")));
+                .map(tag_value -> SimpleMapEntry.create(name(tag_entry.getKey()), escapeTagValue(tag_value)));
     }
 
     /**
@@ -148,7 +157,8 @@ public class WavefrontStrings {
         return Optional.ofNullable(tag_map.remove("source"))
                 .orElseGet(() -> {
                     return Optional.ofNullable(tag_map.get("cluster"))
-                            .orElseGet(() -> tag_map.getOrDefault("moncluster", "\"monsoon\""));
+                            .map(WavefrontStrings::escapeTagValue)
+                            .orElseGet(() -> tag_map.getOrDefault("moncluster", "monsoon"));
                 });
     }
 
