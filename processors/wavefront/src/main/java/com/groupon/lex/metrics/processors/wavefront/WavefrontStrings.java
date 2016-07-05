@@ -54,13 +54,13 @@ public class WavefrontStrings {
     /**
      * Convert a name to a name that wavefront will accept.
      *
-     * Wavefront documentation specifies a metric consists of the characters [-a-z_.]
+     * Wavefront documentation specifies a metric consists of the characters [-a-zA-Z_0-9.]
      * Any disallowed characters are replaced with underscores.
      */
     public static final String name(String name) {
         return name
                 .toLowerCase(Locale.ROOT)
-                .replaceAll("[^-a-z_.]", "_");
+                .replaceAll("[^-a-zA-Z_0-9.]", "_");
     }
 
     /**
