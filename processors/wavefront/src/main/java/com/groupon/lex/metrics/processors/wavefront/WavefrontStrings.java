@@ -139,6 +139,38 @@ public class WavefrontStrings {
     }
 
     /**
+     * Extract the 'source' tag from the tag_map.
+     *
+     * Wavefront requires the 'source' tag to be the first tag on the line, hence
+     * the special handling.  It also *must* be present, so we can never return null.
+     */
+    private static String extractTagSource(Map<String, String> tag_map) {
+        return Optional.ofNullable(tag_map.remove("source"))
+                .orElseGet(() -> {
+                    return Optional.ofNullable(tag_map.get("cluster"))
+                            .orElseGet(() -> tag_map.getOrDefault("moncluster", "\"monsoon\""));
+                });
+    }
+
+    /** Build the wavefront line from its parts. */
+    private static String wavefrontLine(DateTime ts, SimpleGroupPath group, MetricName metric, String value, String source, Map<String, String> tag_map) {
+        return new StringBuilder()
+                .append(name(group, metric))
+                .append(' ')
+                .append(value)
+                .append(' ')
+                .append(timestamp(ts))
+                .append(' ')
+                .append("source=").append(source)
+                .append(' ')
+                .append(tag_map.entrySet().stream()
+                        .map(entry -> entry.getKey() + "=\"" + entry.getValue() + '\"')
+                        .collect(Collectors.joining(" "))
+                )
+                .toString();
+    }
+
+    /**
      * Convert a metric to a wavefront string.
      *
      * Empty metrics and histograms do not emit a value.
@@ -149,26 +181,8 @@ public class WavefrontStrings {
         return wavefrontValue(metric_value)
                 .map(value -> {
                     final Map<String, String> tag_map = tags(group.getTags());
-                    final String source = Optional.ofNullable(tag_map.remove("source"))
-                            .orElseGet(() -> {
-                                return Optional.ofNullable(tag_map.get("cluster"))
-                                        .orElseGet(() -> tag_map.getOrDefault("moncluster", "\"monsoon\""));
-                            });
-
-                    return new StringBuilder()
-                            .append(name(group.getPath(), metric))
-                            .append(' ')
-                            .append(value)
-                            .append(' ')
-                            .append(timestamp(ts))
-                            .append(' ')
-                            .append("source=").append(source)
-                            .append(' ')
-                            .append(tag_map.entrySet().stream()
-                                    .map(entry -> entry.getKey() + "=\"" + entry.getValue() + '\"')
-                                    .collect(Collectors.joining(" "))
-                            )
-                            .toString();
+                    final String source = extractTagSource(tag_map);  // Modifies tag_map.
+                    return wavefrontLine(ts, group.getPath(), metric, value, source, tag_map);
                 });
     }
 
