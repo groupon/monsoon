@@ -186,14 +186,22 @@ public class WavefrontStrings {
                 });
     }
 
+    private static Stream<String> wavefrontLineForMetric(DateTime ts, GroupName group, Map.Entry<MetricName, MetricValue> metricEntry) {
+        return wavefrontLine(ts, group, metricEntry.getKey(), metricEntry.getValue())
+                .map(Stream::of)
+                .orElseGet(Stream::empty);
+    }
+
     /**
      * Convert a time series value into the string entries for wavefront.
      *
      * Note: the line is not terminated with a newline.
      */
     public static Stream<String> wavefrontLine(TimeSeriesValue tsv) {
+        final DateTime ts = tsv.getTimestamp();
+        final GroupName group = tsv.getGroup();
+
         return tsv.getMetrics().entrySet().stream()
-                .map(metric_entry -> wavefrontLine(tsv.getTimestamp(), tsv.getGroup(), metric_entry.getKey(), metric_entry.getValue()))
-                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty));
+                .flatMap(metricEntry -> wavefrontLineForMetric(ts, group, metricEntry));
     }
 }
