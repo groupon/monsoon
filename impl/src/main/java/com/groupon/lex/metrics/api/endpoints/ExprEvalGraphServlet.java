@@ -129,13 +129,12 @@ public class ExprEvalGraphServlet extends DataSourceServlet {
         final Iterator<Collection<CollectHistory.NamedEvaluation>> eval_iter = eval_(exprs, begin, end, stepsize).iterator();
         while (eval_iter.hasNext()) {
             final Collection<CollectHistory.NamedEvaluation> ts_tsdata = eval_iter.next();
-            final DateTime ts = ts_tsdata.stream().findAny().map(CollectHistory.NamedEvaluation::getDatetime).orElseThrow(() -> new IllegalStateException("empty evaluation"));
+            final DateTime ts = ts_tsdata.stream().map(CollectHistory.NamedEvaluation::getDatetime).max(Comparator.naturalOrder()).orElseThrow(() -> new IllegalStateException("empty evaluation"));
             final TableRow row = new TableRow();
             row.addCell(to_graph_datetime_(ts));
 
             for (CollectHistory.NamedEvaluation eval : ts_tsdata) {
                 final String name = eval.getName();
-                assert(ts.equals(eval.getDatetime()));
                 final TimeSeriesMetricDeltaSet tsdata = eval.getTS();
 
                 tsdata.streamAsMap()
