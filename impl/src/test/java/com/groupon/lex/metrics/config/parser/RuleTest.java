@@ -39,8 +39,11 @@ import static com.groupon.lex.metrics.timeseries.AlertState.FIRING;
 import static com.groupon.lex.metrics.timeseries.AlertState.OK;
 import static com.groupon.lex.metrics.timeseries.AlertState.TRIGGERING;
 import static com.groupon.lex.metrics.timeseries.AlertState.UNKNOWN;
+import java.util.Collection;
 import static java.util.Collections.singletonMap;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.Test;
 
 /**
@@ -219,19 +222,19 @@ public class RuleTest extends AbstractAlertTest {
                 + "alert test.'mul'   if      " + TESTGROUP.configString() + " x * by(id) " + TESTGROUP.configString() + " y != " + TESTGROUP.configString() + " 'mul';\n"
                 + "alert test.'div'   if 10 * " + TESTGROUP.configString() + " x / by(id) " + TESTGROUP.configString() + " y != " + TESTGROUP.configString() + " 'div';\n"
                 + "alert test.'mod'   if      " + TESTGROUP.configString() + " x % by(id) " + TESTGROUP.configString() + " y != " + TESTGROUP.configString() + " 'mod';\n", 60,
-                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "x",                1  ,  2  ,  3  ,  4  ,  5  ),
-                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "y",                2  ,  3  ,  4  ,  5  ,  6  ),
-                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "plus",             3  ,  5  ,  7  ,  9  , 11  ),
-                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "minus",           -1  , -1  , -1  , -1  , -1  ),
-                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "mul",              2  ,  6  , 12  , 20  , 30  ),
-                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "div",              5  ,  6  ,  7  ,  8  ,  8  ),
-                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "mod",              1  ,  2  ,  3  ,  4  ,  5  ))) {
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "x",                  1  ,  2  ,  3  ,  4  ,  5  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "y",                  2  ,  3  ,  4  ,  5  ,  6  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "plus",               3  ,  5  ,  7  ,  9  , 11  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "minus",             -1  , -1  , -1  , -1  , -1  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "mul",                2  ,  6  , 12  , 20  , 30  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "div",                5  ,  6  ,  7  ,  8  ,  8  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "mod",                1  ,  2  ,  3  ,  4  ,  5  ))) {
             impl.validate(
-                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "plus" ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
-                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "minus"), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
-                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "mul"  ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
-                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "div"  ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
-                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "mod"  ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ));
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "plus" ), singletonMap("id", MetricValue.fromIntValue(0))), OK  , OK  , OK  , OK  , OK  ),
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "minus"), singletonMap("id", MetricValue.fromIntValue(0))), OK  , OK  , OK  , OK  , OK  ),
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "mul"  ), singletonMap("id", MetricValue.fromIntValue(0))), OK  , OK  , OK  , OK  , OK  ),
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "div"  ), singletonMap("id", MetricValue.fromIntValue(0))), OK  , OK  , OK  , OK  , OK  ),
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "mod"  ), singletonMap("id", MetricValue.fromIntValue(0))), OK  , OK  , OK  , OK  , OK  ));
         }
     }
 
@@ -248,6 +251,81 @@ public class RuleTest extends AbstractAlertTest {
             impl.validate(
                     newDatapoint(GroupName.valueOf("pi.nginx-pool-80.health_score.health_score"),
                         OK, OK, OK, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING));
+        }
+    }
+
+    /** Tag with a constant. */
+    @Test
+    public void define_tagged_constant() throws Exception {
+        try (AbstractAlertTest.AlertValidator impl = replay(
+                  "define test tag (id = 1) x = 2;\n"
+                + "\n"
+                + "alert test\n"
+                + "if test x != 2;\n", 60,
+                newDatapoint(GroupName.valueOf("ignored"), MetricName.valueOf("ignored"), ""))) {
+            impl.validate(
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"), singletonMap("id", MetricValue.fromIntValue(1))),
+                        OK));
+        }
+    }
+
+    /** Combine new tags with existing tags. */
+    @Test
+    public void define_tagged_combining() throws Exception {
+        try (AbstractAlertTest.AlertValidator impl = replay(
+                  "define test tag (id = 1) {\n"
+                + "    x = input x;\n"
+                + "}\n"
+                + "\n"
+                + "alert test\n"
+                + "if test x > 2;\n", 60,
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("input"), singletonMap("key", MetricValue.fromIntValue(17))), MetricName.valueOf("x"), 0, 1, 2, 3, 4))) {
+            impl.validate(
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"),
+                            Stream.of(singletonMap("id", MetricValue.fromIntValue(1)), singletonMap("key", MetricValue.fromIntValue(17)))
+                                    .map(Map::entrySet)
+                                    .flatMap(Collection::stream)),
+                        OK, OK, OK, FIRING, FIRING));
+        }
+    }
+
+    /** Use an expression to define part of the tagging. */
+    @Test
+    public void define_tagged_expr() throws Exception {
+        try (AbstractAlertTest.AlertValidator impl = replay(
+                  "define test tag (id = input x) {\n"
+                + "    x = input x;\n"
+                + "}\n"
+                + "\n"
+                + "alert test\n"
+                + "if test x > 2;\n", 60,
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("input"), singletonMap("key", MetricValue.fromIntValue(17))), MetricName.valueOf("x"), 0, 1, 2, 3, 4))) {
+            impl.validate(
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"),
+                            Stream.of(singletonMap("id", MetricValue.fromIntValue(0)), singletonMap("key", MetricValue.fromIntValue(17)))
+                                    .map(Map::entrySet)
+                                    .flatMap(Collection::stream)),
+                        OK, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"),
+                            Stream.of(singletonMap("id", MetricValue.fromIntValue(1)), singletonMap("key", MetricValue.fromIntValue(17)))
+                                    .map(Map::entrySet)
+                                    .flatMap(Collection::stream)),
+                        UNKNOWN, OK, UNKNOWN, UNKNOWN, UNKNOWN),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"),
+                            Stream.of(singletonMap("id", MetricValue.fromIntValue(2)), singletonMap("key", MetricValue.fromIntValue(17)))
+                                    .map(Map::entrySet)
+                                    .flatMap(Collection::stream)),
+                        UNKNOWN, UNKNOWN, OK, UNKNOWN, UNKNOWN),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"),
+                            Stream.of(singletonMap("id", MetricValue.fromIntValue(3)), singletonMap("key", MetricValue.fromIntValue(17)))
+                                    .map(Map::entrySet)
+                                    .flatMap(Collection::stream)),
+                        UNKNOWN, UNKNOWN, UNKNOWN, FIRING, UNKNOWN),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"),
+                            Stream.of(singletonMap("id", MetricValue.fromIntValue(4)), singletonMap("key", MetricValue.fromIntValue(17)))
+                                    .map(Map::entrySet)
+                                    .flatMap(Collection::stream)),
+                        UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, FIRING));
         }
     }
 }

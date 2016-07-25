@@ -7,12 +7,16 @@ A defined metric is useful to calculate information based off of gathered data a
 Syntax
 ----
 
-**define** group\_name metric **=** expression **;**
+**define** group\_name [ **tag** **(** tag\_name **=** tag\_expr [**,** ...]  **)** ] metric **=** expression **;**
 
 - *group\_name*
   The name of a group.
   The *metric* will be created inside this group.
   If the group doesn't exist, it will be created.
+- *tag\_name*
+  Add an additional tag to the defined metrics.
+- *tag\_expr*
+  An expression to resolve as the value of the tag.
 - *metric*
   The metric name in the group under which to expose the expression.
   If the *group* already holds a metric under this name, it will be replaced.

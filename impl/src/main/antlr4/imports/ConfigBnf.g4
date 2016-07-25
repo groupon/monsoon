@@ -224,15 +224,28 @@ alias_rule       returns [ AliasStatement s ]
                  ;
 
 derived_metric_rule returns [ DerivedMetricStatement s ]
-                 @init{ Map<NameResolver, TimeSeriesMetricExpression> metrics = new HashMap<>(); }
+                 @init{
+                     Map<NameResolver, TimeSeriesMetricExpression> metrics = new HashMap<>();
+                     Map<String, TimeSeriesMetricExpression> tags = new HashMap<>();
+                 }
                  : DEFINE_KW s2=name
+                   (
+                     TAG_KW BRACE_OPEN_LIT
+                     tag_name0=identifier EQ_KW tag_value0=expression
+                     { tags.put($tag_name0.s, $tag_value0.s); }
+                     ( COMMA_LIT tag_nameN=identifier EQ_KW tag_valueN=expression
+                       { tags.put($tag_nameN.s, $tag_valueN.s); }
+                     )*
+                     BRACE_CLOSE_LIT
+                   )?
+
                    ( s3=metric_name EQ_KW s5=expression ENDSTATEMENT_KW
-                     { $s = new DerivedMetricStatement($s2.s, $s3.s, $s5.s); }
+                     { metrics = Collections.singletonMap($s3.s, $s5.s); }
                    | CURLYBRACKET_OPEN
                      (m=derived_metric_rule_metrics{ metrics.putAll($m.s); })*
                      CURLYBRACKET_CLOSE
-                     { $s = new DerivedMetricStatement($s2.s, metrics); }
                    )
+                   { $s = new DerivedMetricStatement($s2.s, tags, metrics); }
                  ;
 derived_metric_rule_metrics returns [ Map<NameResolver, TimeSeriesMetricExpression> s ]
                  @after{ $s = Collections.singletonMap($s1.s, $s3.s); }
