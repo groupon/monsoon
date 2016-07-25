@@ -150,7 +150,7 @@ public abstract class AbstractAlertTest {
 
         try {
             final PushMetricRegistryInstance registry = Configuration.readFromFile(null, new StringReader(configuration))
-                    .create(datetime_supplier, (pattern, handler) -> {});
+                    .create(PushMetricRegistryInstance::new, datetime_supplier, (pattern, handler) -> {});
             registry.add(new ReplayCollector(input));
             return new AlertValidator(registry);
         } catch (ConfigurationException ex) {

@@ -127,7 +127,7 @@ public abstract class AbstractExpressionTest {
 
     protected void validateExpression(String expr, DataPointStream... input) throws Exception {
         try (final PushMetricRegistryInstance registry = configurationForExpr(expr, Arrays.stream(input).map(DataPointStream::getIdentifier))
-                .create((pattern, handler) -> {})) {
+                .create(PushMetricRegistryInstance::new, (pattern, handler) -> {})) {
             ReplayCollector replay_collector = new ReplayCollector(input);
             registry.add(replay_collector);
 

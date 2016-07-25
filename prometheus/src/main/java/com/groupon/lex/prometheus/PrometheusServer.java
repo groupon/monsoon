@@ -31,13 +31,16 @@
  */
 package com.groupon.lex.prometheus;
 
-import com.groupon.lex.metrics.MetricRegistryInstance;
+import com.groupon.lex.metrics.PipelineBuilder;
+import com.groupon.lex.metrics.PullProcessorPipeline;
 import com.groupon.lex.metrics.api.ApiServer;
 import com.groupon.lex.metrics.config.Configuration;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -50,7 +53,7 @@ import org.eclipse.jetty.server.handler.ContextHandler;
 public class PrometheusServer {
     private static final Logger LOG = Logger.getLogger(PrometheusServer.class.getName());
     private final static String _PACKAGE_NAME = PrometheusServer.class.getPackage().getName();
-    private static MetricRegistryInstance registry_;
+    private static PullProcessorPipeline registry_;
 
     private final static Map<String, BiConsumer<PrometheusConfig, String>> createPrometheusConfig_ = new HashMap<String, BiConsumer<PrometheusConfig, String>>() {{
             put("config=", (PrometheusConfig, config) -> {
@@ -88,8 +91,11 @@ public class PrometheusServer {
         final ApiServer api = new ApiServer(new InetSocketAddress(9998));
 
         PrometheusConfig cfg = createPrometheusConfig(args);
-        Configuration _cfg = cfg.getConfiguration();
-        registry_ = _cfg.create(api);
+        final Optional<File> _cfg = cfg.getConfiguration();
+        if (_cfg.isPresent())
+            registry_ = new PipelineBuilder(_cfg.get()).build();
+        else
+            registry_ = new PipelineBuilder(Configuration.DEFAULT).build();
 
         api.start();
         Runtime.getRuntime().addShutdownHook(new Thread(api::close));

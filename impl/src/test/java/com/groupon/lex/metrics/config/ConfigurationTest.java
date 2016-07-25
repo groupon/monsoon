@@ -165,7 +165,7 @@ public class ConfigurationTest {
         Configuration cfg = Configuration.readFromFile(File.listRoots()[0], new StringReader("import all\n  from \"file.name\";"));
 
         assertTrue(cfg.needsResolve());
-        cfg.create((pattern, handler) -> {});
+        cfg.create(PushMetricRegistryInstance::new, (pattern, handler) -> {});
     }
 
     @Test
@@ -192,7 +192,7 @@ public class ConfigurationTest {
                         + "collect url \"http://localhost/\" as 'test';"));
         assertTrue(cfg.needsResolve());
         // Create must not fail.
-        try (PushMetricRegistryInstance instance = cfg.resolve().create((pattern, handler) -> {})) {
+        try (PushMetricRegistryInstance instance = cfg.resolve().create(PushMetricRegistryInstance::new, (pattern, handler) -> {})) {
             /* SKIP */
         }
     }
@@ -227,7 +227,7 @@ public class ConfigurationTest {
                         + "collect url \"http://localhost/\" as 'test';"));
         assertTrue(cfg.needsResolve());
         // Create must not fail.
-        try (PushMetricRegistryInstance instance = cfg.resolve().create((pattern, handler) -> {})) {
+        try (PushMetricRegistryInstance instance = cfg.resolve().create(PushMetricRegistryInstance::new, (pattern, handler) -> {})) {
             /* SKIP */
         }
     }

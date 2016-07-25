@@ -29,38 +29,27 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.timeseries;
+package com.groupon.lex.metrics;
 
-import org.joda.time.DateTime;
+import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
+import java.util.Collection;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
+ * A pull processor pipeline.
  *
- * @author ariane
+ * A pull processor performs a scrape and evaluates rules, returning the evaluated set of metrics.
+ *
+ * Note that pull processors do not keep historical data and ignore alerts.
  */
-public class TimeSeriesCollectionPairInstance extends AbstractTSCPair {
-    private final MutableTimeSeriesCollection current_;
-
-    public TimeSeriesCollectionPairInstance() {
-        current_ = new MutableTimeSeriesCollection();
-    }
-
-    public TimeSeriesCollectionPairInstance(DateTime now) {
-        current_ = new MutableTimeSeriesCollection(now);
+public class PullProcessorPipeline extends AbstractProcessor<PullMetricRegistryInstance> implements Supplier<Collection<TimeSeriesValue>> {
+    public PullProcessorPipeline(PullMetricRegistryInstance registry) {
+        super(registry);
     }
 
     @Override
-    public TimeSeriesCollection getCurrentCollection() {
-        return current_;
-    }
-
-    public TimeSeriesCollectionPairInstance startNewCycle(DateTime timestamp, ExpressionLookBack lookback) {
-        update(current_, lookback);
-        current_.clear(timestamp);
-        return this;
-    }
-
-    @Override
-    public String toString() {
-        return "TimeSeriesCollectionPairInstance{current_=" + current_ + ", " + super.toString() + '}';
+    public Collection<TimeSeriesValue> get() {
+        return getMetricRegistry().updateCollection().getTSValues().stream().collect(Collectors.toList());
     }
 }
