@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -45,7 +45,7 @@ import org.junit.Test;
  * @author ariane
  */
 public class AlertTest {
-    private static final GroupName alert_name = new GroupName("com", "groupon");
+    private static final GroupName alert_name = GroupName.valueOf("com", "groupon");
     private static final DateTime t0 = new DateTime(2015, 10, 21, 10, 10, 10, DateTimeZone.UTC);
     private static final DateTime t_past = new DateTime(2015, 10, 21, 10, 7, 37, DateTimeZone.UTC);
     private static final DateTime t_past_min5 = t_past.minus(Duration.standardMinutes(5));

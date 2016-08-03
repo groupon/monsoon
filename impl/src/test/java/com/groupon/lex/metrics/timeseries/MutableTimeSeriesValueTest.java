@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -53,9 +53,9 @@ import org.junit.Test;
  * @author ariane
  */
 public class MutableTimeSeriesValueTest {
-    private static final MetricName metric_key = new MetricName("value");
+    private static final MetricName metric_key = MetricName.valueOf("value");
     private static final DateTime t0 = DateTime.now(DateTimeZone.UTC);
-    private static final GroupName group_name = new GroupName("foo", "bar");
+    private static final GroupName group_name = GroupName.valueOf("foo", "bar");
     private static final Map<MetricName, MetricValue> values = singletonMap(metric_key, MetricValue.fromIntValue(7));
 
     @Test
@@ -91,7 +91,7 @@ public class MutableTimeSeriesValueTest {
     public void inequality() {
         TimeSeriesValue base = new MutableTimeSeriesValue(t0, group_name, values);
         TimeSeriesValue a = new MutableTimeSeriesValue(t0, group_name, EMPTY_MAP);
-        TimeSeriesValue b = new MutableTimeSeriesValue(t0, new GroupName("abracadabra"), values);
+        TimeSeriesValue b = new MutableTimeSeriesValue(t0, GroupName.valueOf("abracadabra"), values);
         TimeSeriesValue c = new MutableTimeSeriesValue(t0.minus(Duration.standardSeconds(1)), group_name, values);
 
         assertFalse(base.equals(a));

@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -47,7 +47,7 @@ import org.junit.Test;
 public class GroupNameTest {
     @Test
     public void array_constructor() {
-        GroupName group = new GroupName("foo", "bar");
+        GroupName group = GroupName.valueOf("foo", "bar");
 
         assertThat(group.getPath().getPath(), contains("foo", "bar"));
         assertTrue(group.getTags().isEmpty());
@@ -55,7 +55,7 @@ public class GroupNameTest {
 
     @Test
     public void list_constructor() {
-        GroupName group = new GroupName(new SimpleGroupPath("foo", "bar"));
+        GroupName group = GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar"));
 
         assertThat(group.getPath().getPath(), contains("foo", "bar"));
         assertTrue(group.getTags().isEmpty());
@@ -63,7 +63,7 @@ public class GroupNameTest {
 
     @Test
     public void tag_constructor() {
-        GroupName group = new GroupName(new SimpleGroupPath("group"), new Tags(singletonMap("x", MetricValue.TRUE)));
+        GroupName group = GroupName.valueOf(SimpleGroupPath.valueOf("group"), Tags.valueOf(singletonMap("x", MetricValue.TRUE)));
 
         assertThat(group.getPath().getPath(), contains("group"));
         assertThat(group.getTags().asMap(), hasEntry("x", MetricValue.TRUE));
@@ -71,7 +71,7 @@ public class GroupNameTest {
 
     @Test
     public void tagmap_constructor() {
-        GroupName group = new GroupName(new SimpleGroupPath("group"), singletonMap("x", MetricValue.TRUE));
+        GroupName group = GroupName.valueOf(SimpleGroupPath.valueOf("group"), singletonMap("x", MetricValue.TRUE));
 
         assertThat(group.getPath().getPath(), contains("group"));
         assertThat(group.getTags().asMap(), hasEntry("x", MetricValue.TRUE));
@@ -79,8 +79,8 @@ public class GroupNameTest {
 
     @Test
     public void config_string() {
-        GroupName group = new GroupName(new SimpleGroupPath("foo", "bar", "escape-dash"), singletonMap("x", MetricValue.TRUE));
-        GroupName untagged = new GroupName("escape.dots", "escape'quotes'");
+        GroupName group = GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar", "escape-dash"), singletonMap("x", MetricValue.TRUE));
+        GroupName untagged = GroupName.valueOf("escape.dots", "escape'quotes'");
 
         assertEquals("foo.bar.'escape-dash'{x=true}", group.configString().toString());
         assertEquals("'escape.dots'.'escape\\'quotes\\''", untagged.configString().toString());
@@ -88,14 +88,14 @@ public class GroupNameTest {
 
     @Test
     public void to_string() {
-        GroupName group = new GroupName(new SimpleGroupPath("foo", "bar", "escape-dash"), singletonMap("x", MetricValue.TRUE));
+        GroupName group = GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar", "escape-dash"), singletonMap("x", MetricValue.TRUE));
 
         assertEquals("foo.bar.'escape-dash'{x=true}", group.toString());
     }
 
     @Test
     public void tagstream_constructor() {
-        GroupName group = new GroupName(new SimpleGroupPath("group"), singletonMap("x", MetricValue.TRUE).entrySet().stream());
+        GroupName group = GroupName.valueOf(SimpleGroupPath.valueOf("group"), singletonMap("x", MetricValue.TRUE).entrySet().stream());
 
         assertThat(group.getPath().getPath(), contains("group"));
         assertThat(group.getTags().asMap(), hasEntry("x", MetricValue.TRUE));
@@ -103,20 +103,20 @@ public class GroupNameTest {
 
     @Test
     public void equality() {
-        assertEquals(new GroupName("foo").hashCode(), new GroupName(new SimpleGroupPath("foo")).hashCode());
-        assertEquals(new GroupName("foo"), new GroupName(new SimpleGroupPath("foo")));
+        assertEquals(GroupName.valueOf("foo").hashCode(), GroupName.valueOf(SimpleGroupPath.valueOf("foo")).hashCode());
+        assertEquals(GroupName.valueOf("foo"), GroupName.valueOf(SimpleGroupPath.valueOf("foo")));
 
-        assertEquals(new GroupName(new SimpleGroupPath("foo"), singletonMap("x", MetricValue.fromStrValue("y"))).hashCode(),
-                new GroupName(new SimpleGroupPath("foo"), singletonMap("x", MetricValue.fromStrValue("y"))).hashCode());
-        assertEquals(new GroupName(new SimpleGroupPath("foo"), singletonMap("x", MetricValue.fromStrValue("y"))),
-                new GroupName(new SimpleGroupPath("foo"), singletonMap("x", MetricValue.fromStrValue("y"))));
+        assertEquals(GroupName.valueOf(SimpleGroupPath.valueOf("foo"), singletonMap("x", MetricValue.fromStrValue("y"))).hashCode(),
+                GroupName.valueOf(SimpleGroupPath.valueOf("foo"), singletonMap("x", MetricValue.fromStrValue("y"))).hashCode());
+        assertEquals(GroupName.valueOf(SimpleGroupPath.valueOf("foo"), singletonMap("x", MetricValue.fromStrValue("y"))),
+                GroupName.valueOf(SimpleGroupPath.valueOf("foo"), singletonMap("x", MetricValue.fromStrValue("y"))));
     }
 
     @Test
     public void inequality() {
-        GroupName group = new GroupName(new SimpleGroupPath("group"), singletonMap("x", MetricValue.TRUE).entrySet().stream());
-        GroupName group_with_path_change = new GroupName(new SimpleGroupPath("other"), singletonMap("x", MetricValue.TRUE).entrySet().stream());
-        GroupName group_with_tags_change = new GroupName(new SimpleGroupPath("group"), singletonMap("y", MetricValue.TRUE).entrySet().stream());
+        GroupName group = GroupName.valueOf(SimpleGroupPath.valueOf("group"), singletonMap("x", MetricValue.TRUE).entrySet().stream());
+        GroupName group_with_path_change = GroupName.valueOf(SimpleGroupPath.valueOf("other"), singletonMap("x", MetricValue.TRUE).entrySet().stream());
+        GroupName group_with_tags_change = GroupName.valueOf(SimpleGroupPath.valueOf("group"), singletonMap("y", MetricValue.TRUE).entrySet().stream());
 
         assertFalse(group.equals(null));
         assertFalse(group.equals(new Object()));
@@ -126,12 +126,12 @@ public class GroupNameTest {
 
     @Test
     public void compare() {
-        GroupName a = new GroupName("a");
-        GroupName clone_of_a = new GroupName("a");
-        GroupName a_b = new GroupName("a", "b");
-        GroupName abba = new GroupName("abba");
-        GroupName a_tagged_true = new GroupName(new SimpleGroupPath("a"), singletonMap("x", MetricValue.TRUE));
-        GroupName a_tagged_false = new GroupName(new SimpleGroupPath("a"), singletonMap("x", MetricValue.FALSE));
+        GroupName a = GroupName.valueOf("a");
+        GroupName clone_of_a = GroupName.valueOf("a");
+        GroupName a_b = GroupName.valueOf("a", "b");
+        GroupName abba = GroupName.valueOf("abba");
+        GroupName a_tagged_true = GroupName.valueOf(SimpleGroupPath.valueOf("a"), singletonMap("x", MetricValue.TRUE));
+        GroupName a_tagged_false = GroupName.valueOf(SimpleGroupPath.valueOf("a"), singletonMap("x", MetricValue.FALSE));
 
         assertEquals(0, a.compareTo(clone_of_a));
         assertTrue(a.compareTo(a_b) < 0);

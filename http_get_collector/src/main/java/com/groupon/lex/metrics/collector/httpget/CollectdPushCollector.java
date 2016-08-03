@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -40,10 +40,10 @@ import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.SimpleMetric;
 import com.groupon.lex.metrics.SimpleMetricGroup;
+import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import java.io.IOException;
@@ -85,8 +85,8 @@ public class CollectdPushCollector implements GroupGenerator {
     private final static Type collectd_type_ = new TypeToken<List<CollectdMessage>>(){}.getType();
     private Map<String, DateTime> known_hosts_ = EMPTY_MAP;  // Replaced on each collection.
     public final static Duration DROP_DURATION = Duration.standardHours(1);
-    private final static Metric UP_METRIC = new SimpleMetric(NameCache.singleton.newMetricName("up"), Boolean.TRUE);
-    private final static Metric DOWN_METRIC = new SimpleMetric(NameCache.singleton.newMetricName("up"), Boolean.FALSE);
+    private final static Metric UP_METRIC = new SimpleMetric(MetricName.valueOf("up"), Boolean.TRUE);
+    private final static Metric DOWN_METRIC = new SimpleMetric(MetricName.valueOf("up"), Boolean.FALSE);
 
     public static class CollectdKey {
         public final String host, plugin, plugin_instance, type, type_instance;
@@ -186,18 +186,18 @@ public class CollectdPushCollector implements GroupGenerator {
                     .filter(x -> x != null)
                     .filter(s -> !s.isEmpty())
                     .collect(Collectors.toList());
-            return NameCache.singleton.newMetricName(path.isEmpty() ? singletonList("value") : path);
+            return MetricName.valueOf(path.isEmpty() ? singletonList("value") : path);
         }
 
         public MetricGroup toMetricGroup(SimpleGroupPath base_path) {
-            final GroupName group = NameCache.singleton.newGroupName(
-                    NameCache.singleton.newSimpleGroupPath(Stream.concat(
+            final GroupName group = GroupName.valueOf(
+                    SimpleGroupPath.valueOf(Stream.concat(
                             base_path.getPath().stream(),
                             Stream.of(plugin, plugin_instance)
                                     .filter(x -> x != null)
                                     .filter(s -> !s.isEmpty()))
                             .collect(Collectors.toList())),
-                    NameCache.singleton.newTags(singletonMap("host", MetricValue.fromStrValue(host))));
+                    Tags.valueOf(singletonMap("host", MetricValue.fromStrValue(host))));
 
             final List<SimpleMetric> entries = new ArrayList<>(metricCount());
             for (int i = 0; i < metricCount(); ++i)
@@ -287,9 +287,9 @@ public class CollectdPushCollector implements GroupGenerator {
 
     /** Return a metric group indicating if the host is up or down. */
     private MetricGroup up_down_host_(String host, boolean up) {
-        final GroupName group = NameCache.singleton.newGroupName(
+        final GroupName group = GroupName.valueOf(
                 getBasePath(),
-                NameCache.singleton.newTags(singletonMap("host", MetricValue.fromStrValue(host))));
+                Tags.valueOf(singletonMap("host", MetricValue.fromStrValue(host))));
         return new SimpleMetricGroup(group, singleton(up ? UP_METRIC : DOWN_METRIC));
     }
 

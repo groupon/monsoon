@@ -62,7 +62,7 @@ public class TimeSeriesMetricDeltaSetTest {
         empty = new TimeSeriesMetricDeltaSet();
         scalar23 = new TimeSeriesMetricDeltaSet(MetricValue.fromIntValue(23));
         vector = new TimeSeriesMetricDeltaSet(singletonMap(
-                new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))),
+                Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar"))),
                 MetricValue.fromStrValue("baz")));
     }
 
@@ -100,14 +100,14 @@ public class TimeSeriesMetricDeltaSetTest {
         assertThat(vector.streamValues().collect(Collectors.toList()),
                 hasItem(MetricValue.fromStrValue("baz")));
         assertThat(vector.streamAsMap().collect(Collectors.toMap(Entry::getKey, Entry::getValue)),
-                hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.fromStrValue("baz")));
+                hasEntry(Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.fromStrValue("baz")));
         assertEquals(1, vector.size());
         assertFalse(vector.isScalar());
         assertTrue(vector.isVector());
         assertEquals(Optional.empty(), vector.asScalar());
         assertNotEquals(Optional.empty(), vector.asVector());
         assertThat(vector.asVector().get(),
-                hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.fromStrValue("baz")));
+                hasEntry(Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.fromStrValue("baz")));
     }
 
     @Test
@@ -150,7 +150,7 @@ public class TimeSeriesMetricDeltaSetTest {
         TimeSeriesMetricDeltaSet tsd = vector.map(x -> MetricValue.TRUE);
 
         assertThat(tsd.asVector().get(),
-                hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.TRUE));
+                hasEntry(Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.TRUE));
     }
 
     @Test
@@ -159,15 +159,15 @@ public class TimeSeriesMetricDeltaSetTest {
         TimeSeriesMetricDeltaSet opt_empty = vector.mapOptional(x -> Optional.empty());
 
         assertThat(opt_set.asVector().get(),
-                hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.TRUE));
+                hasEntry(Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.TRUE));
         assertThat(opt_empty.asVector().get(),
-                hasEntry(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.EMPTY));
+                hasEntry(Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar"))), MetricValue.EMPTY));
     }
 
     @Test(expected = IllegalStateException.class)
     public void fail_with_duplicate_keys() {
         Map<Tags, MetricValue> key = singletonMap(
-                new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))),
+                Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar"))),
                 MetricValue.fromStrValue("baz"));
 
         new TimeSeriesMetricDeltaSet(Stream.of(key, key).map(Map::entrySet).flatMap(Collection::stream));

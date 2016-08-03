@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -68,10 +68,10 @@ public class TimeSeriesCollection_combineTest {
     public void setup() {
         t1 = DateTime.now(DateTimeZone.UTC);
         t0 = t1.minus(Duration.standardMinutes(1)).minus(Duration.standardSeconds(2));
-        tsv_old_keep = new MutableTimeSeriesValue(t0, new GroupName("keep"), singletonMap(new MetricName("value"), MetricValue.fromStrValue("tsv_old_keep")));
-        tsv_old_overwrite = new MutableTimeSeriesValue(t0, new GroupName("overwrite"), singletonMap(new MetricName("value"), MetricValue.fromStrValue("tsv_old_overwrite")));
-        tsv_new = new MutableTimeSeriesValue(t1, new GroupName("new"), singletonMap(new MetricName("value"), MetricValue.fromStrValue("tsv_new")));
-        tsv_new_overwrite = new MutableTimeSeriesValue(t1, new GroupName("overwrite"), singletonMap(new MetricName("value"), MetricValue.fromStrValue("tsv_new_overwrite")));
+        tsv_old_keep = new MutableTimeSeriesValue(t0, GroupName.valueOf("keep"), singletonMap(MetricName.valueOf("value"), MetricValue.fromStrValue("tsv_old_keep")));
+        tsv_old_overwrite = new MutableTimeSeriesValue(t0, GroupName.valueOf("overwrite"), singletonMap(MetricName.valueOf("value"), MetricValue.fromStrValue("tsv_old_overwrite")));
+        tsv_new = new MutableTimeSeriesValue(t1, GroupName.valueOf("new"), singletonMap(MetricName.valueOf("value"), MetricValue.fromStrValue("tsv_new")));
+        tsv_new_overwrite = new MutableTimeSeriesValue(t1, GroupName.valueOf("overwrite"), singletonMap(MetricName.valueOf("value"), MetricValue.fromStrValue("tsv_new_overwrite")));
 
         expected = Arrays.asList(tsv_old_keep, tsv_new, tsv_new_overwrite);
         ts_data_0 = new MutableTimeSeriesCollection(t0, Stream.concat(Stream.of(tsv_old_keep), Stream.of(tsv_old_overwrite)));

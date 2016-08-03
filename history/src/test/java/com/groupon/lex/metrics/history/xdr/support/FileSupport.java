@@ -3,8 +3,8 @@ package com.groupon.lex.metrics.history.xdr.support;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleGroupPath;
+import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
@@ -95,15 +95,15 @@ public class FileSupport {
         int metric_width = (int)sqrt(width) + 1;
         int group_width = (width + metric_width - 1) / metric_width;
 
-        final SimpleGroupPath base_path = NameCache.singleton.newSimpleGroupPath("foo", "bar");
+        final SimpleGroupPath base_path = SimpleGroupPath.valueOf("foo", "bar");
         final List<GroupName> group_names = Stream.generate(new CounterSupplier())
                 .limit(group_width)
-                .map(idx -> NameCache.singleton.newTags(singletonMap("instance", MetricValue.fromIntValue(idx))))
-                .map(tags -> NameCache.singleton.newGroupName(base_path, tags))
+                .map(idx -> Tags.valueOf(singletonMap("instance", MetricValue.fromIntValue(idx))))
+                .map(tags -> GroupName.valueOf(base_path, tags))
                 .collect(Collectors.toList());
         final List<MetricName> metric_names = Stream.generate(new CounterSupplier())
                 .limit(metric_width)
-                .map(i -> (new MetricName("x", String.valueOf(i))))
+                .map(i -> (MetricName.valueOf("x", String.valueOf(i))))
                 .collect(Collectors.toList());
 
         return new StreamedCollection<>(() -> Stream.generate(new CounterSupplier()))

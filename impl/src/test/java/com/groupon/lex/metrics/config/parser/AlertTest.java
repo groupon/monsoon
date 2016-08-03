@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -42,7 +42,7 @@ import org.junit.Test;
  * @author ariane
  */
 public class AlertTest extends AbstractAlertTest {
-    private static final GroupName TESTGROUP = new GroupName("com", "groupon", "metrics", "test");
+    private static final GroupName TESTGROUP = GroupName.valueOf("com", "groupon", "metrics", "test");
 
     @Test
     public void always_firing_alert() throws Exception {
@@ -78,7 +78,7 @@ public class AlertTest extends AbstractAlertTest {
          */
         try (AlertValidator impl = replay("alert foobar if true;", 60)) {
             impl.validate(
-                newDatapoint(new GroupName("foobar"), FIRING));
+                newDatapoint(GroupName.valueOf("foobar"), FIRING));
         }
     }
 
@@ -88,9 +88,9 @@ public class AlertTest extends AbstractAlertTest {
          * This test doesn't test if the alert performs correctly, but if the 'foobar' group is accepted as a group name.
          */
         try (AlertValidator impl = replay("alert test if foobar x;", 60,
-                newDatapoint(new GroupName("foobar"), "x", true, null, false))) {
+                newDatapoint(GroupName.valueOf("foobar"), "x", true, null, false))) {
             impl.validate(
-                newDatapoint(new GroupName("test"), FIRING, UNKNOWN, OK));
+                newDatapoint(GroupName.valueOf("test"), FIRING, UNKNOWN, OK));
         }
     }
 
@@ -98,16 +98,16 @@ public class AlertTest extends AbstractAlertTest {
     public void alert_match() throws Exception {
         try (AlertValidator impl = replay("match com.**.test as t { alert ${t} if t x; }", 60,
                 newDatapoint(TESTGROUP,                    "x", false,  true),
-                newDatapoint(new GroupName("com", "test"), "x", true,   false))) {
+                newDatapoint(GroupName.valueOf("com", "test"), "x", true,   false))) {
             impl.validate(
-                newDatapoint(new GroupName("com", "test"),      FIRING, OK),
+                newDatapoint(GroupName.valueOf("com", "test"),      FIRING, OK),
                 newDatapoint(TESTGROUP,                         OK,     FIRING));
         }
     }
 
     @Test
     public void alert_match_subgroup() throws Exception {
-        final GroupName EXPECTED_TESTGROUP = new GroupName(new SimpleGroupPath(new ArrayList<String>() {{
+        final GroupName EXPECTED_TESTGROUP = GroupName.valueOf(SimpleGroupPath.valueOf(new ArrayList<String>() {{
                     add("foo");
                     addAll(TESTGROUP.getPath().getPath());
                     add("bar");
@@ -115,9 +115,9 @@ public class AlertTest extends AbstractAlertTest {
 
         try (AlertValidator impl = replay("match com.**.test as t { alert foo.${t}.bar if t x; }", 60,
                 newDatapoint(TESTGROUP,                    "x", false,  true),
-                newDatapoint(new GroupName("com", "test"), "x", true,   false))) {
+                newDatapoint(GroupName.valueOf("com", "test"), "x", true,   false))) {
             impl.validate(
-                newDatapoint(new GroupName("foo", "com", "test", "bar"), FIRING, OK),
+                newDatapoint(GroupName.valueOf("foo", "com", "test", "bar"), FIRING, OK),
                 newDatapoint(EXPECTED_TESTGROUP,                         OK,     FIRING));
         }
     }
@@ -128,13 +128,13 @@ public class AlertTest extends AbstractAlertTest {
                 "if java.lang.Runtime Uptime <= 15 * 60 * 1000  # 15 minutes\n" +
                 "for 20m;\n",
                 60,
-                newDatapoint(new GroupName("java", "lang", "Runtime"), "Uptime",
+                newDatapoint(GroupName.valueOf("java", "lang", "Runtime"), "Uptime",
                          1 * 60 * 1000,  2 * 60 * 1000,  3 * 60 * 1000,  4 * 60 * 1000,  5 * 60 * 1000,
                          6 * 60 * 1000,  7 * 60 * 1000,  8 * 60 * 1000,  9 * 60 * 1000, 10 * 60 * 1000,
                         11 * 60 * 1000, 12 * 60 * 1000, 13 * 60 * 1000, 14 * 60 * 1000, 15 * 60 * 1000,
                         16 * 60 * 1000, 17 * 60 * 1000, 18 * 60 * 1000, 19 * 60 * 1000, 20 * 60 * 1000,
                         21 * 60 * 1000, 22 * 60 * 1000, 23 * 60 * 1000, 24 * 60 * 1000, 25 * 60 * 1000))) {
-            impl.validate(newDatapoint(new GroupName("too_many_restarts"),
+            impl.validate(newDatapoint(GroupName.valueOf("too_many_restarts"),
                     TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING,
                     TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING,
                     TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING,
@@ -149,13 +149,13 @@ public class AlertTest extends AbstractAlertTest {
                 "if java.lang.Runtime Uptime <= 15 * 60 * 1000  # 15 minutes\n" +
                 "for 20m;\n",
                 60,
-                newDatapoint(new GroupName("java", "lang", "Runtime"), "Uptime",
+                newDatapoint(GroupName.valueOf("java", "lang", "Runtime"), "Uptime",
                          1 * 60 * 1000,  2 * 60 * 1000,  3 * 60 * 1000,  4 * 60 * 1000,  5 * 60 * 1000,
                          6 * 60 * 1000,  7 * 60 * 1000,  8 * 60 * 1000,  9 * 60 * 1000, 10 * 60 * 1000,
                         11 * 60 * 1000, 12 * 60 * 1000, 13 * 60 * 1000, 14 * 60 * 1000, 15 * 60 * 1000,
                          1 * 60 * 1000,  2 * 60 * 1000,  3 * 60 * 1000,  4 * 60 * 1000,  5 * 60 * 1000,
                          6 * 60 * 1000,  7 * 60 * 1000,  8 * 60 * 1000,  9 * 60 * 1000, 10 * 60 * 1000))) {
-            impl.validate(newDatapoint(new GroupName("too_many_restarts"),
+            impl.validate(newDatapoint(GroupName.valueOf("too_many_restarts"),
                     TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING,
                     TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING,
                     TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING,
@@ -167,8 +167,8 @@ public class AlertTest extends AbstractAlertTest {
     @Test
     public void alert_with_unknown_inbetween() throws Exception {
         try (AlertValidator impl = replay("alert test if test x for 3m;", 60,
-                newDatapoint(new GroupName("test"), "x", true, true, true, true, null, null, true))) {
-            impl.validate(newDatapoint(new GroupName("test"),
+                newDatapoint(GroupName.valueOf("test"), "x", true, true, true, true, null, null, true))) {
+            impl.validate(newDatapoint(GroupName.valueOf("test"),
                     TRIGGERING, TRIGGERING, TRIGGERING, FIRING, UNKNOWN, UNKNOWN, TRIGGERING));
         }
     }
@@ -176,8 +176,8 @@ public class AlertTest extends AbstractAlertTest {
     @Test
     public void alert_with_unknown_before() throws Exception {
         try (AlertValidator impl = replay("alert test if test x for 3m;", 60,
-                newDatapoint(new GroupName("test"), "x", null, null, null, true))) {
-            impl.validate(newDatapoint(new GroupName("test"),
+                newDatapoint(GroupName.valueOf("test"), "x", null, null, null, true))) {
+            impl.validate(newDatapoint(GroupName.valueOf("test"),
                     UNKNOWN, UNKNOWN, UNKNOWN, TRIGGERING));
         }
     }

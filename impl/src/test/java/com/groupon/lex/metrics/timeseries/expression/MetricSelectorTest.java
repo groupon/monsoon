@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -68,7 +68,7 @@ public class MetricSelectorTest {
     @Before
     public void setup() {
         final MutableTimeSeriesCollection previous = new MutableTimeSeriesCollection(t0.minus(Duration.standardMinutes(1)));
-        final MutableTimeSeriesCollection current = new MutableTimeSeriesCollection(t0, Stream.of(new MutableTimeSeriesValue(t0, new GroupName("99", "Luftballons"), singletonMap(new MetricName("value"), MetricValue.fromIntValue(17)))));
+        final MutableTimeSeriesCollection current = new MutableTimeSeriesCollection(t0, Stream.of(new MutableTimeSeriesValue(t0, GroupName.valueOf("99", "Luftballons"), singletonMap(MetricName.valueOf("value"), MetricValue.fromIntValue(17)))));
         final TimeSeriesCollectionPair ts_data = new TimeSeriesCollectionPairInstance() {{
             startNewCycle(previous.getTimestamp(), ExpressionLookBack.EMPTY);
             previous.getData().values().forEach(this.getCurrentCollection()::add);
@@ -81,7 +81,7 @@ public class MetricSelectorTest {
 
     @Test
     public void lookup() {
-        final MetricSelector selector = new MetricSelector(group, new MetricName("value"));
+        final MetricSelector selector = new MetricSelector(group, MetricName.valueOf("value"));
         TimeSeriesMetricDeltaSet found = selector.apply(ctx);
 
         assertThat(found.streamValues().collect(Collectors.toList()),
@@ -90,7 +90,7 @@ public class MetricSelectorTest {
 
     @Test
     public void metric_notfound() {
-        final MetricSelector selector = new MetricSelector(group, new MetricName("99 Kriegsminister"));
+        final MetricSelector selector = new MetricSelector(group, MetricName.valueOf("99 Kriegsminister"));
         TimeSeriesMetricDeltaSet found = selector.apply(ctx);
 
         assertTrue(found.isEmpty());
@@ -98,7 +98,7 @@ public class MetricSelectorTest {
 
     @Test
     public void group_notfound() {
-        final MetricSelector selector = new MetricSelector(notfound_group, new MetricName("99 Kriegsminister"));
+        final MetricSelector selector = new MetricSelector(notfound_group, MetricName.valueOf("99 Kriegsminister"));
         TimeSeriesMetricDeltaSet found = selector.apply(ctx);
 
         assertTrue(found.isEmpty());

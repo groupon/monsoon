@@ -10,7 +10,6 @@ import ConfigBnf;
     import com.groupon.lex.metrics.expression.*;
     import com.groupon.lex.metrics.timeseries.*;
     import com.groupon.lex.metrics.timeseries.expression.*;
-    import com.groupon.lex.metrics.NameCache;
     import com.groupon.lex.metrics.MetricValue;
     import com.groupon.lex.metrics.GroupName;
     import com.groupon.lex.metrics.PathMatcher;

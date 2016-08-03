@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -57,7 +57,7 @@ import org.junit.Test;
 public class TagsTest {
     @Test
     public void empty_map() {
-        final Tags tags = new Tags(EMPTY_MAP);
+        final Tags tags = Tags.valueOf(EMPTY_MAP);
 
         assertTrue(tags.asMap().isEmpty());
         assertTrue(tags.isEmpty());
@@ -68,7 +68,7 @@ public class TagsTest {
 
     @Test
     public void empty_stream() {
-        final Tags tags = new Tags(Stream.empty());
+        final Tags tags = Tags.valueOf(Stream.empty());
 
         assertTrue(tags.asMap().isEmpty());
         assertTrue(tags.isEmpty());
@@ -79,26 +79,26 @@ public class TagsTest {
 
     @Test
     public void from_stream() {
-        final Tags tags = new Tags(singletonMap("foo", MetricValue.fromStrValue("bar")).entrySet().stream());
+        final Tags tags = Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar")).entrySet().stream());
 
-        assertEquals(new Tags(singletonMap("foo", MetricValue.fromStrValue("bar"))), tags);
+        assertEquals(Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar"))), tags);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void from_bad_stream() {
-        new Tags(singletonMap("foo", MetricValue.EMPTY).entrySet().stream());
+        Tags.valueOf(singletonMap("foo", MetricValue.EMPTY).entrySet().stream());
     }
 
     @Test(expected = IllegalStateException.class)
     public void from_duplicates_stream() {
         final Set<Map.Entry<String, MetricValue>> elems = singletonMap("foo", MetricValue.fromStrValue("bar")).entrySet();
 
-        new Tags(Stream.concat(elems.stream(), elems.stream()));
+        Tags.valueOf(Stream.concat(elems.stream(), elems.stream()));
     }
 
     @Test
     public void present() {
-        final Tags tags = new Tags(singletonMap("foo", MetricValue.fromStrValue("bar")));
+        final Tags tags = Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar")));
 
         assertThat(tags.asMap(), hasEntry("foo", MetricValue.fromStrValue("bar")));
         assertFalse(tags.isEmpty());
@@ -109,9 +109,9 @@ public class TagsTest {
 
     @Test
     public void equality() {
-        final Tags t_empty = new Tags(EMPTY_MAP);
-        final Tags t_foo_1 = new Tags(singletonMap("foo", MetricValue.fromStrValue("bar")));
-        final Tags t_foo_2 = new Tags(singletonMap("foo", MetricValue.fromStrValue("bar")));
+        final Tags t_empty = Tags.valueOf(EMPTY_MAP);
+        final Tags t_foo_1 = Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar")));
+        final Tags t_foo_2 = Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar")));
 
         assertEquals(Tags.EMPTY, t_empty);
         assertEquals(t_foo_1, t_foo_2);
@@ -124,7 +124,7 @@ public class TagsTest {
 
     @Test
     public void inequality_type() {
-        final Tags tags = new Tags(singletonMap("foo", MetricValue.fromStrValue("bar")));
+        final Tags tags = Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar")));
 
         assertFalse(tags.equals(null));
         assertFalse(tags.equals(new Object()));
@@ -132,7 +132,7 @@ public class TagsTest {
 
     @Test
     public void iterator() {
-        final Tags tags = new Tags(singletonMap("foo", MetricValue.fromStrValue("bar")));
+        final Tags tags = Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar")));
 
         assertFalse(Tags.EMPTY.iterator().hasNext());
         assertTrue(tags.iterator().hasNext());
@@ -141,9 +141,9 @@ public class TagsTest {
 
     @Test
     public void hascode_changes_with_contents() {
-        final Tags t0 = new Tags(singletonMap("fizz", MetricValue.fromStrValue("bar")));
-        final Tags t1 = new Tags(singletonMap("buzz", MetricValue.fromStrValue("bar")));
-        final Tags t2 = new Tags(singletonMap("fizz", MetricValue.fromStrValue("bar")));
+        final Tags t0 = Tags.valueOf(singletonMap("fizz", MetricValue.fromStrValue("bar")));
+        final Tags t1 = Tags.valueOf(singletonMap("buzz", MetricValue.fromStrValue("bar")));
+        final Tags t2 = Tags.valueOf(singletonMap("fizz", MetricValue.fromStrValue("bar")));
 
         if (t0.asMap().hashCode() != t1.asMap().hashCode())
             assertNotEquals(t0.hashCode(), t1.hashCode());
@@ -152,7 +152,7 @@ public class TagsTest {
 
     @Test
     public void filter() {
-        final Tags tags = new Tags(singletonMap("fizz", MetricValue.fromStrValue("bar")));
+        final Tags tags = Tags.valueOf(singletonMap("fizz", MetricValue.fromStrValue("bar")));
 
         assertThat(tags.filter(singleton("fizz")).asMap(), hasEntry("fizz", MetricValue.fromStrValue("bar")));
         assertThat(tags.filter(singleton("buzz")).asMap(), not(hasEntry("fizz", MetricValue.fromStrValue("bar"))));
@@ -160,7 +160,7 @@ public class TagsTest {
 
     @Test
     public void tag_as_string() {
-        final Tags tags = new Tags(new HashMap<String, MetricValue>() {{
+        final Tags tags = Tags.valueOf(new HashMap<String, MetricValue>() {{
             put("bool", MetricValue.TRUE);
             put("int", MetricValue.fromIntValue(17));
             put("flt", MetricValue.fromDblValue(19));
@@ -173,15 +173,15 @@ public class TagsTest {
 
     @Test
     public void compare() {
-        final Tags t0 = new Tags(singletonMap("a", MetricValue.TRUE));
-        final Tags t1 = new Tags(singletonMap("b", MetricValue.fromIntValue(7)));
-        final Tags t2 = new Tags(singletonMap("b", MetricValue.fromIntValue(9)));
-        final Tags t3 = new Tags(
+        final Tags t0 = Tags.valueOf(singletonMap("a", MetricValue.TRUE));
+        final Tags t1 = Tags.valueOf(singletonMap("b", MetricValue.fromIntValue(7)));
+        final Tags t2 = Tags.valueOf(singletonMap("b", MetricValue.fromIntValue(9)));
+        final Tags t3 = Tags.valueOf(
                 Stream.of(singletonMap("b", MetricValue.fromIntValue(9)),
                                 singletonMap("c", MetricValue.fromIntValue(9)))
                         .map(Map::entrySet)
                         .flatMap(Collection::stream));
-        final Tags t4 = new Tags(singletonMap("c", MetricValue.fromIntValue(9)));
+        final Tags t4 = Tags.valueOf(singletonMap("c", MetricValue.fromIntValue(9)));
 
         assertTrue(t0.compareTo(t1) < 0);
         assertTrue(t0.compareTo(t2) < 0);
@@ -211,9 +211,9 @@ public class TagsTest {
 
     @Test
     public void compare_on_value() {
-        final Tags t0 = new Tags(singletonMap("a", MetricValue.fromIntValue(7)));
-        final Tags t1 = new Tags(singletonMap("a", MetricValue.fromIntValue(9)));
-        final Tags t2 = new Tags(singletonMap("a", MetricValue.TRUE));
+        final Tags t0 = Tags.valueOf(singletonMap("a", MetricValue.fromIntValue(7)));
+        final Tags t1 = Tags.valueOf(singletonMap("a", MetricValue.fromIntValue(9)));
+        final Tags t2 = Tags.valueOf(singletonMap("a", MetricValue.TRUE));
 
         assertTrue(t0.compareTo(t1) < 0);
         assertTrue(t0.compareTo(t2) < 0);
