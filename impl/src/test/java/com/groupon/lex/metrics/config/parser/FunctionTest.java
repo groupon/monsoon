@@ -366,4 +366,14 @@ public class FunctionTest extends AbstractAlertTest {
                     OK, OK, OK, UNKNOWN, UNKNOWN));
         }
     }
+
+    @Test
+    public void name_expr() throws Exception {
+        try (AbstractAlertTest.AlertValidator impl = replay("alert test if "
+                + "name(" + TESTGROUP.configString() + ") != " + TESTGROUP.configString() + " expected;", 60,
+                newDatapoint(TESTGROUP, "expected", String.join(".", TESTGROUP.getPath().getPath())))) {
+            impl.validate(newDatapoint(GroupName.valueOf("test"),
+                    OK));
+        }
+    }
 }
