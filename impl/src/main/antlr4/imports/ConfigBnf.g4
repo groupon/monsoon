@@ -803,6 +803,7 @@ function_invocation returns [ TimeSeriesMetricExpression s ]
                    | { $fn.getText().equals("str")            }? s_fn__str=fn__str         { expr = $s_fn__str.s;     }
                    | { $fn.getText().equals("regexp")         }? s_fn__regexp=fn__regexp   { expr = $s_fn__regexp.s;  }
                    | { $fn.getText().equals("percentile_agg") }? s_fn__pct_agg=fn__pct_agg { expr = $s_fn__pct_agg.s; }
+                   | { $fn.getText().equals("name")           }? s_fn__name=fn__name       { expr = $s_fn__name.s;    }
                    )
                    | TAG_KW BRACE_OPEN_LIT                       s_fn__tag=fn__tag         { expr = $s_fn__tag.s;     }
                  ;
@@ -860,6 +861,11 @@ fn__regexp       returns [ TimeSeriesMetricExpression s ]
                    | s_regexp_re=regex{ regexp = $s_regexp_re.s; }
                    ) COMMA_LIT
                    s_replacement=quoted_string
+                   BRACE_CLOSE_LIT
+                 ;
+fn__name         returns [ TimeSeriesMetricExpression s ]
+                 @after{ $s = new NameExpression($s_name.s); }
+                 : s_name=name
                    BRACE_CLOSE_LIT
                  ;
 
