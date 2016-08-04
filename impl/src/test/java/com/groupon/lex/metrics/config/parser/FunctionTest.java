@@ -376,4 +376,45 @@ public class FunctionTest extends AbstractAlertTest {
                     OK));
         }
     }
+
+    @Test
+    public void name_indirect() throws Exception {
+        final GroupName groupName0 = GroupName.valueOf("com", "groupon", "metrics", "17");  // G[3] = 17
+        final GroupName groupName1 = GroupName.valueOf("com", "groupon", "metrics", "true");  // G[3] = true
+        final GroupName groupName2 = GroupName.valueOf("com", "groupon", "metrics", "false");  // G[3] = false
+        final GroupName groupName3 = GroupName.valueOf("com", "groupon", "metrics", "3e4");  // G[3] = 3e4
+        final GroupName groupName4 = GroupName.valueOf("com", "groupon", "metrics", "just a string");  // G[3] = "just a string"
+
+        try (AbstractAlertTest.AlertValidator impl = replay(
+                  "match com.groupon.metrics.* as G {\n"
+                + "    alert ${G[2:]}\n"
+                + "    if name(${G[2:]}) != G expected;\n"
+                + "\n"
+                + "    alert shortname.${G[3]}\n"
+                + "    if name(${G[3]}) != G shortname;\n"
+                + "}\n", 60,
+                newDatapoint(groupName0, "expected", String.join(".", groupName0.getPath().getPath().subList(2, 4))),
+                newDatapoint(groupName1, "expected", String.join(".", groupName1.getPath().getPath().subList(2, 4))),
+                newDatapoint(groupName2, "expected", String.join(".", groupName2.getPath().getPath().subList(2, 4))),
+                newDatapoint(groupName3, "expected", String.join(".", groupName3.getPath().getPath().subList(2, 4))),
+                newDatapoint(groupName4, "expected", String.join(".", groupName4.getPath().getPath().subList(2, 4))),
+                newDatapoint(groupName0, "shortname", 17),
+                newDatapoint(groupName1, "shortname", true),
+                newDatapoint(groupName2, "shortname", false),
+                newDatapoint(groupName3, "shortname", 3e4),
+                newDatapoint(groupName4, "shortname", "just a string")
+        )) {
+            impl.validate(
+                    newDatapoint(GroupName.valueOf("metrics",   "17"),            OK),
+                    newDatapoint(GroupName.valueOf("metrics",   "true"),          OK),
+                    newDatapoint(GroupName.valueOf("metrics",   "false"),         OK),
+                    newDatapoint(GroupName.valueOf("metrics",   "3e4"),           OK),
+                    newDatapoint(GroupName.valueOf("metrics",   "just a string"), OK),
+                    newDatapoint(GroupName.valueOf("shortname", "17"),            OK),
+                    newDatapoint(GroupName.valueOf("shortname", "true"),          OK),
+                    newDatapoint(GroupName.valueOf("shortname", "false"),         OK),
+                    newDatapoint(GroupName.valueOf("shortname", "3e4"),           OK),
+                    newDatapoint(GroupName.valueOf("shortname", "just a string"), OK));
+        }
+    }
 }
