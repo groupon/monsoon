@@ -46,39 +46,27 @@ import com.groupon.lex.metrics.timeseries.expression.Context;
 import com.groupon.lex.metrics.transformers.NameResolver;
 import java.util.Collection;
 import static java.util.Collections.EMPTY_MAP;
-import static java.util.Collections.singletonMap;
-import static java.util.Collections.unmodifiableMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
-import lombok.Getter;
-import static java.util.Objects.requireNonNull;
+import lombok.NonNull;
+import lombok.Value;
 
 /**
  * Creates a new metric, by applying an expression.
  * @author ariane
  */
+@Value
 public class DerivedMetricTransformerImpl implements TimeSeriesTransformer {
-    @Getter
+    @NonNull
     private final NameResolver group;
-    @Getter
+    @NonNull
     private final Map<String, TimeSeriesMetricExpression> tags;
-    @Getter
+    @NonNull
     private final Map<NameResolver, TimeSeriesMetricExpression> mapping;
-
-    public DerivedMetricTransformerImpl(NameResolver group, NameResolver metric, TimeSeriesMetricExpression value_expr) {
-        this(group, EMPTY_MAP, singletonMap(requireNonNull(metric), requireNonNull(value_expr)));
-    }
-
-    public DerivedMetricTransformerImpl(NameResolver group, Map<String, TimeSeriesMetricExpression> tags, Map<NameResolver, TimeSeriesMetricExpression> mapping) {
-        this.group = requireNonNull(group);
-        this.tags = unmodifiableMap(new HashMap<>(requireNonNull(tags)));
-        this.mapping = unmodifiableMap(new HashMap<>(requireNonNull(mapping)));
-    }
 
     private static <T, U> Stream<Map.Entry<U, TimeSeriesMetricDeltaSet>> resolveMapping(Context ctx, Map<T, TimeSeriesMetricExpression> mapping, Function<? super T, Optional<? extends U>> key_mapper_) {
         return mapping.entrySet().stream()
@@ -136,36 +124,6 @@ public class DerivedMetricTransformerImpl implements TimeSeriesTransformer {
                                         .addMetric(grp, metric, tsdelta);
                             });
                 });
-    }
-
-    @Override
-    public int hashCode() {
-        int hash = 5;
-        hash = 61 * hash + Objects.hashCode(this.group);
-        hash = 61 * hash + Objects.hashCode(this.tags);
-        hash = 61 * hash + Objects.hashCode(this.mapping);
-        return hash;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final DerivedMetricTransformerImpl other = (DerivedMetricTransformerImpl) obj;
-        if (!Objects.equals(this.group, other.group)) {
-            return false;
-        }
-        if (!Objects.equals(this.tags, other.tags)) {
-            return false;
-        }
-        if (!Objects.equals(this.mapping, other.mapping)) {
-            return false;
-        }
-        return true;
     }
 
     @Override

@@ -36,59 +36,71 @@ import com.groupon.lex.metrics.config.impl.DerivedMetricTransformerImpl;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import com.groupon.lex.metrics.timeseries.TimeSeriesTransformer;
 import com.groupon.lex.metrics.transformers.NameResolver;
+import gnu.trove.map.hash.THashMap;
+import static java.util.Collections.unmodifiableMap;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
+import lombok.Data;
+import lombok.NonNull;
 
 /**
  *
  * @author ariane
  */
+@Data
 public class DerivedMetricStatement implements RuleStatement {
     private final static String INDENT = "    ";
-    private final DerivedMetricTransformerImpl impl_;
-
-    public DerivedMetricStatement(NameResolver group, NameResolver metric, TimeSeriesMetricExpression value_expr) {
-        impl_ = new DerivedMetricTransformerImpl(group, metric, value_expr);
-    }
-
-    public DerivedMetricStatement(NameResolver group, Map<String, TimeSeriesMetricExpression> tag_value_exprs, Map<NameResolver, TimeSeriesMetricExpression> metric_value_exprs) {
-        impl_ = new DerivedMetricTransformerImpl(group, tag_value_exprs, metric_value_exprs);
-    }
+    @NonNull
+    private NameResolver group;
+    @NonNull
+    private Map<String, TimeSeriesMetricExpression> tags;
+    @NonNull
+    private Map<NameResolver, TimeSeriesMetricExpression> mapping;
 
     @Override
     public TimeSeriesTransformer get() {
-        return impl_;
+        // Use copies of the internal map.
+        return new DerivedMetricTransformerImpl(group, unmodifiableMap(new THashMap<>(tags)), unmodifiableMap(new THashMap<>(mapping)));
     }
 
     @Override
     public StringBuilder configString() {
         final StringBuilder sb = new StringBuilder()
                 .append("define ")
-                .append(impl_.getGroup().configString())
+                .append(getGroup().configString())
                 .append(' ');
 
-        if (!impl_.getTags().isEmpty()) {
-            sb.append(impl_.getTags().entrySet().stream()
+        if (!getTags().isEmpty()) {
+            final boolean multiLine = getTags().size() != 1;  // Don't do newlines for single tag.
+            final Collector<CharSequence, ?, String> joiner;
+
+            if (multiLine)
+                joiner = Collectors.joining(",\n", "tag (\n", ") ");
+            else
+                joiner = Collectors.joining(", ", "tag (", ") ");
+
+            sb.append(getTags().entrySet().stream()
                     .map(tag_mapping -> {
                         final String tagIdent = ConfigSupport.maybeQuoteIdentifier(tag_mapping.getKey()).toString();
                         final String tagExpr = tag_mapping.getValue().configString().toString();
-                        return INDENT + tagIdent + " = " + tagExpr;
+                        return (multiLine ? INDENT : "") + tagIdent + " = " + tagExpr;
                     })
-                    .collect(Collectors.joining(",\n", "tag (\n", "\n) ")));
+                    .collect(joiner));
         }
 
-        if (impl_.getMapping().size() == 1) {
-            Map.Entry<NameResolver, TimeSeriesMetricExpression> entry = impl_.getMapping().entrySet().stream().findAny().get();
+        if (getMapping().size() == 1) {
+            Map.Entry<NameResolver, TimeSeriesMetricExpression> entry = getMapping().entrySet().stream().findAny().get();
             sb
                     .append(entry.getKey().configString())
                     .append(" = ")
                     .append(entry.getValue().configString())
                     .append(";\n");
-        } else if (impl_.getMapping().isEmpty()) {
+        } else if (getMapping().isEmpty()) {
             sb.append("{}\n");
         } else {
-            sb.append(impl_.getMapping().entrySet().stream()
+            sb.append(getMapping().entrySet().stream()
                     .sorted(Comparator.comparing(entry -> entry.getKey().configString().toString()))
                     .map(entry -> {
                         final String metricName = entry.getKey().configString().toString();
