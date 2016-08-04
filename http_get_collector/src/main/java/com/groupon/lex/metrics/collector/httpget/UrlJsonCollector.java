@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -38,8 +38,8 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.groupon.lex.metrics.Metric;
+import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.SimpleMetric;
 import java.io.IOException;
@@ -82,7 +82,7 @@ public class UrlJsonCollector extends UrlGetCollector {
 
     private static Stream<Metric> decode_(List<String> prefix, JsonElement elem) {
         if (elem.isJsonNull())
-            return Stream.of(new SimpleMetric(NameCache.singleton.newMetricName(prefix), MetricValue.EMPTY));
+            return Stream.of(new SimpleMetric(MetricName.valueOf(prefix), MetricValue.EMPTY));
 
         if (elem.isJsonArray()) {
             return decode_array_(prefix, elem.getAsJsonArray());
@@ -92,7 +92,7 @@ public class UrlJsonCollector extends UrlGetCollector {
             return decode_object_(prefix, elem.getAsJsonObject());
         }
 
-        return Stream.of(new SimpleMetric(NameCache.singleton.newMetricName(prefix), decode_primitive_(elem)));
+        return Stream.of(new SimpleMetric(MetricName.valueOf(prefix), decode_primitive_(elem)));
     }
 
     private static Stream<Metric> decode_array_(List<String> prefix, JsonArray elem) {

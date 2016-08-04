@@ -188,11 +188,11 @@ public class TSDataTest {
                     public FileTimeSeriesCollection apply(Integer i) {
                         return new FileTimeSeriesCollection(now.plusMinutes(i), Stream.of(
                                 new MutableTimeSeriesValue(now.plusMinutes(i),
-                                        new GroupName(new SimpleGroupPath("foo", "bar")),
-                                        singletonMap(new MetricName("x"), MetricValue.fromIntValue(i))),
+                                        GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
+                                        singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))),
                                 new MutableTimeSeriesValue(now.plusMinutes(i),
-                                        new GroupName(new SimpleGroupPath("h", "i", "s", "t", "o", "g", "r", "a", "m")),
-                                        singletonMap(new MetricName("x"), MetricValue.fromHistValue(hist)))
+                                        GroupName.valueOf(SimpleGroupPath.valueOf("h", "i", "s", "t", "o", "g", "r", "a", "m")),
+                                        singletonMap(MetricName.valueOf("x"), MetricValue.fromHistValue(hist)))
                                 ));
                     }
                 })

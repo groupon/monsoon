@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -85,9 +85,9 @@ public class CollectdPushCollector_CollectdMessageTest {
 
     @Test
     public void toMetricGroup() {
-        MetricGroup group = msg.toMetricGroup(new SimpleGroupPath("foo"));
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
 
-        assertEquals(new GroupName(new SimpleGroupPath("foo", "plugin", "instance-0"), singletonMap("host", MetricValue.fromStrValue("otherhost"))),
+        assertEquals(GroupName.valueOf(SimpleGroupPath.valueOf("foo", "plugin", "instance-0"), singletonMap("host", MetricValue.fromStrValue("otherhost"))),
                 group.getName());
 
         /** Convenience for testing: metrics as a map. */
@@ -95,9 +95,9 @@ public class CollectdPushCollector_CollectdMessageTest {
                 .collect(Collectors.toMap(Metric::getName, Metric::getValue));
         assertThat(metric_map,
                 allOf(
-                        hasEntry(new MetricName("type", "type-0", "x"), MetricValue.fromDblValue(10)),
-                        hasEntry(new MetricName("type", "type-0", "y"), MetricValue.fromIntValue(20)),
-                        hasEntry(new MetricName("type", "type-0", "z"), MetricValue.fromIntValue(30))));
+                        hasEntry(MetricName.valueOf("type", "type-0", "x"), MetricValue.fromDblValue(10)),
+                        hasEntry(MetricName.valueOf("type", "type-0", "y"), MetricValue.fromIntValue(20)),
+                        hasEntry(MetricName.valueOf("type", "type-0", "z"), MetricValue.fromIntValue(30))));
     }
 
     @Test
@@ -113,12 +113,12 @@ public class CollectdPushCollector_CollectdMessageTest {
         msg.plugin_instance = "instance-0";
         msg.type = "type";
         msg.type_instance = "type-0";
-        MetricGroup group = msg.toMetricGroup(new SimpleGroupPath("foo"));
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
 
-        assertEquals(new GroupName(new SimpleGroupPath("foo", "plugin", "instance-0"), singletonMap("host", MetricValue.fromStrValue("otherhost"))),
+        assertEquals(GroupName.valueOf(SimpleGroupPath.valueOf("foo", "plugin", "instance-0"), singletonMap("host", MetricValue.fromStrValue("otherhost"))),
                 group.getName());
         assertEquals(1, group.getMetrics().length);
-        assertEquals(new MetricName("type", "type-0"), group.getMetrics()[0].getName());
+        assertEquals(MetricName.valueOf("type", "type-0"), group.getMetrics()[0].getName());
         assertEquals(MetricValue.fromDblValue(10.0d), group.getMetrics()[0].getValue());
     }
 
@@ -135,12 +135,12 @@ public class CollectdPushCollector_CollectdMessageTest {
         msg.plugin_instance = "instance-0";
         msg.type = "type";
         msg.type_instance = "type-0";
-        MetricGroup group = msg.toMetricGroup(new SimpleGroupPath("foo"));
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
 
-        assertEquals(new GroupName(new SimpleGroupPath("foo", "plugin", "instance-0"), singletonMap("host", MetricValue.fromStrValue("otherhost"))),
+        assertEquals(GroupName.valueOf(SimpleGroupPath.valueOf("foo", "plugin", "instance-0"), singletonMap("host", MetricValue.fromStrValue("otherhost"))),
                 group.getName());
         assertEquals(1, group.getMetrics().length);
-        assertEquals(new MetricName("type", "type-0", "x"), group.getMetrics()[0].getName());
+        assertEquals(MetricName.valueOf("type", "type-0", "x"), group.getMetrics()[0].getName());
         assertEquals(MetricValue.fromDblValue(10.0d), group.getMetrics()[0].getValue());
     }
 
@@ -157,9 +157,9 @@ public class CollectdPushCollector_CollectdMessageTest {
         msg.plugin_instance = "instance-0";
         msg.type = "type";
         msg.type_instance = "type-0";
-        MetricGroup group = msg.toMetricGroup(new SimpleGroupPath("foo"));
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
 
-        assertEquals(new GroupName(new SimpleGroupPath("foo", "plugin", "instance-0"), singletonMap("host", MetricValue.fromStrValue("otherhost"))),
+        assertEquals(GroupName.valueOf(SimpleGroupPath.valueOf("foo", "plugin", "instance-0"), singletonMap("host", MetricValue.fromStrValue("otherhost"))),
                 group.getName());
         assertEquals(2, group.getMetrics().length);
 
@@ -168,7 +168,7 @@ public class CollectdPushCollector_CollectdMessageTest {
                 .collect(Collectors.toMap(Metric::getName, Metric::getValue));
         assertThat(metric_map,
                 allOf(
-                        hasEntry(new MetricName("type", "type-0", "value"), MetricValue.fromDblValue(10)),
-                        hasEntry(new MetricName("type", "type-0", "x"), MetricValue.fromIntValue(11))));
+                        hasEntry(MetricName.valueOf("type", "type-0", "value"), MetricValue.fromDblValue(10)),
+                        hasEntry(MetricName.valueOf("type", "type-0", "x"), MetricValue.fromIntValue(11))));
     }
 }

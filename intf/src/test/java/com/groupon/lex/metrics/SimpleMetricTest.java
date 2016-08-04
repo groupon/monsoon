@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -47,60 +47,60 @@ import org.junit.Test;
 public class SimpleMetricTest {
     @Test
     public void constructor_number() {
-        Metric m = new SimpleMetric(new MetricName("foobar"), (short)7);
+        Metric m = new SimpleMetric(MetricName.valueOf("foobar"), (short)7);
 
-        assertEquals(new MetricName("foobar"), m.getName());
+        assertEquals(MetricName.valueOf("foobar"), m.getName());
         assertNotNull(m.getValue());
         MetricValueTest.validateNumber(true, 7, m.getValue());
     }
 
     @Test
     public void constructor_string() {
-        Metric m = new SimpleMetric(new MetricName("foobar"), "chocoladevla");
+        Metric m = new SimpleMetric(MetricName.valueOf("foobar"), "chocoladevla");
 
-        assertEquals(new MetricName("foobar"), m.getName());
+        assertEquals(MetricName.valueOf("foobar"), m.getName());
         assertNotNull(m.getValue());
         MetricValueTest.validateString("chocoladevla", m.getValue());
     }
 
     @Test
     public void constructor_bool() {
-        Metric m = new SimpleMetric(new MetricName("foobar"), true);
+        Metric m = new SimpleMetric(MetricName.valueOf("foobar"), true);
 
-        assertEquals(new MetricName("foobar"), m.getName());
+        assertEquals(MetricName.valueOf("foobar"), m.getName());
         assertNotNull(m.getValue());
         MetricValueTest.validateBoolean(true, m.getValue());
     }
 
     @Test
     public void constructor_metric() {
-        Metric m = new SimpleMetric(new MetricName("foobar"), MetricValue.fromNumberValue(9000));
+        Metric m = new SimpleMetric(MetricName.valueOf("foobar"), MetricValue.fromNumberValue(9000));
 
-        assertEquals(new MetricName("foobar"), m.getName());
+        assertEquals(MetricName.valueOf("foobar"), m.getName());
         assertNotNull(m.getValue());
         MetricValueTest.validateNumber(true, 9000, m.getValue());
     }
 
     @Test
     public void constructor_empty() {
-        Metric m = new SimpleMetric(new MetricName("foobar"), MetricValue.EMPTY);
+        Metric m = new SimpleMetric(MetricName.valueOf("foobar"), MetricValue.EMPTY);
 
-        assertEquals(new MetricName("foobar"), m.getName());
+        assertEquals(MetricName.valueOf("foobar"), m.getName());
         assertNotNull(m.getValue());
         MetricValueTest.validateEmpty(m.getValue());
     }
 
     @Test
     public void to_string() {
-        Metric m = new SimpleMetric(new MetricName("foobar"), MetricValue.fromIntValue(19));
+        Metric m = new SimpleMetric(MetricName.valueOf("foobar"), MetricValue.fromIntValue(19));
 
         assertThat(m.toString(), Matchers.allOf(containsString("foobar"), containsString("19")));
     }
 
     @Test
     public void equality() {
-        Metric m0 = new SimpleMetric(new MetricName("foobar"), MetricValue.fromIntValue(19));
-        Metric m1 = new SimpleMetric(new MetricName("foobar"), MetricValue.fromIntValue(19));
+        Metric m0 = new SimpleMetric(MetricName.valueOf("foobar"), MetricValue.fromIntValue(19));
+        Metric m1 = new SimpleMetric(MetricName.valueOf("foobar"), MetricValue.fromIntValue(19));
 
         assertEquals(m0, m1);
         assertEquals(m0.hashCode(), m1.hashCode());
@@ -108,9 +108,9 @@ public class SimpleMetricTest {
 
     @Test
     public void inequality() {
-        Metric m0 = new SimpleMetric(new MetricName("foobar"), MetricValue.fromIntValue(17));
-        Metric m1 = new SimpleMetric(new MetricName("foobar"), MetricValue.fromIntValue(19));
-        Metric m2 = new SimpleMetric(new MetricName("fizzbuzz"), MetricValue.fromIntValue(19));
+        Metric m0 = new SimpleMetric(MetricName.valueOf("foobar"), MetricValue.fromIntValue(17));
+        Metric m1 = new SimpleMetric(MetricName.valueOf("foobar"), MetricValue.fromIntValue(19));
+        Metric m2 = new SimpleMetric(MetricName.valueOf("fizzbuzz"), MetricValue.fromIntValue(19));
 
         assertNotEquals(m0, m1);
         assertNotEquals(m0, m2);
@@ -124,7 +124,7 @@ public class SimpleMetricTest {
 
     @Test
     public void equal_across_types() {
-        Metric m = new SimpleMetric(new MetricName("foobar"), MetricValue.fromIntValue(19));
+        Metric m = new SimpleMetric(MetricName.valueOf("foobar"), MetricValue.fromIntValue(19));
 
         assertFalse(m.equals(null));
         assertFalse(m.equals(new Object()));

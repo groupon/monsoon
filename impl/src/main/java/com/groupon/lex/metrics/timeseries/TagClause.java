@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -31,7 +31,6 @@
  */
 package com.groupon.lex.metrics.timeseries;
 
-import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.Tags;
 import java.util.Optional;
 import java.util.Set;
@@ -43,18 +42,18 @@ import java.util.Set;
 public interface TagClause {
     /** Create a Tags entry with only the specified keys. */
     public static Tags matchingKeys(Tags in, Set<String> keys) {
-        return NameCache.singleton.newTags(in.asMap().entrySet().stream()
+        return Tags.valueOf(in.asMap().entrySet().stream()
                 .filter(entry -> keys.contains(entry.getKey())));
     }
 
     /** Create a Tags entry with only mismatching keys. */
     public static Tags mismatchingKeys(Tags in, Set<String> keys) {
-        return NameCache.singleton.newTags(in.asMap().entrySet().stream()
+        return Tags.valueOf(in.asMap().entrySet().stream()
                 .filter(entry -> !keys.contains(entry.getKey())));
     }
 
     public static Tags keepCommonTags(Tags x, Tags y) {
-        return NameCache.singleton.newTags(x.stream()
+        return Tags.valueOf(x.stream()
                 .filter(x_entry -> {
                     return Optional.ofNullable(y.asMap().get(x_entry.getKey()))
                             .map(x_entry.getValue()::equals)

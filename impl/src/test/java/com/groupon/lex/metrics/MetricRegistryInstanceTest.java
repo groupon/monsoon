@@ -136,7 +136,7 @@ public class MetricRegistryInstanceTest {
 
     @Test
     public void generator_handling() throws Exception {
-        when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(new GroupName("test"), Stream.of(new SimpleMetric(new MetricName("x"), 17))))));
+        when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17))))));
         final DateTime now = DateTime.now(DateTimeZone.UTC);
 
         try (MetricRegistryInstance mr = create(false, now)) {
@@ -144,7 +144,7 @@ public class MetricRegistryInstanceTest {
             List<TimeSeriesValue> sgroups = mr.updateCollection().getTSValues().stream().collect(Collectors.toList());
 
             assertThat(sgroups,
-                    hasItem(new MutableTimeSeriesValue(now, new GroupName("test"), singletonMap(new MetricName("x"), MetricValue.fromIntValue(17)))));
+                    hasItem(new MutableTimeSeriesValue(now, GroupName.valueOf("test"), singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(17)))));
         }
 
         verify(generator, times(1)).getGroups();
@@ -165,7 +165,7 @@ public class MetricRegistryInstanceTest {
 
     @Test
     public void stream_groups() throws Exception {
-        when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(new GroupName("test"), Stream.of(new SimpleMetric(new MetricName("x"), 17))))));
+        when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17))))));
 
         try (MetricRegistryInstance mr = create(false)) {
             mr.add(generator);
@@ -179,12 +179,12 @@ public class MetricRegistryInstanceTest {
 
     @Test
     public void group_names_resolution() throws Exception {
-        when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(new GroupName("test"), Stream.of(new SimpleMetric(new MetricName("x"), 17))))));
+        when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17))))));
 
         try (MetricRegistryInstance mr = create(false)) {
             mr.add(generator);
             assertThat(mr.getGroupNames(),
-                    arrayContaining(new GroupName("test")));
+                    arrayContaining(GroupName.valueOf("test")));
         }
     }
 

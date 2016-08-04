@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -31,6 +31,9 @@
  */
 package com.groupon.lex.metrics;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import static com.groupon.lex.metrics.ConfigSupport.maybeQuoteIdentifier;
 import static java.util.Collections.EMPTY_MAP;
 import static java.util.Collections.unmodifiableSortedMap;
@@ -42,6 +45,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -50,15 +54,15 @@ import java.util.stream.Stream;
  * @author ariane
  */
 public final class Tags implements Comparable<Tags> {
-    private final SortedMap<String, MetricValue> tags_;
+    private static final Function<Map<String, MetricValue>, Tags> CACHE = CacheBuilder.newBuilder()
+            .softValues()
+            .build(CacheLoader.from((Map<String, MetricValue> in) -> new Tags(in)))::getUnchecked;
     public static final Tags EMPTY = new Tags(EMPTY_MAP);
+    private final SortedMap<String, MetricValue> tags_;
 
-    /** Recommend using NameCache.newTags instead. */
-    public Tags(Stream<Entry<String, MetricValue>> tags) {
-        tags_ = unmodifiableSortedMap(tags.collect(Collectors.toMap(Entry<String, MetricValue>::getKey,
-                Entry<String, MetricValue>::getValue,
-                (u, v) -> { throw new IllegalStateException(String.format("Duplicate key %s", u)); },
-                () -> new TreeMap<String, MetricValue>())));
+    /** Use valueOf() instead. */
+    private Tags(Map<String, MetricValue> tags) {
+        tags_ = unmodifiableSortedMap(new TreeMap<String, MetricValue>(tags));
 
         // Validation
         tags_.keySet().forEach(Objects::requireNonNull);
@@ -69,9 +73,19 @@ public final class Tags implements Comparable<Tags> {
             throw new IllegalArgumentException("tag with histogram makes no sense");
     }
 
-    /** Recommend using NameCache.newTags instead. */
-    public Tags(Map<String, MetricValue> tags) {
-        this(tags.entrySet().stream());
+    public static Tags valueOf(Stream<Map.Entry<String, MetricValue>> tags) {
+        return valueOf(tags.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    }
+
+    public static Tags valueOf(Map<String, MetricValue> tags) {
+        if (tags.isEmpty()) return EMPTY;
+        try {
+            return CACHE.apply(tags);
+        } catch (UncheckedExecutionException e) {
+            if (e.getCause() instanceof RuntimeException)
+                throw (RuntimeException)e.getCause();
+            throw e;
+        }
     }
 
     public SortedMap<String, MetricValue> asMap() { return tags_; }
@@ -105,7 +119,7 @@ public final class Tags implements Comparable<Tags> {
      * @return A new instance of tags, which contains only tags mentioned in the argument set.
      */
     public Tags filter(Set<String> tag_names) {
-        return new Tags(tags_.entrySet().stream()
+        return Tags.valueOf(tags_.entrySet().stream()
                 .filter(entry -> tag_names.contains(entry.getKey())));
     }
 

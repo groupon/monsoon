@@ -62,8 +62,8 @@ public class XdrStreamIteratorTest {
         for (int i = 0; i < 100; ++i) {
             tsdata.add(new FileTimeSeriesCollection(now.plusMinutes(i), Stream.of(
                 new MutableTimeSeriesValue(now.plusMinutes(i),
-                        new GroupName(new SimpleGroupPath("foo", "bar")),
-                        singletonMap(new MetricName("x"), MetricValue.fromIntValue(i))))));
+                        GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
+                        singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))))));
         }
 
         tmpdir = Files.createTempDirectory("monsoon-XdrStreamIteratorTest");

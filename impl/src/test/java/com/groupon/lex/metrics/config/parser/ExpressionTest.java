@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -187,64 +187,64 @@ public class ExpressionTest extends AbstractExpressionTest {
     @Test
     public void percentile_agg_exact() throws Exception {
         validateExpression("percentile_agg(50, TEST *) = test ex.pected",
-                newDatapoint("a",                             4,   7,  -2,    0),
-                newDatapoint("b",                             1,   9,  -1, null),
-                newDatapoint("c",                             1,  11,  -3, null),
-                newDatapoint(new MetricName("ex", "pected"), 1d,  9d, -2d,   0d));
+                newDatapoint("a",                                 4,   7,  -2,    0),
+                newDatapoint("b",                                 1,   9,  -1, null),
+                newDatapoint("c",                                 1,  11,  -3, null),
+                newDatapoint(MetricName.valueOf("ex", "pected"), 1d,  9d, -2d,   0d));
     }
 
     @Test
     public void percentile_agg_fraction() throws Exception {
         validateExpression("percentile_agg(50, TEST *) = test ex.pected",
-                newDatapoint("a",                             4,   7,    -2,    0),
-                newDatapoint("b",                             1,   9,    -1,    1),
-                newDatapoint("c",                             1,  11,    -3,    2),
-                newDatapoint("d",                             1,  13,    -3, null),
-                newDatapoint(new MetricName("ex", "pected"), 1d, 10d, -2.5d,   1d));
+                newDatapoint("a",                                 4,   7,    -2,    0),
+                newDatapoint("b",                                 1,   9,    -1,    1),
+                newDatapoint("c",                                 1,  11,    -3,    2),
+                newDatapoint("d",                                 1,  13,    -3, null),
+                newDatapoint(MetricName.valueOf("ex", "pected"), 1d, 10d, -2.5d,   1d));
     }
 
     @Test
     public void percentile_agg_p99() throws Exception {
         validateExpression("percentile_agg(99, TEST *) = test ex.pected",
-                newDatapoint("00",                             0),
-                newDatapoint("01",                             1),
-                newDatapoint("02",                             2),
-                newDatapoint("03",                             3),
-                newDatapoint("04",                             4),
-                newDatapoint("05",                             5),
-                newDatapoint("06",                             6),
-                newDatapoint("07",                             7),
-                newDatapoint("08",                             8),
-                newDatapoint("09",                             9),
-                newDatapoint("10",                            10),
-                newDatapoint(new MetricName("ex", "pected"), 9.9d));
+                newDatapoint("00",                                 0),
+                newDatapoint("01",                                 1),
+                newDatapoint("02",                                 2),
+                newDatapoint("03",                                 3),
+                newDatapoint("04",                                 4),
+                newDatapoint("05",                                 5),
+                newDatapoint("06",                                 6),
+                newDatapoint("07",                                 7),
+                newDatapoint("08",                                 8),
+                newDatapoint("09",                                 9),
+                newDatapoint("10",                                10),
+                newDatapoint(MetricName.valueOf("ex", "pected"), 9.9d));
     }
 
     @Test
     public void max() throws Exception {
         validateExpression("max(TEST *) = test ex.pected",
-                newDatapoint("a",                             4,   7,  -2,    0),
-                newDatapoint("b",                             1,   9,  -1, null),
-                newDatapoint("c",                             1,  11,  -3, null),
-                newDatapoint(new MetricName("ex", "pected"),  4,  11,  -1,    0));
+                newDatapoint("a",                                 4,   7,  -2,    0),
+                newDatapoint("b",                                 1,   9,  -1, null),
+                newDatapoint("c",                                 1,  11,  -3, null),
+                newDatapoint(MetricName.valueOf("ex", "pected"),  4,  11,  -1,    0));
     }
 
     @Test
     public void min() throws Exception {
         validateExpression("min(TEST *) = test ex.pected",
-                newDatapoint("a",                             4,   7,  -2,    0),
-                newDatapoint("b",                             1,   9,  -1, null),
-                newDatapoint("c",                             1,  11,  -3, null),
-                newDatapoint(new MetricName("ex", "pected"),  1,   7,  -3,    0));
+                newDatapoint("a",                                 4,   7,  -2,    0),
+                newDatapoint("b",                                 1,   9,  -1, null),
+                newDatapoint("c",                                 1,  11,  -3, null),
+                newDatapoint(MetricName.valueOf("ex", "pected"),  1,   7,  -3,    0));
     }
 
     @Test
     public void avg() throws Exception {
         validateExpression("avg(TEST *) = test ex.pected",
-                newDatapoint("a",                             4,   7,  -2,    0),
-                newDatapoint("b",                             1,   9,  -1, null),
-                newDatapoint("c",                             1,  11,  -3, null),
-                newDatapoint(new MetricName("ex", "pected"), 2d,  9d, -2d,    0));
+                newDatapoint("a",                                 4,   7,  -2,    0),
+                newDatapoint("b",                                 1,   9,  -1, null),
+                newDatapoint("c",                                 1,  11,  -3, null),
+                newDatapoint(MetricName.valueOf("ex", "pected"), 2d,  9d, -2d,    0));
     }
 
     @Test

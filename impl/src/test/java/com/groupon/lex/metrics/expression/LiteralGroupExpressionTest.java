@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -69,7 +69,7 @@ public class LiteralGroupExpressionTest {
     @Mock
     private TimeSeriesCollectionPair ts_data;
 
-    private TimeSeriesValue tsv = new MutableTimeSeriesValue(DateTime.now(DateTimeZone.UTC), new GroupName("foobar"));
+    private TimeSeriesValue tsv = new MutableTimeSeriesValue(DateTime.now(DateTimeZone.UTC), GroupName.valueOf("foobar"));
 
     @Test
     public void name() {
@@ -99,9 +99,9 @@ public class LiteralGroupExpressionTest {
         final LiteralGroupExpression expr = new LiteralGroupExpression(resolver);
         final TimeSeriesValueSet expect = new TimeSeriesValueSet(Stream.of(tsv));
 
-        when(resolver.apply(ctx)).thenReturn(Optional.of(new SimpleGroupPath("foobar")));
+        when(resolver.apply(ctx)).thenReturn(Optional.of(SimpleGroupPath.valueOf("foobar")));
         when(ctx.getTSData()).thenReturn(ts_data);
-        when(ts_data.getTSValue(new SimpleGroupPath("foobar"))).thenReturn(expect);
+        when(ts_data.getTSValue(SimpleGroupPath.valueOf("foobar"))).thenReturn(expect);
         assertEquals(expect, expr.getTSDelta(ctx));
     }
 
@@ -117,9 +117,9 @@ public class LiteralGroupExpressionTest {
     public void apply_returning_no_tsv() {
         final LiteralGroupExpression expr = new LiteralGroupExpression(resolver);
 
-        when(resolver.apply(ctx)).thenReturn(Optional.of(new SimpleGroupPath("foobar")));
+        when(resolver.apply(ctx)).thenReturn(Optional.of(SimpleGroupPath.valueOf("foobar")));
         when(ctx.getTSData()).thenReturn(ts_data);
-        when(ts_data.getTSValue(new SimpleGroupPath("foobar"))).thenReturn(TimeSeriesValueSet.EMPTY);
+        when(ts_data.getTSValue(SimpleGroupPath.valueOf("foobar"))).thenReturn(TimeSeriesValueSet.EMPTY);
         assertEquals(TimeSeriesValueSet.EMPTY, expr.getTSDelta(ctx));
     }
 

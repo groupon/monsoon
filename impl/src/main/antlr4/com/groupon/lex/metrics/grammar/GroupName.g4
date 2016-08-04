@@ -41,7 +41,6 @@ import ConfigBnf;
     import com.groupon.lex.metrics.expression.*;
     import com.groupon.lex.metrics.timeseries.*;
     import com.groupon.lex.metrics.timeseries.expression.*;
-    import com.groupon.lex.metrics.NameCache;
     import com.groupon.lex.metrics.MetricValue;
     import com.groupon.lex.metrics.GroupName;
     import com.groupon.lex.metrics.PathMatcher;
@@ -76,5 +75,5 @@ import ConfigBnf;
 
 expr             returns [ GroupName s ]
                  : s1=raw_dotted_identifier EOF
-                   { $s = NameCache.singleton.newGroupName(NameCache.singleton.newSimpleGroupPath($s1.s)); }
+                   { $s = GroupName.valueOf(SimpleGroupPath.valueOf($s1.s)); }
                  ;

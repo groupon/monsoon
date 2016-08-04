@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -70,7 +70,7 @@ public class UrlGetCollectorTest {
     private MockServerClient mockServerClient;
 
     private UrlGetCollector endpoint(String path) {
-        return new UrlGetCollector(new SimpleGroupPath("test"), new UrlPattern(StringTemplate.fromString("http://localhost:" + mockServerRule.getPort() + path), EMPTY_LIST));
+        return new UrlGetCollector(SimpleGroupPath.valueOf("test"), new UrlPattern(StringTemplate.fromString("http://localhost:" + mockServerRule.getPort() + path), EMPTY_LIST));
     }
 
     @Test(timeout = 10000)
@@ -89,11 +89,11 @@ public class UrlGetCollectorTest {
         assertTrue(groups.isSuccessful());
 
         assertThat(groups.getGroups().stream().map(MetricGroup::getName).collect(Collectors.toList()),
-                Matchers.contains(new GroupName("test")));
+                Matchers.contains(GroupName.valueOf("test")));
 
         // Verify data in test_group.
         final Map<MetricName, MetricValue> metrics = Arrays.stream(groups.getGroups().stream()
-                        .filter(mg -> mg.getName().equals(new GroupName("test")))
+                        .filter(mg -> mg.getName().equals(GroupName.valueOf("test")))
                         .findFirst()
                         .get()
                         .getMetrics()
@@ -101,13 +101,13 @@ public class UrlGetCollectorTest {
                 .collect(Collectors.toMap(Metric::getName, Metric::getValue));
         System.err.println(metrics);
         assertThat(metrics, allOf(
-                hasEntry(new MetricName("up"), MetricValue.TRUE),
-                hasEntry(new MetricName("header", "Test-Header"), MetricValue.fromStrValue("Test-Response")),
-                hasEntry(new MetricName("header", "Double-Value"), MetricValue.fromDblValue(17.1)),
-                hasEntry(new MetricName("content", "length"), MetricValue.fromIntValue(12)),
-                hasEntry(new MetricName("content", "type"), MetricValue.fromStrValue("text/plain")),
-                hasEntry(new MetricName("status", "code"), MetricValue.fromIntValue(200)),
-                not(hasKey(new MetricName("body")))));
+                hasEntry(MetricName.valueOf("up"), MetricValue.TRUE),
+                hasEntry(MetricName.valueOf("header", "Test-Header"), MetricValue.fromStrValue("Test-Response")),
+                hasEntry(MetricName.valueOf("header", "Double-Value"), MetricValue.fromDblValue(17.1)),
+                hasEntry(MetricName.valueOf("content", "length"), MetricValue.fromIntValue(12)),
+                hasEntry(MetricName.valueOf("content", "type"), MetricValue.fromStrValue("text/plain")),
+                hasEntry(MetricName.valueOf("status", "code"), MetricValue.fromIntValue(200)),
+                not(hasKey(MetricName.valueOf("body")))));
     }
 
     @Test(timeout = 10000)
@@ -125,11 +125,11 @@ public class UrlGetCollectorTest {
         assertTrue(groups.isSuccessful());
 
         assertThat(groups.getGroups().stream().map(MetricGroup::getName).collect(Collectors.toList()),
-                Matchers.contains(new GroupName("test")));
+                Matchers.contains(GroupName.valueOf("test")));
 
         // Verify data in test_group.
         final Map<MetricName, MetricValue> metrics = Arrays.stream(groups.getGroups().stream()
-                        .filter(mg -> mg.getName().equals(new GroupName("test")))
+                        .filter(mg -> mg.getName().equals(GroupName.valueOf("test")))
                         .findFirst()
                         .get()
                         .getMetrics()
@@ -137,7 +137,7 @@ public class UrlGetCollectorTest {
                 .collect(Collectors.toMap(Metric::getName, Metric::getValue));
         System.err.println(metrics);
         assertThat(metrics, allOf(
-                hasEntry(new MetricName("up"), MetricValue.TRUE),
-                hasEntry(new MetricName("content", "length"), MetricValue.fromIntValue(12))));
+                hasEntry(MetricName.valueOf("up"), MetricValue.TRUE),
+                hasEntry(MetricName.valueOf("content", "length"), MetricValue.fromIntValue(12))));
     }
 }

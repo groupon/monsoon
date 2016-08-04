@@ -9,7 +9,6 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.xdr.support.ImmutableTimeSeriesValue;
@@ -32,7 +31,7 @@ public class FromXdr {
     private FromXdr() {}
 
     public static SimpleGroupPath groupname(path p) {
-        return NameCache.singleton.newSimpleGroupPath(Arrays.stream(p.elems).map((pe) -> pe.value).collect(Collectors.toList()));
+        return SimpleGroupPath.valueOf(Arrays.stream(p.elems).map((pe) -> pe.value).collect(Collectors.toList()));
     }
 
     public static DateTime timestamp(timestamp_msec ts) {
@@ -60,12 +59,12 @@ public class FromXdr {
     }
 
     public static Entry<MetricName, MetricValue> metric(tsfile_metric m) {
-        final MetricName m_name = NameCache.singleton.newMetricName(Arrays.stream(m.metric.elems).map(p -> p.value).collect(Collectors.toList()));
+        final MetricName m_name = MetricName.valueOf(Arrays.stream(m.metric.elems).map(p -> p.value).collect(Collectors.toList()));
         return SimpleMapEntry.create(m_name, metricValue(m.value));
     }
 
     public static Tags tags(tags t) {
-        return NameCache.singleton.newTags(Arrays.stream(t.data)
+        return Tags.valueOf(Arrays.stream(t.data)
                 .collect(Collectors.toMap(tag -> tag.key, tag -> metricValue(tag.value))));
     }
 
@@ -77,7 +76,7 @@ public class FromXdr {
         return Arrays.stream(dp)
                 .map(dp_elem -> {
                     final Tags tags = FromXdr.tags(dp_elem.tags);
-                    final GroupName group = NameCache.singleton.newGroupName(name, tags);
+                    final GroupName group = GroupName.valueOf(name, tags);
                     return time_series_value_(timestamp, group, dp_elem.tsv);
                 });
     }

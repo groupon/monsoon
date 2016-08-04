@@ -34,7 +34,6 @@ package com.groupon.lex.metrics.timeseries;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import gnu.trove.map.hash.THashMap;
 import java.util.Collection;
@@ -145,7 +144,7 @@ public class BackRefTimeSeriesCollection implements TimeSeriesCollection {
         if (name instanceof SimpleGroupPath)
             sname = (SimpleGroupPath)name;
         else
-            sname = NameCache.singleton.newSimpleGroupPath(name.getPath());
+            sname = SimpleGroupPath.valueOf(name.getPath());
 
         return Optional.ofNullable(data_by_path_.get(sname))
                 .map(Collection::stream)
