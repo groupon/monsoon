@@ -39,6 +39,7 @@ import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import java.util.Arrays;
 import static java.util.Collections.singletonMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import static org.hamcrest.Matchers.allOf;
@@ -170,5 +171,36 @@ public class CollectdPushCollector_CollectdMessageTest {
                 allOf(
                         hasEntry(MetricName.valueOf("type", "type-0", "value"), MetricValue.fromDblValue(10)),
                         hasEntry(MetricName.valueOf("type", "type-0", "x"), MetricValue.fromIntValue(11))));
+    }
+
+    @Test
+    public void tag_handling() {
+        msg.plugin_instance = "instance-0[zero=0,aleph=\u2135]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("zero", MetricValue.fromIntValue(0));
+                            put("aleph", MetricValue.fromStrValue("\u2135"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void tag_handling_hosttag_overrides_host() {
+        msg.plugin_instance = "instance-0[host=dont-call-me-otherhost,aleph=\u2135]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("dont-call-me-otherhost"));
+                            put("aleph", MetricValue.fromStrValue("\u2135"));
+                        }}),
+                group.getName());
     }
 }
