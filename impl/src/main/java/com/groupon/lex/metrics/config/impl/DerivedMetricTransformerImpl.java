@@ -52,6 +52,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import lombok.Data;
 import lombok.NonNull;
 import lombok.Value;
 
@@ -92,37 +93,15 @@ public class DerivedMetricTransformerImpl implements TimeSeriesTransformer {
                 .map(path -> SimpleGroupPath.valueOf(path.getPath()))
                 .orElseThrow(() -> new IllegalArgumentException("unable to resolve group name"));
 
-        Map<String, MetricValue> scalar_tags = new HashMap<>();
-        Map<Tags, Map<String, MetricValue>> vector_tags = new HashMap<>();
+        final TagData tagData = new TagData();
         resolveMapping(ctx, tags, Optional::of)
-                .forEach((Map.Entry<String, TimeSeriesMetricDeltaSet> tag) -> {
-                    tag.getValue().asScalar()
-                            .ifPresent(scalar -> scalar_tags.put(tag.getKey(), scalar));
-                    tag.getValue().asVector()
-                            .ifPresent(vector -> {
-                                vector.forEach((tags, value) -> {
-                                    vector_tags.computeIfAbsent(tags, (ignored) -> new HashMap<>())
-                                            .put(tag.getKey(), value);
-                                });
-                            });
-                });
+                .forEach(tagData::addTag);
 
         resolveMapping(ctx, mapping, name -> resolveMetricName(ctx, name))
                 .forEach(metric_expr -> {
                     final MetricName metric = metric_expr.getKey();
-
                     metric_expr.getValue().streamAsMap()
-                            .forEach((Entry<Tags, MetricValue> entry) -> {
-                                final Map<String, MetricValue> tagMap = new HashMap<>();
-                                tagMap.putAll(entry.getKey().asMap());
-                                tagMap.putAll(scalar_tags);
-                                tagMap.putAll(vector_tags.getOrDefault(entry.getKey(), EMPTY_MAP));
-
-                                final GroupName grp = GroupName.valueOf(group_name, tagMap);
-                                final MetricValue tsdelta = entry.getValue();
-                                ctx.getTSData().getCurrentCollection()
-                                        .addMetric(grp, metric, tsdelta);
-                            });
+                            .forEach((Entry<Tags, MetricValue> entry) -> addMetricMappingToCtx(ctx, group_name, metric, tagData, entry));
                 });
     }
 
@@ -132,5 +111,35 @@ public class DerivedMetricTransformerImpl implements TimeSeriesTransformer {
                 .map(Map::values)
                 .flatMap(Collection::stream)
                 .map(TimeSeriesMetricExpression::getLookBack));
+    }
+
+    private static void addMetricMappingToCtx(Context ctx, SimpleGroupPath group_name, MetricName metric, TagData tagData, Entry<Tags, MetricValue> entry) {
+        final Map<String, MetricValue> tagMap = new HashMap<>();
+        tagMap.putAll(entry.getKey().asMap());
+        tagMap.putAll(tagData.getScalarTags());
+        tagMap.putAll(tagData.getVectorTags().getOrDefault(entry.getKey(), EMPTY_MAP));
+
+        final GroupName grp = GroupName.valueOf(group_name, tagMap);
+        final MetricValue tsdelta = entry.getValue();
+        ctx.getTSData().getCurrentCollection()
+                .addMetric(grp, metric, tsdelta);
+    }
+
+    @Data
+    private static class TagData {
+        private final Map<String, MetricValue> scalarTags = new HashMap<>();
+        private final Map<Tags, Map<String, MetricValue>> vectorTags = new HashMap<>();
+
+        public void addTag(Map.Entry<String, TimeSeriesMetricDeltaSet> tag) {
+            tag.getValue().asScalar()
+                    .ifPresent(scalar -> scalarTags.put(tag.getKey(), scalar));
+            tag.getValue().asVector()
+                    .ifPresent(vector -> {
+                        vector.forEach((tags, value) -> {
+                            vectorTags.computeIfAbsent(tags, (ignored) -> new HashMap<>())
+                                    .put(tag.getKey(), value);
+                        });
+                    });
+        }
     }
 }
