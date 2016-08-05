@@ -34,6 +34,7 @@
         <module>prometheus</module>
         <module>verify</module>
         <module>file_convert</module>
+        <module>exporter</module>
     </modules>
 
     <!-- XXX post release: find a nice nexus to host the binaries. -->
