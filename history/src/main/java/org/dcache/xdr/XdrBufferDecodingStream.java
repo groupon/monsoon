@@ -4,17 +4,19 @@ import com.groupon.lex.metrics.history.xdr.BufferSupplier;
 import java.io.IOException;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
+import java.net.InetAddress;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.charset.Charset;
 import static java.util.Objects.requireNonNull;
+import org.acplt.oncrpc.OncRpcException;
+import org.acplt.oncrpc.XdrDecodingStream;
 
 /**
  *
  * @author ariane
  */
-public class XdrBufferDecodingStream implements XdrDecodingStream {
+public class XdrBufferDecodingStream extends XdrDecodingStream {
     private static final int MIN_BUFSIZ = 8;
     private static final int DEFAULT_BUFSIZ = 4 * 1024;
     private final ByteBuffer buf_;
@@ -47,15 +49,11 @@ public class XdrBufferDecodingStream implements XdrDecodingStream {
         buf_supplier_ = null;
     }
 
-    private void update_buffer_() throws BadXdrOncRpcException {
+    private void update_buffer_() throws OncRpcException, IOException {
         if (buf_supplier_ == null) return;
         read_bytes_ += buf_.position();
         buf_.compact();
-        try {
-            buf_supplier_.load(buf_);
-        } catch (IOException ex) {
-            throw new BadXdrOncRpcException(ex.getMessage());
-        }
+        buf_supplier_.load(buf_);
         buf_.flip();
     }
 
@@ -63,39 +61,30 @@ public class XdrBufferDecodingStream implements XdrDecodingStream {
     public void beginDecoding() {}
     @Override
     public void endDecoding() {}
+    @Override
+    public InetAddress getSenderAddress() { return InetAddress.getLoopbackAddress(); }
+    @Override
+    public int getSenderPort() { return 0; }
 
     @Override
-    public int xdrDecodeInt() throws BadXdrOncRpcException {
+    public int xdrDecodeInt() throws OncRpcException, IOException {
         if (buf_.remaining() < 4) update_buffer_();
         try {
             return buf_.getInt();
         } catch (BufferUnderflowException ex) {
-            throw new BadXdrOncRpcException("xdr stream too short");
+            throw new IOException("xdr stream too short");
         }
     }
 
     @Override
-    public int[] xdrDecodeIntVector() throws BadXdrOncRpcException {
-        int[] buf = new int[xdrDecodeInt()];
-        for (int i = 0; i < buf.length; ++i)
-            buf[i] = xdrDecodeInt();
-        return buf;
-    }
-
-    @Override
-    public byte[] xdrDecodeDynamicOpaque() throws BadXdrOncRpcException {
-        return xdrDecodeOpaque(xdrDecodeInt());
-    }
-
-    @Override
-    public byte[] xdrDecodeOpaque(int length) throws BadXdrOncRpcException {
+    public byte[] xdrDecodeOpaque(int length) throws OncRpcException, IOException {
         byte[] buf = new byte[length];
         xdrDecodeOpaque(buf, 0, length);
         return buf;
     }
 
     @Override
-    public void xdrDecodeOpaque(byte[] opaque, int offset, int length) throws BadXdrOncRpcException {
+    public void xdrDecodeOpaque(byte[] opaque, int offset, int length) throws OncRpcException, IOException {
         int pad_len = length % 4 == 0 ? 0 : 4 - length % 4;
 
         while (length > 0) {
@@ -104,7 +93,7 @@ public class XdrBufferDecodingStream implements XdrDecodingStream {
             try {
                 buf_.get(opaque, offset, rdlen);
             } catch (BufferUnderflowException ex) {
-                throw new BadXdrOncRpcException("xdr stream too short");
+                throw new IOException("xdr stream too short");
             }
             offset += rdlen;
             length -= rdlen;
@@ -115,131 +104,31 @@ public class XdrBufferDecodingStream implements XdrDecodingStream {
             try {
                 buf_.get();
             } catch (BufferUnderflowException ex) {
-                throw new BadXdrOncRpcException("xdr stream too short");
+                throw new IOException("xdr stream too short");
             }
             --pad_len;
         }
     }
 
-    @Override
-    public boolean xdrDecodeBoolean() throws BadXdrOncRpcException {
-        return xdrDecodeInt() != 0;
-    }
-
-    @Override
-    public String xdrDecodeString() throws BadXdrOncRpcException {
-        return new String(xdrDecodeOpaque(xdrDecodeInt()), Charset.forName("UTF-8"));
-    }
-
-    @Override
-    public long xdrDecodeLong() throws BadXdrOncRpcException {
-        if (buf_.remaining() < 8) update_buffer_();
-        try {
-            return buf_.getLong();
-        } catch (BufferUnderflowException ex) {
-            throw new BadXdrOncRpcException("xdr stream too short");
-        }
-    }
-
-    @Override
-    public long[] xdrDecodeLongVector() throws BadXdrOncRpcException {
-        long[] buf = new long[xdrDecodeInt()];
-        for (int i = 0; i < buf.length; ++i)
-            buf[i] = xdrDecodeLong();
-        return buf;
-    }
-
-    @Override
-    public ByteBuffer xdrDecodeByteBuffer() throws BadXdrOncRpcException {
-        final int len = xdrDecodeInt();
-
-        if (buf_.capacity() >= len && buf_ instanceof ByteBuffer) {
-            final int padding = (len % 4 == 0 ? 0 : 4 - len % 4);
-            if (buf_.remaining() < len + padding) update_buffer_();
-            if (buf_.remaining() >= len + padding) {
-                ByteBuffer buf = ((ByteBuffer)buf_).slice();
-                buf.limit(len);
-                buf_.position(buf_.position() + len + padding);
-                return buf;
-            }
-        }
-
-        ByteBuffer buf = ByteBuffer.allocate(len);
-        xdrDecodeOpaque(buf.array(), buf.arrayOffset(), buf.arrayOffset() + buf.remaining());
-        return buf;
-    }
-
-    @Override
-    public float xdrDecodeFloat() throws BadXdrOncRpcException {
-        return Float.intBitsToFloat(xdrDecodeInt());
-    }
-
-    @Override
-    public double xdrDecodeDouble() throws BadXdrOncRpcException {
-        return Double.longBitsToDouble(xdrDecodeLong());
-    }
-
-    @Override
-    public double[] xdrDecodeDoubleVector() throws BadXdrOncRpcException {
-        return xdrDecodeDoubleFixedVector(xdrDecodeInt());
-    }
-
-    @Override
-    public double[] xdrDecodeDoubleFixedVector(int length) throws BadXdrOncRpcException {
-        double[] buf = new double[length];
-        for (int i = 0; i < buf.length; ++i)
-            buf[i] = xdrDecodeDouble();
-        return buf;
-    }
-
-    @Override
-    public float[] xdrDecodeFloatVector() throws BadXdrOncRpcException {
-        return xdrDecodeFloatFixedVector(xdrDecodeInt());
-    }
-
-    @Override
-    public float[] xdrDecodeFloatFixedVector(int length) throws BadXdrOncRpcException {
-        float[] buf = new float[length];
-        for (int i = 0; i < buf.length; ++i)
-            buf[i] = xdrDecodeFloat();
-        return buf;
-    }
-
-    @Override
-    public byte[] xdrDecodeByteVector() throws BadXdrOncRpcException {
-        return xdrDecodeByteFixedVector(xdrDecodeInt());
-    }
-
-    @Override
-    public byte[] xdrDecodeByteFixedVector(int length) throws BadXdrOncRpcException {
-        byte[] buf = new byte[length];
-        for (int i = 0; i < buf.length; ++i)
-            buf[i] = xdrDecodeByte();
-        return buf;
-    }
-
-    @Override
-    public byte xdrDecodeByte() throws BadXdrOncRpcException {
-        return (byte)xdrDecodeInt();
-    }
-
-    @Override
-    public short xdrDecodeShort() throws BadXdrOncRpcException {
-        return (short)xdrDecodeInt();
-    }
-
-    @Override
-    public short[] xdrDecodeShortVector() throws BadXdrOncRpcException {
-        return xdrDecodeShortFixedVector(xdrDecodeInt());
-    }
-
-    @Override
-    public short[] xdrDecodeShortFixedVector(int length) throws BadXdrOncRpcException {
-        short[] buf = new short[length];
-        for (int i = 0; i < buf.length; ++i)
-            buf[i] = xdrDecodeShort();
-        return buf;
-    }
+//    @Override
+//    public ByteBuffer xdrDecodeByteBuffer() throws OncRpcException, IOException {
+//        final int len = xdrDecodeInt();
+//
+//        if (buf_.capacity() >= len && buf_ instanceof ByteBuffer) {
+//            final int padding = (len % 4 == 0 ? 0 : 4 - len % 4);
+//            if (buf_.remaining() < len + padding) update_buffer_();
+//            if (buf_.remaining() >= len + padding) {
+//                ByteBuffer buf = ((ByteBuffer)buf_).slice();
+//                buf.limit(len);
+//                buf_.position(buf_.position() + len + padding);
+//                return buf;
+//            }
+//        }
+//
+//        ByteBuffer buf = ByteBuffer.allocate(len);
+//        xdrDecodeOpaque(buf.array(), buf.arrayOffset(), buf.arrayOffset() + buf.remaining());
+//        return buf;
+//    }
 
     public long readBytes() { return read_bytes_ + buf_.position(); }
     public long avail() { return buf_.remaining(); }

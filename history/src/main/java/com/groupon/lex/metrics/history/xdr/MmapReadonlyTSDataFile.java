@@ -26,6 +26,7 @@ import java.util.Iterator;
 import static java.util.Objects.requireNonNull;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.acplt.oncrpc.OncRpcException;
 import org.dcache.xdr.XdrBufferDecodingStream;
 import org.joda.time.DateTime;
 
@@ -93,7 +94,11 @@ public class MmapReadonlyTSDataFile implements TSData {
             stream = wrap_gzip_(data_.asReadOnlyBuffer());
         else
             stream = new XdrBufferDecodingStream(data_.asReadOnlyBuffer());
-        version_ = validateHeaderOrThrow(stream);
+        try {
+            version_ = validateHeaderOrThrow(stream);
+        } catch (OncRpcException ex) {
+            throw new IOException("RPC decoding error", ex);
+        }
 
         final Parser.BeginEnd header = Parser.fromVersion(version_).header(stream);
         begin_ = header.getBegin();

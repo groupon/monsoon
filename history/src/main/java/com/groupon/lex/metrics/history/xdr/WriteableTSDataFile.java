@@ -32,8 +32,7 @@ import java.util.Spliterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
-import org.dcache.xdr.OncRpcException;
-import org.dcache.xdr.Xdr;
+import org.acplt.oncrpc.OncRpcException;
 import org.dcache.xdr.XdrBufferDecodingStream;
 import org.joda.time.DateTime;
 
@@ -156,12 +155,20 @@ public class WriteableTSDataFile implements TSData {
          * This means streaming the entire file through the xdr decoder.
          */
         XdrBufferDecodingStream decoder = new XdrBufferDecodingStream(new PositionalReader(fd_));
-        new tsfile_mimeheader(decoder);  // Read MIME header and skip it.
-        new tsfile_header(decoder);  // Read header and skip it.
+        try {
+            new tsfile_mimeheader(decoder);  // Read MIME header and skip it.
+            new tsfile_header(decoder);  // Read header and skip it.
+        } catch (OncRpcException ex) {
+            throw new IOException("RPC decoding error", ex);
+        }
         final tsfile_data tsfd = new tsfile_data();
-        while (!decoder.atEof()) {
-            tsfd.xdrDecode(decoder);  // Load record.
-            from_xdr_.data(tsfd);  // Update from_xdr, discard decoding result.
+        try {
+            while (!decoder.atEof()) {
+                tsfd.xdrDecode(decoder);  // Load record.
+                from_xdr_.data(tsfd);  // Update from_xdr, discard decoding result.
+            }
+        } catch (OncRpcException ex) {
+            throw new IOException("RPC decoding error", ex);
         }
     }
 
