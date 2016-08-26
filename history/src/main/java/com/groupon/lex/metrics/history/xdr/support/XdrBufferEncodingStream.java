@@ -1,4 +1,4 @@
-package org.dcache.xdr;
+package com.groupon.lex.metrics.history.xdr.support;
 
 import java.io.IOException;
 import static java.lang.Integer.min;

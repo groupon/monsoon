@@ -33,8 +33,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 import org.acplt.oncrpc.OncRpcException;
-import org.dcache.xdr.XdrBufferDecodingStream;
-import org.dcache.xdr.XdrBufferEncodingStream;
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferEncodingStream;
 import org.joda.time.DateTime;
 
 public class WriteableTSDataFile implements TSData {

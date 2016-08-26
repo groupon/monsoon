@@ -4,7 +4,7 @@ import com.groupon.lex.metrics.history.xdr.support.Parser;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import org.acplt.oncrpc.OncRpcException;
-import org.dcache.xdr.XdrBufferDecodingStream;
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 
 public class Parser1 implements Parser<tsfile_header> {
     private final FromXdr from_xdr_ = new FromXdr();

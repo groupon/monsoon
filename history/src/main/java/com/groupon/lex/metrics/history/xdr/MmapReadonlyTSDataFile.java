@@ -27,7 +27,7 @@ import static java.util.Objects.requireNonNull;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.acplt.oncrpc.OncRpcException;
-import org.dcache.xdr.XdrBufferDecodingStream;
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import org.joda.time.DateTime;
 
 /**

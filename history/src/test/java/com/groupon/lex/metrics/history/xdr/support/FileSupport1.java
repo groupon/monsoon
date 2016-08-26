@@ -18,7 +18,6 @@ import java.nio.ByteBuffer;
 import java.util.Comparator;
 import java.util.List;
 import org.acplt.oncrpc.OncRpcException;
-import org.dcache.xdr.XdrBufferEncodingStream;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 

@@ -3,8 +3,9 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package org.dcache.xdr;
+package com.groupon.lex.metrics.history.xdr.support;
 
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import static org.junit.Assert.assertArrayEquals;

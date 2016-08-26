@@ -6,7 +6,6 @@ import com.groupon.lex.metrics.history.xdr.Const;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import lombok.Value;
-import org.dcache.xdr.XdrBufferDecodingStream;
 import org.joda.time.DateTime;
 
 public interface Parser<HeaderType> {
