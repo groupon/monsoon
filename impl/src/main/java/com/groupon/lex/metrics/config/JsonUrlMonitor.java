@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -33,11 +33,9 @@ package com.groupon.lex.metrics.config;
 
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.TupledElements;
-import static com.groupon.lex.metrics.TupledElements.config_string_for_args;
 import com.groupon.lex.metrics.collector.httpget.UrlJsonCollector;
 import com.groupon.lex.metrics.collector.httpget.UrlPattern;
-import java.util.Collection;
+import com.groupon.lex.metrics.resolver.NameResolverSet;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -48,7 +46,7 @@ public class JsonUrlMonitor implements MonitorStatement {
     private final UrlPattern pattern_;
     private final SimpleGroupPath base_name_;
 
-    public JsonUrlMonitor(SimpleGroupPath base_name, String pattern, Collection<TupledElements> args) {
+    public JsonUrlMonitor(SimpleGroupPath base_name, String pattern, NameResolverSet args) {
         pattern_ = new UrlPattern(pattern, args);
         base_name_ = requireNonNull(base_name);
     }
@@ -66,13 +64,10 @@ public class JsonUrlMonitor implements MonitorStatement {
                 .append(" as ")
                 .append(base_name_.configString());
 
-        if (!pattern_.getTemplateArgs().isEmpty()) {
-            buf.append(" {\n");
-            buf.append(config_string_for_args("    ", pattern_.getTemplateArgs()));
-            buf.append("}");
-        } else {
+        if (!pattern_.getTemplateArgs().isEmpty())
+            buf.append(pattern_.getTemplateArgs().configString());
+        else
             buf.append(';');
-        }
 
         return buf.append('\n');
     }

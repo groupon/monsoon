@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -53,10 +53,10 @@ import org.antlr.v4.runtime.UnbufferedTokenStream;
  *
  * @author ariane
  */
-public class StringTemplate implements Function<Map<Any2<String, Integer>, String>, String> {
+public class StringTemplate implements Function<Map<Any2<Integer, String>, String>, String> {
     public static interface Element {
-        public void apply(StringBuilder out, Map<Any2<String, Integer>, String> args);
-        public void keys(Consumer<Any2<String, Integer>> c);
+        public void apply(StringBuilder out, Map<Any2<Integer, String>, String> args);
+        public void keys(Consumer<Any2<Integer, String>> c);
     }
 
     public static class LiteralElement implements Element {
@@ -67,14 +67,14 @@ public class StringTemplate implements Function<Map<Any2<String, Integer>, Strin
         }
 
         @Override
-        public void apply(StringBuilder out, Map<Any2<String, Integer>, String> args) {
+        public void apply(StringBuilder out, Map<Any2<Integer, String>, String> args) {
             out.append(lit_);
         }
 
         @Override
         public String toString() { return lit_.replace("$", "$$"); }
         @Override
-        public void keys(Consumer<Any2<String, Integer>> c) {}
+        public void keys(Consumer<Any2<Integer, String>> c) {}
     }
 
     public static class SubstituteElement implements Element {
@@ -86,8 +86,8 @@ public class StringTemplate implements Function<Map<Any2<String, Integer>, Strin
         }
 
         @Override
-        public void apply(StringBuilder out, Map<Any2<String, Integer>, String> args) {
-            out.append(args.get(Any2.<String, Integer>right(idx_)));
+        public void apply(StringBuilder out, Map<Any2<Integer, String>, String> args) {
+            out.append(args.get(Any2.<Integer, String>left(idx_)));
         }
 
         public int getIndex() { return idx_; }
@@ -95,7 +95,7 @@ public class StringTemplate implements Function<Map<Any2<String, Integer>, Strin
         @Override
         public String toString() { return "${" + idx_ + '}'; }
         @Override
-        public void keys(Consumer<Any2<String, Integer>> c) { c.accept(Any2.right(getIndex())); }
+        public void keys(Consumer<Any2<Integer, String>> c) { c.accept(Any2.left(getIndex())); }
     }
 
     public static class SubstituteNameElement implements Element {
@@ -107,8 +107,8 @@ public class StringTemplate implements Function<Map<Any2<String, Integer>, Strin
         }
 
         @Override
-        public void apply(StringBuilder out, Map<Any2<String, Integer>, String> args) {
-            out.append(args.get(Any2.<String, Integer>left(name_)));
+        public void apply(StringBuilder out, Map<Any2<Integer, String>, String> args) {
+            out.append(args.get(Any2.<Integer, String>right(name_)));
         }
 
         public String getName() { return name_; }
@@ -116,7 +116,7 @@ public class StringTemplate implements Function<Map<Any2<String, Integer>, Strin
         @Override
         public String toString() { return "${" + name_ + '}'; }
         @Override
-        public void keys(Consumer<Any2<String, Integer>> c) { c.accept(Any2.left(getName())); }
+        public void keys(Consumer<Any2<Integer, String>> c) { c.accept(Any2.right(getName())); }
     }
 
     private final List<Element> elements_;
@@ -156,7 +156,7 @@ public class StringTemplate implements Function<Map<Any2<String, Integer>, Strin
     }
 
     @Override
-    public String apply(Map<Any2<String, Integer>, String> args) {
+    public String apply(Map<Any2<Integer, String>, String> args) {
         StringBuilder out = new StringBuilder();
         elements_.stream().forEach((elem) -> elem.apply(out, args));
         return out.toString();
@@ -187,8 +187,8 @@ public class StringTemplate implements Function<Map<Any2<String, Integer>, Strin
      * Retrieve the variables used to render this string.
      * @return The list of variables used to render this string.
      */
-    public List<Any2<String, Integer>> getArguments() {
-        final List<Any2<String, Integer>> result = new ArrayList<>();
+    public List<Any2<Integer, String>> getArguments() {
+        final List<Any2<Integer, String>> result = new ArrayList<>();
         elements_.forEach(elem -> elem.keys(result::add));
         return result;
     }

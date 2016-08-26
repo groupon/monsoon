@@ -34,7 +34,7 @@ public class NameResolverSet {
     }
 
     public String configString() {
-        if (isEmpty()) return "";
+        if (isEmpty()) return "{}";
         return nameResolvers.stream()
                 .map(NameResolver::toString)
                 .collect(Collectors.joining(",\n", "{\n", "\n}"));
