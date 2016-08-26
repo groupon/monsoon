@@ -110,26 +110,6 @@ public class XdrBufferDecodingStream extends XdrDecodingStream {
         }
     }
 
-//    @Override
-//    public ByteBuffer xdrDecodeByteBuffer() throws OncRpcException, IOException {
-//        final int len = xdrDecodeInt();
-//
-//        if (buf_.capacity() >= len && buf_ instanceof ByteBuffer) {
-//            final int padding = (len % 4 == 0 ? 0 : 4 - len % 4);
-//            if (buf_.remaining() < len + padding) update_buffer_();
-//            if (buf_.remaining() >= len + padding) {
-//                ByteBuffer buf = ((ByteBuffer)buf_).slice();
-//                buf.limit(len);
-//                buf_.position(buf_.position() + len + padding);
-//                return buf;
-//            }
-//        }
-//
-//        ByteBuffer buf = ByteBuffer.allocate(len);
-//        xdrDecodeOpaque(buf.array(), buf.arrayOffset(), buf.arrayOffset() + buf.remaining());
-//        return buf;
-//    }
-
     public long readBytes() { return read_bytes_ + buf_.position(); }
     public long avail() { return buf_.remaining(); }
 

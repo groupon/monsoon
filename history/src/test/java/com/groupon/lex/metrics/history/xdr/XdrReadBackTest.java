@@ -18,8 +18,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-import org.dcache.xdr.Xdr;
 import org.dcache.xdr.XdrBufferDecodingStream;
+import org.dcache.xdr.XdrBufferEncodingStream;
 import static org.junit.Assert.assertEquals;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -95,11 +95,11 @@ public class XdrReadBackTest {
 
     @Test
     public void int_serialized() throws Exception {
-        Xdr encoder = new Xdr(8);
+        XdrBufferEncodingStream encoder = new XdrBufferEncodingStream(8);
         encoder.beginEncoding();
         encoder.xdrEncodeInt(17);
         encoder.endEncoding();
-        byte[] result = to_byte_array(encoder.asBuffer().toByteBuffer());
+        byte[] result = to_byte_array(encoder.getBuffers());
 
         assertArrayEquals(new byte[]{ 0, 0, 0, 17 }, result);
     }
@@ -118,13 +118,13 @@ public class XdrReadBackTest {
         tsfile_datapoint tsv_xdr = ToXdr.datapoints(tsv_);
         assertEquals(tsv_, FromXdr.datapoints(tsv_xdr));
 
-        Xdr out = new Xdr(8);
+        XdrBufferEncodingStream out = new XdrBufferEncodingStream(8);
         out.beginEncoding();
         tsv_xdr.xdrEncode(out);
         out.endEncoding();
 
         tsfile_datapoint tsv_xdr_read_back = new tsfile_datapoint();
-        byte[] stream_bytes = to_byte_array(out.asBuffer().toByteBuffer());
+        byte[] stream_bytes = to_byte_array(out.getBuffers());
         XdrBufferDecodingStream stream = new XdrBufferDecodingStream(new ByteArraySupplier(stream_bytes));
         tsv_xdr_read_back.xdrDecode(stream);
 
@@ -136,13 +136,13 @@ public class XdrReadBackTest {
     @Test(expected = IOException.class)
     public void datapoint_read_too_many() throws Exception {
         tsfile_datapoint tsv_xdr = ToXdr.datapoints(tsv_);
-        Xdr out = new Xdr(512);
+        XdrBufferEncodingStream out = new XdrBufferEncodingStream(512);
         out.beginEncoding();
         tsv_xdr.xdrEncode(out);  // Write 1 entry
         out.endEncoding();
 
         tsfile_datapoint tsv_xdr_read_back = new tsfile_datapoint();
-        XdrBufferDecodingStream stream = new XdrBufferDecodingStream(new ByteArraySupplier(to_byte_array(out.asBuffer().toByteBuffer())));
+        XdrBufferDecodingStream stream = new XdrBufferDecodingStream(new ByteArraySupplier(to_byte_array(out.getBuffers())));
 
         tsv_xdr_read_back.xdrDecode(stream);  // Read 1 entry
         TimeSeriesCollection read_tsv = FromXdr.datapoints(tsv_xdr_read_back);
@@ -156,13 +156,13 @@ public class XdrReadBackTest {
     @Test(expected = IOException.class)
     public void not_too_many_bytes_written() throws Exception {
         tsfile_datapoint tsv_xdr = ToXdr.datapoints(tsv_);
-        Xdr out = new Xdr(4);
+        XdrBufferEncodingStream out = new XdrBufferEncodingStream(4);
         out.beginEncoding();
         tsv_xdr.xdrEncode(out);  // Write 1 entry
         out.endEncoding();
 
         tsfile_datapoint tsv_xdr_read_back = new tsfile_datapoint();
-        XdrBufferDecodingStream stream = new XdrBufferDecodingStream(new ByteArraySupplier(to_byte_array(out.asBuffer().toByteBuffer())));
+        XdrBufferDecodingStream stream = new XdrBufferDecodingStream(new ByteArraySupplier(to_byte_array(out.getBuffers())));
 
         tsv_xdr_read_back.xdrDecode(stream);  // Read 1 entry
         TimeSeriesCollection read_tsv = FromXdr.datapoints(tsv_xdr_read_back);
@@ -180,14 +180,14 @@ public class XdrReadBackTest {
         final int N = 1000000;
 
         tsfile_datapoint tsv_xdr = ToXdr.datapoints(tsv_);
-        Xdr out = new Xdr(8);
+        XdrBufferEncodingStream out = new XdrBufferEncodingStream(8);
         out.beginEncoding();
         for (int i = 0; i < N; ++i)
             tsv_xdr.xdrEncode(out);  // Write 1 entry
         out.endEncoding();
 
         tsfile_datapoint tsv_xdr_read_back = new tsfile_datapoint();
-        byte[] stream_bytes = to_byte_array(out.asBuffer().toByteBuffer());
+        byte[] stream_bytes = to_byte_array(out.getBuffers());
         XdrBufferDecodingStream stream = new XdrBufferDecodingStream(new ByteArraySupplier(stream_bytes));
 
         for (int i = 0; i < N; ++i) {

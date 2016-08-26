@@ -210,22 +210,6 @@ public class XdrBufferDecodingStreamTest {
     }
 
     @Test
-    public void read_byte_buffer() throws Exception {
-        direct.putInt(3).put((byte)8).put((byte)9).put((byte)10).put((byte)11).flip();
-        array.putInt(3).put((byte)8).put((byte)9).put((byte)10).put((byte)11).flip();
-
-        byte[] direct_buf = new byte[3];
-        boolean direct_remaining = new XdrBufferDecodingStream(direct).xdrDecodeByteBuffer().get(direct_buf).hasRemaining();
-        byte[] array_buf = new byte[3];
-        boolean array_remaining = new XdrBufferDecodingStream(array).xdrDecodeByteBuffer().get(array_buf).hasRemaining();
-
-        assertFalse(direct_remaining);
-        assertArrayEquals(new byte[]{ 8, 9, 10 }, direct_buf);
-        assertFalse(array_remaining);
-        assertArrayEquals(new byte[]{ 8, 9, 10 }, array_buf);
-    }
-
-    @Test
     public void at_eof() throws Exception {
         direct.putLong(17).flip();
         XdrBufferDecodingStream direct_decoder = new XdrBufferDecodingStream(direct);
