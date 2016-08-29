@@ -1,6 +1,6 @@
 package com.groupon.lex.metrics.resolver;
 
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 import static java.lang.Integer.max;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -29,7 +29,7 @@ public class RangeResolver implements Resolver {
     public Collection<ResolverTuple> getTuples() {
         List<ResolverTuple> tuples = new ArrayList<>(max(end - begin, 0));
         for (int i = begin; i < end; ++i)
-            tuples.add(new ResolverTuple(newElement(i)));
+            tuples.add(new ResolverTuple(newTupleElement(i)));
         return tuples;
     }
 
