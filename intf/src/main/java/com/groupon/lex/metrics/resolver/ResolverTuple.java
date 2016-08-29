@@ -38,9 +38,9 @@ public class ResolverTuple {
                 .collect(joiner);
     }
 
-    public static Any3<Boolean, Integer, String> newElement(boolean b) { return Any3.create1(b); }
-    public static Any3<Boolean, Integer, String> newElement(int i) { return Any3.create2(i); }
-    public static Any3<Boolean, Integer, String> newElement(@NonNull String s) { return Any3.create3(s); }
+    public static Any3<Boolean, Integer, String> newTupleElement(boolean b) { return Any3.create1(b); }
+    public static Any3<Boolean, Integer, String> newTupleElement(int i) { return Any3.create2(i); }
+    public static Any3<Boolean, Integer, String> newTupleElement(@NonNull String s) { return Any3.create3(s); }
 
     private static String fieldString(Any3<Boolean, Integer, String> field) {
         return field.mapCombine(String::valueOf, String::valueOf, s -> quotedString(s).toString());

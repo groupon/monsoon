@@ -2,13 +2,14 @@ package com.groupon.lex.metrics.resolver;
 
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.Any3;
+import static java.util.Collections.EMPTY_MAP;
 import java.util.Map;
 import java.util.stream.Stream;
 
 public interface NameResolver {
     public static final NameResolver EMPTY = new NameResolver() {
         @Override
-        public Stream<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolve() { return Stream.empty(); }
+        public Stream<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolve() { return Stream.of(EMPTY_MAP); }
         @Override
         public Stream<Any2<Integer, String>> getKeys() { return Stream.empty(); }
         @Override

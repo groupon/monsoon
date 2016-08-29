@@ -1,10 +1,11 @@
 package com.groupon.lex.metrics.resolver;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
-import static java.util.Collections.unmodifiableSet;
-import java.util.HashSet;
+import static java.util.Collections.unmodifiableList;
 import java.util.Iterator;
-import java.util.Set;
+import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Getter;
 
@@ -13,11 +14,11 @@ import lombok.Getter;
  */
 @Getter
 public class ConstResolver implements Resolver {
-    private final Set<ResolverTuple> tuples;
+    private final List<ResolverTuple> tuples;
     private final int tupleWidth;
 
     public ConstResolver(Collection<ResolverTuple> values) {
-        this.tuples = unmodifiableSet(new HashSet<>(values));
+        this.tuples = unmodifiableList(new ArrayList<>(values));
 
         // Derive tuple width.
         if (this.tuples.isEmpty()) {
@@ -33,8 +34,13 @@ public class ConstResolver implements Resolver {
         }
     }
 
+    public ConstResolver(ResolverTuple... values) {
+        this(Arrays.asList(values));
+    }
+
     @Override
     public String configString() {
+        if (tuples.isEmpty()) return "[]";
         return tuples.stream()
                 .map(ResolverTuple::toString)
                 .collect(Collectors.joining(", ", "[ ", " ]"));

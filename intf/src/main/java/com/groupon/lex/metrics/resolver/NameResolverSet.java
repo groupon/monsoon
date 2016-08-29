@@ -3,12 +3,15 @@ package com.groupon.lex.metrics.resolver;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.Any3;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import static java.util.Collections.EMPTY_MAP;
+import static java.util.Collections.unmodifiableList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import static java.util.Objects.requireNonNull;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.Value;
@@ -16,6 +19,16 @@ import lombok.Value;
 @Value
 public class NameResolverSet implements NameResolver {
     private final List<NameResolver> nameResolvers;
+
+    public NameResolverSet(Collection<NameResolver> nameResolvers) {
+        for (NameResolver nr : nameResolvers)
+            requireNonNull(nr, "null name resolver");
+        this.nameResolvers = unmodifiableList(new ArrayList<>(nameResolvers));
+    }
+
+    public NameResolverSet(NameResolver... nameResolvers) {
+        this(Arrays.asList(nameResolvers));
+    }
 
     @Override
     public Stream<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolve() throws Exception {
