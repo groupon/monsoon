@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -31,10 +31,8 @@
  */
 package com.groupon.lex.metrics.lib;
 
-import com.groupon.lex.metrics.lib.StringTemplate;
 import com.groupon.lex.metrics.lib.StringTemplate.LiteralElement;
 import com.groupon.lex.metrics.lib.StringTemplate.SubstituteElement;
-import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.StringTemplate.SubstituteNameElement;
 import java.util.Arrays;
 import java.util.Collection;
@@ -75,7 +73,7 @@ public class StringTemplateTest {
         final StringTemplate tmpl = StringTemplate.fromString("$0");
 
         assertEquals(1, tmpl.indexSize());
-        assertEquals("foobar", tmpl.apply(singletonMap(Any2.<String, Integer>right(0), "foobar")));
+        assertEquals("foobar", tmpl.apply(singletonMap(Any2.<Integer, String>left(0), "foobar")));
     }
 
     @Test
@@ -83,7 +81,7 @@ public class StringTemplateTest {
         final StringTemplate tmpl = StringTemplate.fromString("${arg}");
 
         assertEquals(0, tmpl.indexSize());
-        assertEquals("foobar", tmpl.apply(singletonMap(Any2.<String, Integer>left("arg"), "foobar")));
+        assertEquals("foobar", tmpl.apply(singletonMap(Any2.<Integer, String>right("arg"), "foobar")));
     }
 
     @Test
@@ -99,10 +97,10 @@ public class StringTemplateTest {
         assertEquals(4, tmpl.indexSize());
         assertEquals("E=mc^2", tmpl.apply(
                 Stream.of(
-                                singletonMap(Any2.<String, Integer>right(0), "E"),
-                                singletonMap(Any2.<String, Integer>right(1), "c"),
-                                singletonMap(Any2.<String, Integer>right(2), "m"),
-                                singletonMap(Any2.<String, Integer>right(3), "2")
+                                singletonMap(Any2.<Integer, String>left(0), "E"),
+                                singletonMap(Any2.<Integer, String>left(1), "c"),
+                                singletonMap(Any2.<Integer, String>left(2), "m"),
+                                singletonMap(Any2.<Integer, String>left(3), "2")
                         )
                         .map(Map::entrySet)
                         .flatMap(Collection::stream)
@@ -115,13 +113,13 @@ public class StringTemplateTest {
 
         assertEquals(3, tmpl.indexSize());
         assertThat(tmpl.getArguments(),
-                containsInAnyOrder(Any2.left("two"), Any2.right(0), Any2.right(1), Any2.right(2)));
+                containsInAnyOrder(Any2.right("two"), Any2.left(0), Any2.left(1), Any2.left(2)));
         assertEquals("E=mc^2", tmpl.apply(
                 Stream.of(
-                                singletonMap(Any2.<String, Integer>right(0), "E"),
-                                singletonMap(Any2.<String, Integer>right(1), "c"),
-                                singletonMap(Any2.<String, Integer>right(2), "m"),
-                                singletonMap(Any2.<String, Integer>left("two"), "2")
+                                singletonMap(Any2.<Integer, String>left(0), "E"),
+                                singletonMap(Any2.<Integer, String>left(1), "c"),
+                                singletonMap(Any2.<Integer, String>left(2), "m"),
+                                singletonMap(Any2.<Integer, String>right("two"), "2")
                         )
                         .map(Map::entrySet)
                         .flatMap(Collection::stream)
@@ -161,8 +159,8 @@ public class StringTemplateTest {
         assertEquals("${1}-${0}", tmpl.toString());
         assertEquals("b-a", tmpl.apply(
                 Stream.of(
-                                singletonMap(Any2.<String, Integer>right(0), "a"),
-                                singletonMap(Any2.<String, Integer>right(1), "b")
+                                singletonMap(Any2.<Integer, String>left(0), "a"),
+                                singletonMap(Any2.<Integer, String>left(1), "b")
                         )
                         .map(Map::entrySet)
                         .flatMap(Collection::stream)
@@ -174,7 +172,7 @@ public class StringTemplateTest {
         final StringTemplate tmpl = StringTemplate.fromString("$$$0");
 
         assertEquals("$$${0}", tmpl.toString());
-        assertEquals("$foobar", tmpl.apply(singletonMap(Any2.right(0), "foobar")));
+        assertEquals("$foobar", tmpl.apply(singletonMap(Any2.left(0), "foobar")));
     }
 
     @Test(expected = IllegalArgumentException.class)

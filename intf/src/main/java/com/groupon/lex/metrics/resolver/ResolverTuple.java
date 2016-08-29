@@ -25,6 +25,7 @@ public class ResolverTuple {
 
     public int getFieldsSize() { return getFields().size(); }
 
+    @Override
     public String toString() {
         final Collector<CharSequence, ?, String> joiner;
         if (fields.size() == 1)

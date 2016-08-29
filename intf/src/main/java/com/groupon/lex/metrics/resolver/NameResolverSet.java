@@ -14,9 +14,10 @@ import java.util.stream.Stream;
 import lombok.Value;
 
 @Value
-public class NameResolverSet {
+public class NameResolverSet implements NameResolver {
     private final List<NameResolver> nameResolvers;
 
+    @Override
     public Stream<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolve() throws Exception {
         final List<List<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>>> sets = new ArrayList<>(nameResolvers.size());
         for (NameResolver nr : nameResolvers)
@@ -25,21 +26,21 @@ public class NameResolverSet {
         return cartesianProduct(Stream.of(EMPTY_MAP), sets);
     }
 
-    public List<Any2<Integer, String>> getKeys() {
+    @Override
+    public Stream<Any2<Integer, String>> getKeys() {
         return nameResolvers.stream()
-                .map(NameResolver::getNames)
-                .map(NameResolver.Names::getNames)
-                .flatMap(Collection::stream)
-                .collect(Collectors.toList());
+                .flatMap(NameResolver::getKeys);
     }
 
+    @Override
     public String configString() {
         if (isEmpty()) return "{}";
         return nameResolvers.stream()
-                .map(NameResolver::toString)
+                .map(NameResolver::configString)
                 .collect(Collectors.joining(",\n", "{\n", "\n}"));
     }
 
+    @Override
     public boolean isEmpty() {
         return nameResolvers.stream()
                 .allMatch(NameResolver::isEmpty);
@@ -48,7 +49,7 @@ public class NameResolverSet {
     private static <K, V> Stream<Map<K, V>> cartesianProduct(Stream<Map<K, V>> in, Iterable<? extends Collection<Map<K, V>>> sets) {
         final Iterator<? extends Collection<Map<K, V>>> setsIter = sets.iterator();
 
-        while (!setsIter.hasNext()) {
+        while (setsIter.hasNext()) {
             final Collection<Map<K, V>> head = setsIter.next();
 
             in = in
