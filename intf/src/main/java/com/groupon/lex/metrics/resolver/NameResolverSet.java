@@ -50,6 +50,7 @@ public class NameResolverSet implements NameResolver {
         if (isEmpty()) return "{}";
         return nameResolvers.stream()
                 .map(NameResolver::configString)
+                .map(s -> "    " + s)  // Indentation
                 .collect(Collectors.joining(",\n", "{\n", "\n}"));
     }
 
