@@ -38,7 +38,7 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.Any3;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
-import com.groupon.lex.metrics.resolver.NameResolverSet;
+import com.groupon.lex.metrics.resolver.NameResolver;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -54,17 +54,17 @@ import lombok.Value;
 @Value
 public class UrlPattern {
     private final StringTemplate urlTemplate;
-    private final NameResolverSet templateArgs;
+    private final NameResolver templateArgs;
 
-    public UrlPattern(@NonNull StringTemplate urlTemplate, @NonNull NameResolverSet templateArgs) {
+    public UrlPattern(@NonNull StringTemplate urlTemplate, @NonNull NameResolver templateArgs) {
         this.urlTemplate = urlTemplate;
         this.templateArgs = templateArgs;
 
-        if (!this.templateArgs.getKeys().containsAll(this.urlTemplate.getArguments()))
+        if (!this.templateArgs.getKeys().collect(Collectors.toSet()).containsAll(this.urlTemplate.getArguments()))
             throw new IllegalArgumentException("Not all parameters are fulfilled.");
     }
 
-    public UrlPattern(String urlTemplate, NameResolverSet templateArgs) {
+    public UrlPattern(String urlTemplate, NameResolver templateArgs) {
         this(StringTemplate.fromString(urlTemplate), templateArgs);
     }
 

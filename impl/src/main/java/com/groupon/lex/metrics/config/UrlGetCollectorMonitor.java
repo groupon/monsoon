@@ -35,7 +35,7 @@ import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.collector.httpget.UrlGetCollector;
 import com.groupon.lex.metrics.collector.httpget.UrlPattern;
-import com.groupon.lex.metrics.resolver.NameResolverSet;
+import com.groupon.lex.metrics.resolver.NameResolver;
 import lombok.NonNull;
 
 /**
@@ -46,7 +46,7 @@ public class UrlGetCollectorMonitor implements MonitorStatement {
     private final UrlPattern pattern_;
     private final SimpleGroupPath base_name_;
 
-    public UrlGetCollectorMonitor(@NonNull SimpleGroupPath base_name, @NonNull String pattern, @NonNull NameResolverSet args) {
+    public UrlGetCollectorMonitor(@NonNull SimpleGroupPath base_name, @NonNull String pattern, @NonNull NameResolver args) {
         pattern_ = new UrlPattern(pattern, args);
         base_name_ = base_name;
     }

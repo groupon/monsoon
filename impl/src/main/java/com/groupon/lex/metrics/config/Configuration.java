@@ -33,6 +33,7 @@ package com.groupon.lex.metrics.config;
 
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
+import com.groupon.lex.metrics.resolver.NameResolver;
 import java.util.Collection;
 import java.util.Objects;
 import java.io.File;
@@ -41,7 +42,6 @@ import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
-import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import java.util.List;
@@ -69,7 +69,7 @@ public class Configuration {
                             new TreeSet(Arrays.asList(new ObjectName("metrics:name=*"),
                                     new ObjectName("java.lang:*"),
                                     new ObjectName("java.lang.*:*"))),
-                            EMPTY_LIST)),
+                            NameResolver.EMPTY)),
                     emptyList());
             cfg.has_config_ = false;
             return cfg;
