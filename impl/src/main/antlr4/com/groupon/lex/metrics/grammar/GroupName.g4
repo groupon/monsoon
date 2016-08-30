@@ -51,6 +51,7 @@ import ConfigBnf;
     import com.groupon.lex.metrics.transformers.NameResolver;
     import com.groupon.lex.metrics.transformers.LiteralNameResolver;
     import com.groupon.lex.metrics.transformers.IdentifierNameResolver;
+    import com.groupon.lex.metrics.resolver.*;
     import java.util.Objects;
     import java.util.SortedSet;
     import java.util.TreeSet;

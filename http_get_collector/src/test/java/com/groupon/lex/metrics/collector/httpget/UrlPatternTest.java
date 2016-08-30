@@ -35,10 +35,9 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.lib.Any2;
-import com.groupon.lex.metrics.resolver.BoundNameResolver;
+import com.groupon.lex.metrics.resolver.SimpleBoundNameResolver;
 import com.groupon.lex.metrics.resolver.ConstResolver;
-import com.groupon.lex.metrics.resolver.NameResolver;
-import com.groupon.lex.metrics.resolver.NameResolverSet;
+import com.groupon.lex.metrics.resolver.NameBoundResolverSet;
 import com.groupon.lex.metrics.resolver.ResolverTuple;
 import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 import static java.util.Collections.EMPTY_LIST;
@@ -51,38 +50,46 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
+import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 
 /**
  *
  * @author ariane
  */
 public class UrlPatternTest {
-    private static final NameResolver PARAMS =
-            new NameResolverSet(
-                    new BoundNameResolver(
-                            new BoundNameResolver.Names(Any2.left(0)),
+    private static final NameBoundResolver PARAMS =
+            new NameBoundResolverSet(
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.left(0)),
                             new ConstResolver(
                                     new ResolverTuple(newTupleElement("foo")),
                                     new ResolverTuple(newTupleElement("bar")))),
-                    new BoundNameResolver(
-                            new BoundNameResolver.Names(Any2.left(1)),
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.left(1)),
                             new ConstResolver(
                                     new ResolverTuple(newTupleElement("fizz")),
                                     new ResolverTuple(newTupleElement("buzz"))))
             );
-    private static final NameResolver PARAMS_WITH_HOST =
-            new NameResolverSet(
-                    new BoundNameResolver(
-                            new BoundNameResolver.Names(Any2.right("host")),
+    private static final NameBoundResolver PARAMS_WITH_HOST =
+            new NameBoundResolverSet(
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.right("host")),
                             new ConstResolver(
                                     new ResolverTuple(newTupleElement("localhost")))),
-                    new BoundNameResolver(
-                            new BoundNameResolver.Names(Any2.left(0)),
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.left(0)),
                             new ConstResolver(
                                     new ResolverTuple(newTupleElement("foo")),
                                     new ResolverTuple(newTupleElement("bar")))),
-                    new BoundNameResolver(
-                            new BoundNameResolver.Names(Any2.left(1)),
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.left(1)),
                             new ConstResolver(
                                     new ResolverTuple(newTupleElement("fizz")),
                                     new ResolverTuple(newTupleElement("buzz"))))
@@ -90,7 +97,7 @@ public class UrlPatternTest {
 
     @Test
     public void emptyArguments() throws Exception {
-        final UrlPattern pattern = new UrlPattern("foobar", NameResolver.EMPTY);
+        final UrlPattern pattern = new UrlPattern("foobar", NameBoundResolver.EMPTY);
         final Map<GroupName, String> result = pattern.getUrls().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
         assertTrue(pattern.getTemplateArgs().isEmpty());
@@ -166,15 +173,15 @@ public class UrlPatternTest {
         }
         final Helper H = new Helper();
 
-        final NameResolver params =
-            new NameResolverSet(
-                    new BoundNameResolver(
-                            new BoundNameResolver.Names(Any2.right("host")),
+        final NameBoundResolver params =
+            new NameBoundResolverSet(
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.right("host")),
                             new ConstResolver(
                                     new ResolverTuple(newTupleElement("www.google.com")),
                                     new ResolverTuple(newTupleElement("www.groupon.com")))),
-                    new BoundNameResolver(
-                            new BoundNameResolver.Names(Any2.right("port")),
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.right("port")),
                             new ConstResolver(
                                     new ResolverTuple(newTupleElement("8080")),
                                     new ResolverTuple(newTupleElement("80"))))

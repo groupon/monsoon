@@ -35,7 +35,8 @@ import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.collector.httpget.UrlJsonCollector;
 import com.groupon.lex.metrics.collector.httpget.UrlPattern;
-import com.groupon.lex.metrics.resolver.NameResolver;
+import static java.util.Objects.requireNonNull;
+import com.groupon.lex.metrics.resolver.NameBoundResolver;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -46,7 +47,7 @@ public class JsonUrlMonitor implements MonitorStatement {
     private final UrlPattern pattern_;
     private final SimpleGroupPath base_name_;
 
-    public JsonUrlMonitor(SimpleGroupPath base_name, String pattern, NameResolver args) {
+    public JsonUrlMonitor(SimpleGroupPath base_name, String pattern, NameBoundResolver args) {
         pattern_ = new UrlPattern(pattern, args);
         base_name_ = requireNonNull(base_name);
     }

@@ -52,6 +52,7 @@ parser grammar ConfigBnf;
  *     import com.groupon.lex.metrics.transformers.NameResolver;
  *     import com.groupon.lex.metrics.transformers.LiteralNameResolver;
  *     import com.groupon.lex.metrics.transformers.IdentifierNameResolver;
+ *     import com.groupon.lex.metrics.resolver.*;
  *     import java.util.Objects;
  *     import java.util.SortedSet;
  *     import java.util.TreeSet;
@@ -432,12 +433,12 @@ collect_json_url returns [ MonitorStatement s ]
                  : s1=quoted_string AS_KW s3=lit_group_name s4=opt_tuple_body
                    { $s = new JsonUrlMonitor($s3.s, $s1.s, $s4.s); }
                  ;
-opt_tuple_body   returns [ com.groupon.lex.metrics.resolver.NameResolver s ]
+opt_tuple_body   returns [ NameBoundResolver s ]
                  @init{
-                   final List<com.groupon.lex.metrics.resolver.NameResolver> resolvers = new ArrayList<>();
+                   final List<NameBoundResolver> resolvers = new ArrayList<>();
                  }
                  : ENDSTATEMENT_KW
-                   { $s = com.groupon.lex.metrics.resolver.NameResolver.EMPTY; }
+                   { $s = NameBoundResolver.EMPTY; }
                  | CURLYBRACKET_OPEN
                    m0=collect_url_line{ resolvers.add($m0.s); }
                    (
@@ -448,35 +449,35 @@ opt_tuple_body   returns [ com.groupon.lex.metrics.resolver.NameResolver s ]
                      if (resolvers.size() == 1)
                          $s = resolvers.get(0);
                      else
-                         $s = new com.groupon.lex.metrics.resolver.NameResolverSet(resolvers);
+                         $s = new NameBoundResolverSet(resolvers);
                    }
                  ;
-collect_url_line returns [ com.groupon.lex.metrics.resolver.NameResolver s ]
+collect_url_line returns [ NameBoundResolver s ]
                  @init{
                    List<Any2<Integer, String>> keys = new ArrayList<>();
-                   List<com.groupon.lex.metrics.resolver.ResolverTuple> tuples = new ArrayList<>();
+                   List<ResolverTuple> tuples = new ArrayList<>();
                  }
                  : ( s_tk=tuple_key { keys = Collections.singletonList($s_tk.s); }
                      EQ_KW
                      SQBRACE_OPEN_LIT
-                     s0=tuple_value{ tuples.add(new com.groupon.lex.metrics.resolver.ResolverTuple($s0.s)); }
-                     (COMMA_LIT sN=tuple_value{ tuples.add(new com.groupon.lex.metrics.resolver.ResolverTuple($sN.s)); })*
+                     s0=tuple_value{ tuples.add(new ResolverTuple($s0.s)); }
+                     (COMMA_LIT sN=tuple_value{ tuples.add(new ResolverTuple($sN.s)); })*
                      SQBRACE_CLOSE_LIT
                    | keys=collect_url_line_key_tuple
                      { keys = $keys.s; }
                      EQ_KW
                      SQBRACE_OPEN_LIT
                      values=collect_url_line_value_tuple
-                     { tuples.add(new com.groupon.lex.metrics.resolver.ResolverTuple($values.s)); }
+                     { tuples.add(new ResolverTuple($values.s)); }
                      ( COMMA_LIT values=collect_url_line_value_tuple
-                       { tuples.add(new com.groupon.lex.metrics.resolver.ResolverTuple($values.s)); }
+                       { tuples.add(new ResolverTuple($values.s)); }
                      )*
                      SQBRACE_CLOSE_LIT
                    )
                    {
-                     $s = new com.groupon.lex.metrics.resolver.BoundNameResolver(
-                            new com.groupon.lex.metrics.resolver.BoundNameResolver.Names(keys),
-                            new com.groupon.lex.metrics.resolver.ConstResolver(tuples));
+                     $s = new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(keys),
+                            new ConstResolver(tuples));
                    }
                  ;
 collect_url_line_key_tuple returns [ List<Any2<Integer, String>> s = new ArrayList<>() ]
@@ -500,10 +501,10 @@ tuple_key        returns [ Any2<Integer, String> s ]
                  | s_s=identifier    { $s = Any2.right($s_s.s); }
                  ;
 tuple_value      returns [ Any3<Boolean, Integer, String> s ]
-                 : TRUE_KW           { $s = com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement(true);   }
-                 | FALSE_KW          { $s = com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement(false);  }
-                 | s_i=int_val       { $s = com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement((int)$s_i.s); }
-                 | s_s=quoted_string { $s = com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement($s_s.s); }
+                 : TRUE_KW           { $s = ResolverTuple.newTupleElement(true);   }
+                 | FALSE_KW          { $s = ResolverTuple.newTupleElement(false);  }
+                 | s_i=int_val       { $s = ResolverTuple.newTupleElement((int)$s_i.s); }
+                 | s_s=quoted_string { $s = ResolverTuple.newTupleElement($s_s.s); }
                  ;
 
 /*

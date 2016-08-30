@@ -11,29 +11,29 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import static java.util.Objects.requireNonNull;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.Value;
+import static java.util.Objects.requireNonNull;
 
 @Value
-public class NameResolverSet implements NameResolver {
-    private final List<NameResolver> nameResolvers;
+public class NameBoundResolverSet implements NameBoundResolver {
+    private final List<NameBoundResolver> nameResolvers;
 
-    public NameResolverSet(Collection<NameResolver> nameResolvers) {
-        for (NameResolver nr : nameResolvers)
+    public NameBoundResolverSet(Collection<NameBoundResolver> nameResolvers) {
+        for (NameBoundResolver nr : nameResolvers)
             requireNonNull(nr, "null name resolver");
         this.nameResolvers = unmodifiableList(new ArrayList<>(nameResolvers));
     }
 
-    public NameResolverSet(NameResolver... nameResolvers) {
+    public NameBoundResolverSet(NameBoundResolver... nameResolvers) {
         this(Arrays.asList(nameResolvers));
     }
 
     @Override
     public Stream<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolve() throws Exception {
         final List<List<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>>> sets = new ArrayList<>(nameResolvers.size());
-        for (NameResolver nr : nameResolvers)
+        for (NameBoundResolver nr : nameResolvers)
             sets.add(nr.resolve().collect(Collectors.toList()));
 
         return cartesianProduct(Stream.of(EMPTY_MAP), sets);
@@ -42,14 +42,14 @@ public class NameResolverSet implements NameResolver {
     @Override
     public Stream<Any2<Integer, String>> getKeys() {
         return nameResolvers.stream()
-                .flatMap(NameResolver::getKeys);
+                .flatMap(NameBoundResolver::getKeys);
     }
 
     @Override
     public String configString() {
         if (isEmpty()) return "{}";
         return nameResolvers.stream()
-                .map(NameResolver::configString)
+                .map(NameBoundResolver::configString)
                 .map(s -> "    " + s)  // Indentation
                 .collect(Collectors.joining(",\n", "{\n", "\n}"));
     }
@@ -57,7 +57,7 @@ public class NameResolverSet implements NameResolver {
     @Override
     public boolean isEmpty() {
         return nameResolvers.stream()
-                .allMatch(NameResolver::isEmpty);
+                .allMatch(NameBoundResolver::isEmpty);
     }
 
     private static <K, V> Stream<Map<K, V>> cartesianProduct(Stream<Map<K, V>> in, Iterable<? extends Collection<Map<K, V>>> sets) {

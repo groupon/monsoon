@@ -38,7 +38,6 @@ import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.jmx.MetricListenerInstance;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.Any3;
-import com.groupon.lex.metrics.resolver.NameResolver;
 import java.io.IOException;
 import static java.util.Collections.unmodifiableSortedSet;
 import java.util.Comparator;
@@ -53,15 +52,16 @@ import javax.management.InstanceNotFoundException;
 import javax.management.ObjectName;
 import lombok.NonNull;
 import lombok.Value;
+import com.groupon.lex.metrics.resolver.NameBoundResolver;
 
 @Value
 public final class JmxListenerMonitor implements MonitorStatement {
     @NonNull
     private final SortedSet<ObjectName> includes;
     @NonNull
-    private final NameResolver tupledElements;
+    private final NameBoundResolver tupledElements;
 
-    public JmxListenerMonitor(@NonNull Set<ObjectName> includes, @NonNull NameResolver template_args) {
+    public JmxListenerMonitor(@NonNull Set<ObjectName> includes, @NonNull NameBoundResolver template_args) {
         this.includes = unmodifiableSortedSet(new TreeSet<>(includes));
         this.tupledElements = template_args;
     }
@@ -75,11 +75,11 @@ public final class JmxListenerMonitor implements MonitorStatement {
             final Any3<Boolean, Integer, String> host = arg.getOrDefault(Any2.<Integer, String>right("host"), Any3.create3("localhost"));
             final Any3<Boolean, Integer, String> port = arg.getOrDefault(Any2.<Integer, String>right("port"), Any3.create3("9999"));
 
-            final List<String> sublist = NameResolver.indexToStringMap(arg).entrySet().stream()
+            final List<String> sublist = NameBoundResolver.indexToStringMap(arg).entrySet().stream()
                     .sorted(Comparator.comparing(Map.Entry::getKey))
                     .map(Map.Entry::getValue)
                     .collect(Collectors.toList());
-            final Tags tags = Tags.valueOf(NameResolver.tagMap(arg));
+            final Tags tags = Tags.valueOf(NameBoundResolver.tagMap(arg));
 
             MetricListenerInstance listener = new MetricListenerInstance(new JmxClient("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi"), getIncludes(), sublist, tags);
             registry.add(listener);

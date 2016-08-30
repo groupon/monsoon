@@ -33,7 +33,6 @@ package com.groupon.lex.metrics.config;
 
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
-import com.groupon.lex.metrics.resolver.NameResolver;
 import java.util.Collection;
 import java.util.Objects;
 import java.io.File;
@@ -56,6 +55,7 @@ import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import com.groupon.lex.metrics.resolver.NameBoundResolver;
 
 /**
  *
@@ -69,7 +69,7 @@ public class Configuration {
                             new TreeSet(Arrays.asList(new ObjectName("metrics:name=*"),
                                     new ObjectName("java.lang:*"),
                                     new ObjectName("java.lang.*:*"))),
-                            NameResolver.EMPTY)),
+                            NameBoundResolver.EMPTY)),
                     emptyList());
             cfg.has_config_ = false;
             return cfg;

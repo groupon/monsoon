@@ -9,8 +9,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public interface NameResolver {
-    public static final NameResolver EMPTY = new NameResolver() {
+public interface NameBoundResolver {
+    public static final NameBoundResolver EMPTY = new NameBoundResolver() {
         @Override
         public Stream<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolve() { return Stream.of(EMPTY_MAP); }
         @Override

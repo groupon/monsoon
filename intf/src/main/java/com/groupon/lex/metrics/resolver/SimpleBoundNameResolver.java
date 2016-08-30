@@ -10,19 +10,19 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import static java.util.Objects.requireNonNull;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.NonNull;
 import lombok.Value;
+import static java.util.Objects.requireNonNull;
 
 @Value
-public class BoundNameResolver implements NameResolver {
+public class SimpleBoundNameResolver implements NameBoundResolver {
     private final Names names;
     private final Resolver resolver;
 
-    public BoundNameResolver(@NonNull Names names, @NonNull Resolver resolver) {
+    public SimpleBoundNameResolver(@NonNull Names names, @NonNull Resolver resolver) {
         if (names.getWidth() > resolver.getTupleWidth())
             throw new IllegalArgumentException("Insufficient tuple elements (" + resolver.getTupleWidth() + ") for names (at least " + names.getWidth() + " elements needed)");
         if (new HashSet<>(names.getNames()).size() != names.getNames().size())
