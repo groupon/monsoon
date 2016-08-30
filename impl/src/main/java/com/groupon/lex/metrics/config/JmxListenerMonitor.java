@@ -72,8 +72,8 @@ public final class JmxListenerMonitor implements MonitorStatement {
         while (argIter.hasNext()) {
             final Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> arg = argIter.next();
 
-            final Any3<Boolean, Integer, String> host = arg.getOrDefault(Any2.<Integer, String>right("host"), Any3.create3("localhost"));
-            final Any3<Boolean, Integer, String> port = arg.getOrDefault(Any2.<Integer, String>right("port"), Any3.create3("9999"));
+            final String host = arg.getOrDefault(Any2.<Integer, String>right("host"), Any3.create3("localhost")).mapCombine(String::valueOf, String::valueOf, String::valueOf);
+            final String port = arg.getOrDefault(Any2.<Integer, String>right("port"), Any3.create2(9999)).mapCombine(String::valueOf, String::valueOf, String::valueOf);
 
             final List<String> sublist = NameBoundResolver.indexToStringMap(arg).entrySet().stream()
                     .sorted(Comparator.comparing(Map.Entry::getKey))
