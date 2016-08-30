@@ -25,6 +25,7 @@
     </properties>
 
     <modules>
+        <module>collectd</module>
         <module>http</module>
     </modules>
 
