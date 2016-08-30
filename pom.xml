@@ -31,10 +31,10 @@
         <module>impl</module>
         <module>api_server</module>
         <module>history</module>
-        <module>http_get_collector</module>
         <module>prometheus</module>
         <module>verify</module>
         <module>file_convert</module>
+        <module>collectors</module>
         <module>processors</module>
         <module>exporter</module>
     </modules>

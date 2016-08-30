@@ -36,7 +36,7 @@
         </dependency>
         <dependency>
             <groupId>com.groupon.lex</groupId>
-            <artifactId>monsoon-http_get_collector</artifactId>
+            <artifactId>monsoon-collector-http</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>
