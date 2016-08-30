@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -184,6 +184,10 @@ public abstract class MetricValue implements Comparable<MetricValue>, Serializab
         return true;
     }
 
+    public boolean isInfinite() { return false; }
+    public boolean isNaN() { return false; }
+    public boolean isInfiniteOrNaN() { return isInfinite() || isNaN(); }
+
     /** Internal use: integer used during comparison, unique per implementation type, to allow comparison across distinct types. */
     protected abstract int __type_comparison_index();
 
@@ -311,6 +315,10 @@ public abstract class MetricValue implements Comparable<MetricValue>, Serializab
             if (__type_comparison_index() > o.__type_comparison_index()) return  1;
             return Double.compare(value_, ((DblMetricValue)o).value_);
         }
+        @Override
+        public boolean isInfinite() { return Double.isInfinite(value_); }
+        @Override
+        public boolean isNaN() { return Double.isNaN(value_); }
     }
 
     private final static class StringMetricValue extends MetricValue {

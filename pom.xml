@@ -34,6 +34,7 @@
         <module>prometheus</module>
         <module>verify</module>
         <module>file_convert</module>
+        <module>processors</module>
         <module>exporter</module>
     </modules>
 
