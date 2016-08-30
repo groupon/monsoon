@@ -51,7 +51,7 @@ public class ParserSupportTest {
 
     @Test
     public void group_name() throws Exception {
-        assertEquals(GroupName.valueOf("com", "groupon", "lex", "\u10ff", "\010"),
+        assertEquals(GroupName.valueOf("com", "groupon", "lex", "\u10ff", "\013"),
                 new ParserSupport("com.groupon.'lex'.'\\u10ff'.'\\v'").group_name());
     }
 
