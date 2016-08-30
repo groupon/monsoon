@@ -203,4 +203,365 @@ public class CollectdPushCollector_CollectdMessageTest {
                         }}),
                 group.getName());
     }
+
+    @Test
+    public void handle_escaped_backslash() {
+        msg.plugin_instance = "instance-0[test=\"\\\\\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\\"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_backslash_a() {
+        msg.plugin_instance = "instance-0[test=\"\\a\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\007"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_backslash_b() {
+        msg.plugin_instance = "instance-0[test=\"\\b\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\010"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_backslash_t() {
+        msg.plugin_instance = "instance-0[test=\"\\t\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\t"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_backslash_n() {
+        msg.plugin_instance = "instance-0[test=\"\\n\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\n"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_backslash_v() {
+        msg.plugin_instance = "instance-0[test=\"\\v\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\013"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_backslash_f() {
+        msg.plugin_instance = "instance-0[test=\"\\f\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\f"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_backslash_r() {
+        msg.plugin_instance = "instance-0[test=\"\\r\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\r"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_escaped_single_quote() {
+        msg.plugin_instance = "instance-0[test=\"\\'\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("'"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_escaped_double_quote() {
+        msg.plugin_instance = "instance-0[test=\"\\\"\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\""));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_escaped_slash() {
+        msg.plugin_instance = "instance-0[test=\"\\/\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("/"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_escaped_octal3() {
+        msg.plugin_instance = "instance-0[test=\"\\002\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\002"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_escaped_octal2() {
+        msg.plugin_instance = "instance-0[test=\"\\02\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\002"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_escaped_octal1() {
+        msg.plugin_instance = "instance-0[test=\"\\2\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\002"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_null_char() {
+        msg.plugin_instance = "instance-0[test=\"\\0\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\000"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_escaped_hex() {
+        msg.plugin_instance = "instance-0[test=\"\\x2f\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\u002f"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_escaped_unicode_2byte() {
+        msg.plugin_instance = "instance-0[test=\"\\u202f\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue("\u202f"));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_escaped_unicode_4byte() {
+        final String expected = String.valueOf(Character.toChars(0x0009202f));
+        msg.plugin_instance = "instance-0[test=\"\\U0009202f\"]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromStrValue(expected));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_uint_dec() {
+        msg.plugin_instance = "instance-0[test=19]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromIntValue(19));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_uint_oct() {
+        msg.plugin_instance = "instance-0[test=017]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromIntValue(017));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_uint_hex() {
+        msg.plugin_instance = "instance-0[test=0x19]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromIntValue(0x19));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_int_dec() {
+        msg.plugin_instance = "instance-0[test=-19]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromIntValue(-19));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_int_oct() {
+        msg.plugin_instance = "instance-0[test=-017]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromIntValue(-017));
+                        }}),
+                group.getName());
+    }
+
+    @Test
+    public void handle_int_hex() {
+        msg.plugin_instance = "instance-0[test=-0x19]";
+        MetricGroup group = msg.toMetricGroup(SimpleGroupPath.valueOf("foo"));
+
+        assertEquals(
+                GroupName.valueOf(
+                        SimpleGroupPath.valueOf("foo", "plugin", "instance-0"),
+                        new HashMap<String, MetricValue>() {{
+                            put("host", MetricValue.fromStrValue("otherhost"));
+                            put("test", MetricValue.fromIntValue(-0x19));
+                        }}),
+                group.getName());
+    }
 }

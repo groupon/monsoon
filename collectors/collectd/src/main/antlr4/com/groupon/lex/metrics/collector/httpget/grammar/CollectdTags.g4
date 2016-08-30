@@ -70,9 +70,9 @@ uint_val        returns [ long value ]
                 : s1=DIGITS
                   { $value = Long.parseLong($s1.getText()); }
                 | s1=HEXDIGITS
-                  { $value = Long.parseLong($s1.getText()); }
+                  { $value = Long.parseLong($s1.getText().substring(2), 16); }
                 | s1=OCTDIGITS
-                  { $value = Long.parseLong($s1.getText()); }
+                  { $value = Long.parseLong($s1.getText(), 8); }
                 ;
 
 
@@ -188,7 +188,7 @@ ESC_CHAR         : { is_string_state_() }? '\\\\'
                          ('0'..'9' | 'a'..'f' | 'A'..'F')
                    {
                      try {
-                         int ch_int = Integer.valueOf(getText().substring(1), 16);
+                         int ch_int = Integer.valueOf(getText().substring(2), 16);
                          if (ch_int > 127) throw new CharEscapeException("Invalid hex escape");
                          setText(String.valueOf((char)ch_int));
                      } catch (NumberFormatException e) {
@@ -201,7 +201,7 @@ ESC_CHAR         : { is_string_state_() }? '\\\\'
                          ('0'..'9' | 'a'..'f' | 'A'..'F')
                    {
                      try {
-                         int ch_int = Integer.valueOf(getText().substring(1), 16);
+                         int ch_int = Integer.valueOf(getText().substring(2), 16);
                          if (ch_int > 0x10ffff) throw new CharEscapeException("Invalid hex escape");
                          setText(String.valueOf(Character.toChars(ch_int)));
                      } catch (NumberFormatException e) {
@@ -218,7 +218,7 @@ ESC_CHAR         : { is_string_state_() }? '\\\\'
                          ('0'..'9' | 'a'..'f' | 'A'..'F')
                    {
                      try {
-                         int ch_int = Integer.valueOf(getText().substring(1), 16);
+                         int ch_int = Integer.valueOf(getText().substring(2), 16);
                          if (ch_int > 0x10ffff) throw new CharEscapeException("Invalid hex escape");
                          setText(String.valueOf(Character.toChars(ch_int)));
                      } catch (NumberFormatException e) {
