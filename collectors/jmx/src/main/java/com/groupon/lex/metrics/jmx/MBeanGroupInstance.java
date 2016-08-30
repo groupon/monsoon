@@ -33,7 +33,6 @@ package com.groupon.lex.metrics.jmx;
 
 import static com.groupon.lex.metrics.AttributeConverter.resolve_property;
 import com.groupon.lex.metrics.GroupName;
-import com.groupon.lex.metrics.JmxClient;
 import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.MetricName;

@@ -31,7 +31,7 @@
  */
 package com.groupon.lex.metrics.config;
 
-import com.groupon.lex.metrics.JmxClient;
+import com.groupon.lex.metrics.jmx.JmxClient;
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import static com.groupon.lex.metrics.ConfigSupport.quotedString;
 import com.groupon.lex.metrics.Tags;
