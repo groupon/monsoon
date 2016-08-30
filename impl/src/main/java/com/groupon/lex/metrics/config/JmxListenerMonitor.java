@@ -73,7 +73,7 @@ public final class JmxListenerMonitor implements MonitorStatement {
             final Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> arg = argIter.next();
 
             final Any3<Boolean, Integer, String> host = arg.getOrDefault(Any2.<Integer, String>right("host"), Any3.create3("localhost"));
-            final Any3<Boolean, Integer, String> port = arg.getOrDefault(Any2.<Integer, String>right("port"), Any3.create3("9999"));
+            final Any3<Boolean, Integer, String> port = arg.getOrDefault(Any2.<Integer, String>right("port"), Any3.create2(9999));
 
             final List<String> sublist = NameBoundResolver.indexToStringMap(arg).entrySet().stream()
                     .sorted(Comparator.comparing(Map.Entry::getKey))
@@ -89,19 +89,27 @@ public final class JmxListenerMonitor implements MonitorStatement {
 
     @Override
     public StringBuilder configString() {
-        final StringBuilder buf = new StringBuilder().append("collect jmx_listener ");
+        final StringBuilder buf = new StringBuilder().append("collect jmx_listener");
+
         boolean first = true;
         for (ObjectName obj : includes) {
-            if (first)
+            if (first) {
+                buf.append(' ');
                 first = false;
-            else
+            } else {
                 buf.append(", ");
+            }
             buf.append(quotedString(obj.toString()));
         }
-        if (!tupledElements.isEmpty())
-            buf.append(tupledElements);
-        else
+
+        if (!tupledElements.isEmpty()) {
+            buf
+                    .append(' ')
+                    .append(tupledElements.configString());
+        } else {
             buf.append(';');
+        }
+
         buf.append('\n');
         return buf;
     }
