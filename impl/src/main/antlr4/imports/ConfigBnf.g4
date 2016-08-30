@@ -52,6 +52,7 @@ parser grammar ConfigBnf;
  *     import com.groupon.lex.metrics.transformers.NameResolver;
  *     import com.groupon.lex.metrics.transformers.LiteralNameResolver;
  *     import com.groupon.lex.metrics.transformers.IdentifierNameResolver;
+ *     import com.groupon.lex.metrics.resolver.*;
  *     import java.util.Objects;
  *     import java.util.SortedSet;
  *     import java.util.TreeSet;
@@ -71,6 +72,7 @@ parser grammar ConfigBnf;
  *     import java.util.Optional;
  *     import org.joda.time.Duration;
  *     import com.groupon.lex.metrics.lib.Any2;
+ *     import com.groupon.lex.metrics.lib.Any3;
  * }
  */
 
@@ -444,63 +446,78 @@ collect_json_url returns [ MonitorStatement s ]
                  : s1=quoted_string AS_KW s3=lit_group_name s4=opt_tuple_body
                    { $s = new JsonUrlMonitor($s3.s, $s1.s, $s4.s); }
                  ;
-opt_tuple_body   returns [ Collection<com.groupon.lex.metrics.TupledElements> s = new ArrayList<>() ]
+opt_tuple_body   returns [ NameBoundResolver s ]
+                 @init{
+                   final List<NameBoundResolver> resolvers = new ArrayList<>();
+                 }
                  : ENDSTATEMENT_KW
-                   { /* SKIP */ }
+                   { $s = NameBoundResolver.EMPTY; }
                  | CURLYBRACKET_OPEN
-                   m0=collect_url_line{ $s.add($m0.s); }
+                   m0=collect_url_line{ resolvers.add($m0.s); }
                    (
-                     COMMA_LIT mN=collect_url_line{ $s.add($mN.s); }
+                     COMMA_LIT mN=collect_url_line{ resolvers.add($mN.s); }
                    )*
                    CURLYBRACKET_CLOSE
+                   {
+                     if (resolvers.size() == 1)
+                         $s = resolvers.get(0);
+                     else
+                         $s = new NameBoundResolverSet(resolvers);
+                   }
                  ;
-collect_url_line returns [ com.groupon.lex.metrics.TupledElements s ]
-                 : ( s_idx=uint_val
-                     {
-                       $s = new com.groupon.lex.metrics.TupledElements(Collections.singletonList(Any2.right((int)$s_idx.s)));
-                     }
-                   | s_tag=identifier
-                     {
-                       $s = new com.groupon.lex.metrics.TupledElements(Collections.singletonList(Any2.left($s_tag.s)));
-                     }
+collect_url_line returns [ NameBoundResolver s ]
+                 @init{
+                   List<Any2<Integer, String>> keys = new ArrayList<>();
+                   List<ResolverTuple> tuples = new ArrayList<>();
+                 }
+                 : ( s_tk=tuple_key { keys = Collections.singletonList($s_tk.s); }
+                     EQ_KW
+                     SQBRACE_OPEN_LIT
+                     s0=tuple_value{ tuples.add(new ResolverTuple($s0.s)); }
+                     (COMMA_LIT sN=tuple_value{ tuples.add(new ResolverTuple($sN.s)); })*
+                     SQBRACE_CLOSE_LIT
+                   | keys=collect_url_line_key_tuple
+                     { keys = $keys.s; }
+                     EQ_KW
+                     SQBRACE_OPEN_LIT
+                     values=collect_url_line_value_tuple
+                     { tuples.add(new ResolverTuple($values.s)); }
+                     ( COMMA_LIT values=collect_url_line_value_tuple
+                       { tuples.add(new ResolverTuple($values.s)); }
+                     )*
+                     SQBRACE_CLOSE_LIT
                    )
-                   EQ_KW
-                   SQBRACE_OPEN_LIT
-                   s0=quoted_string{ $s.addValues(Collections.singletonList($s0.s)); }
-                   (COMMA_LIT sN=quoted_string{ $s.addValues(Collections.singletonList($sN.s)); })*
-                   SQBRACE_CLOSE_LIT
-                 | keys=collect_url_line_key_tuple
-                   { $s = new com.groupon.lex.metrics.TupledElements($keys.s); }
-                   EQ_KW
-                   SQBRACE_OPEN_LIT
-                   values=collect_url_line_value_tuple
-                   { $values.s.size() == $keys.s.size() }?
-                   { $s.addValues($values.s); }
-                   ( COMMA_LIT values=collect_url_line_value_tuple
-                     { $values.s.size() == $keys.s.size() }?
-                     { $s.addValues($values.s); }
-                   )*
-                   SQBRACE_CLOSE_LIT
+                   {
+                     $s = new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(keys),
+                            new ConstResolver(tuples));
+                   }
                  ;
-collect_url_line_key_tuple returns [ List<Any2<String, Integer>> s = new ArrayList<>() ]
+collect_url_line_key_tuple returns [ List<Any2<Integer, String>> s = new ArrayList<>() ]
                  : BRACE_OPEN_LIT
-                   ( s_idx=uint_val { $s.add(Any2.right((int)$s_idx.s)); }
-                   | s_tag=identifier { $s.add(Any2.left($s_tag.s)); }
-                   )
+                   s1=tuple_key { $s.add($s1.s); }
                    ( COMMA_LIT
-                     ( s_idx=uint_val { $s.add(Any2.right((int)$s_idx.s)); }
-                     | s_tag=identifier { $s.add(Any2.left($s_tag.s)); }
-                     )
+                     sN=tuple_key { $s.add($sN.s); }
                    )*
                    BRACE_CLOSE_LIT
                  ;
-collect_url_line_value_tuple returns [ List<String> s = new ArrayList<>() ]
+collect_url_line_value_tuple returns [ List<Any3<Boolean, Integer, String>> s = new ArrayList<>() ]
                  : BRACE_OPEN_LIT
-                   s0=quoted_string{ $s.add($s0.s); }
+                   s0=tuple_value{ $s.add($s0.s); }
                    ( COMMA_LIT
-                     sN=quoted_string{ $s.add($sN.s); }
+                     sN=tuple_value{ $s.add($sN.s); }
                    )*
                    BRACE_CLOSE_LIT
+                 ;
+tuple_key        returns [ Any2<Integer, String> s ]
+                 : s_i=uint_val      { $s = Any2.left((int)$s_i.s); }
+                 | s_s=identifier    { $s = Any2.right($s_s.s); }
+                 ;
+tuple_value      returns [ Any3<Boolean, Integer, String> s ]
+                 : TRUE_KW           { $s = ResolverTuple.newTupleElement(true);   }
+                 | FALSE_KW          { $s = ResolverTuple.newTupleElement(false);  }
+                 | s_i=int_val       { $s = ResolverTuple.newTupleElement((int)$s_i.s); }
+                 | s_s=quoted_string { $s = ResolverTuple.newTupleElement($s_s.s); }
                  ;
 
 /*

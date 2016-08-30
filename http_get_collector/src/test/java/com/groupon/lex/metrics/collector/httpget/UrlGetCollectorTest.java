@@ -40,7 +40,6 @@ import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.lib.StringTemplate;
 import java.util.Arrays;
-import static java.util.Collections.EMPTY_LIST;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.hamcrest.Matchers;
@@ -58,6 +57,7 @@ import org.mockserver.model.ConnectionOptions;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
 import org.mockserver.verify.VerificationTimes;
+import com.groupon.lex.metrics.resolver.NameBoundResolver;
 
 /**
  *
@@ -70,7 +70,7 @@ public class UrlGetCollectorTest {
     private MockServerClient mockServerClient;
 
     private UrlGetCollector endpoint(String path) {
-        return new UrlGetCollector(SimpleGroupPath.valueOf("test"), new UrlPattern(StringTemplate.fromString("http://localhost:" + mockServerRule.getPort() + path), EMPTY_LIST));
+        return new UrlGetCollector(SimpleGroupPath.valueOf("test"), new UrlPattern(StringTemplate.fromString("http://localhost:" + mockServerRule.getPort() + path), NameBoundResolver.EMPTY));
     }
 
     @Test(timeout = 10000)

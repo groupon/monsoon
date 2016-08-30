@@ -31,49 +31,73 @@
  */
 package com.groupon.lex.metrics.collector.httpget;
 
-import com.groupon.lex.metrics.TupledElements;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.lib.Any2;
-import java.util.Collection;
-import java.util.Collections;
+import com.groupon.lex.metrics.resolver.SimpleBoundNameResolver;
+import com.groupon.lex.metrics.resolver.ConstResolver;
+import com.groupon.lex.metrics.resolver.NameBoundResolverSet;
+import com.groupon.lex.metrics.resolver.ResolverTuple;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 import static java.util.Collections.EMPTY_LIST;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
+import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 
 /**
  *
  * @author ariane
  */
 public class UrlPatternTest {
-    private final Map<Any2<String, Integer>, Set<String>> PARAMS_MAP = new HashMap<Any2<String, Integer>, Set<String>>() {{
-        put(Any2.<String, Integer>right(0), Stream.of("foo", "bar").collect(Collectors.toSet()));
-        put(Any2.<String, Integer>right(1), Stream.of("fizz", "buzz").collect(Collectors.toSet()));
-    }};
-
-    private final Collection<TupledElements> PARAMS = PARAMS_MAP.entrySet().stream()
-            .map(e -> {
-                final TupledElements elem = new TupledElements(Collections.singletonList(e.getKey()));
-                e.getValue().stream()
-                        .map(Collections::singletonList)
-                        .forEach(elem::addValues);
-                return elem;
-            })
-            .collect(Collectors.toList());
+    private static final NameBoundResolver PARAMS =
+            new NameBoundResolverSet(
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.left(0)),
+                            new ConstResolver(
+                                    new ResolverTuple(newTupleElement("foo")),
+                                    new ResolverTuple(newTupleElement("bar")))),
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.left(1)),
+                            new ConstResolver(
+                                    new ResolverTuple(newTupleElement("fizz")),
+                                    new ResolverTuple(newTupleElement("buzz"))))
+            );
+    private static final NameBoundResolver PARAMS_WITH_HOST =
+            new NameBoundResolverSet(
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.right("host")),
+                            new ConstResolver(
+                                    new ResolverTuple(newTupleElement("localhost")))),
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.left(0)),
+                            new ConstResolver(
+                                    new ResolverTuple(newTupleElement("foo")),
+                                    new ResolverTuple(newTupleElement("bar")))),
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.left(1)),
+                            new ConstResolver(
+                                    new ResolverTuple(newTupleElement("fizz")),
+                                    new ResolverTuple(newTupleElement("buzz"))))
+            );
 
     @Test
-    public void emptyArguments() {
-        final UrlPattern pattern = new UrlPattern("foobar", EMPTY_LIST);
+    public void emptyArguments() throws Exception {
+        final UrlPattern pattern = new UrlPattern("foobar", NameBoundResolver.EMPTY);
         final Map<GroupName, String> result = pattern.getUrls().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
         assertTrue(pattern.getTemplateArgs().isEmpty());
@@ -81,7 +105,7 @@ public class UrlPatternTest {
     }
 
     @Test
-    public void emptyDiscardingArguments() {
+    public void emptyDiscardingArguments() throws Exception {
         final UrlPattern pattern = new UrlPattern("foobar", PARAMS);
         final Map<GroupName, String> result = pattern.getUrls().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
@@ -92,7 +116,7 @@ public class UrlPatternTest {
     }
 
     @Test
-    public void processOneArgument() {
+    public void processOneArgument() throws Exception {
         final UrlPattern pattern = new UrlPattern("Hello $0!", PARAMS);
         final Map<GroupName, String> result = pattern.getUrls().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
@@ -103,7 +127,7 @@ public class UrlPatternTest {
     }
 
     @Test
-    public void processTwoArguments() {
+    public void processTwoArguments() throws Exception {
         final UrlPattern pattern = new UrlPattern("$0 - $1", PARAMS);
         final Map<GroupName, String> result = pattern.getUrls().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
@@ -114,26 +138,31 @@ public class UrlPatternTest {
     }
 
     @Test(expected = IllegalArgumentException.class)
-    public void insufficientArguments() {
+    public void insufficientArguments() throws Exception {
         final UrlPattern pattern = new UrlPattern("$0 $1 $2", PARAMS);
     }
 
-    @Test
-    public void config_string() {
+    @Test(expected = IllegalArgumentException.class)
+    public void insufficientNamedArguments() throws Exception {
         final UrlPattern pattern = new UrlPattern("$0 $1 ${host}", PARAMS);
+    }
+
+    @Test
+    public void config_string() throws Exception {
+        final UrlPattern pattern = new UrlPattern("$0 $1 ${host}", PARAMS_WITH_HOST);
 
         assertEquals("${0} ${1} ${host}", pattern.toString());
     }
 
     @Test
-    public void get_pattern() {
-        final UrlPattern pattern = new UrlPattern("$0 $1 ${host}", PARAMS);
+    public void get_pattern() throws Exception {
+        final UrlPattern pattern = new UrlPattern("$0 $1 ${host}", PARAMS_WITH_HOST);
 
         assertEquals("${0} ${1} ${host}", pattern.getUrlTemplate().toString());
     }
 
     @Test
-    public void named_argument() {
+    public void named_argument() throws Exception {
         class Helper {
             GroupName group_(String host, String port) {
                 final Map<String, MetricValue> tags = new HashMap<>();
@@ -144,19 +173,19 @@ public class UrlPatternTest {
         }
         final Helper H = new Helper();
 
-        final Map<Any2<String, Integer>, Set<String>> params_map = new HashMap<Any2<String, Integer>, Set<String>>() {{
-                put(Any2.<String, Integer>left("host"), Stream.of("www.google.com", "www.groupon.com").collect(Collectors.toSet()));
-                put(Any2.<String, Integer>left("port"), Stream.of("8080", "80").collect(Collectors.toSet()));
-            }};
-        final Collection<TupledElements> params = params_map.entrySet().stream()
-                .map(e -> {
-                    final TupledElements elem = new TupledElements(Collections.singletonList(e.getKey()));
-                    e.getValue().stream()
-                            .map(Collections::singletonList)
-                            .forEach(elem::addValues);
-                    return elem;
-                })
-                .collect(Collectors.toList());
+        final NameBoundResolver params =
+            new NameBoundResolverSet(
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.right("host")),
+                            new ConstResolver(
+                                    new ResolverTuple(newTupleElement("www.google.com")),
+                                    new ResolverTuple(newTupleElement("www.groupon.com")))),
+                    new SimpleBoundNameResolver(
+                            new SimpleBoundNameResolver.Names(Any2.right("port")),
+                            new ConstResolver(
+                                    new ResolverTuple(newTupleElement("8080")),
+                                    new ResolverTuple(newTupleElement("80"))))
+            );
         final UrlPattern pattern = new UrlPattern("http://${host}:${port}/", params);
 
         // This is under test.

@@ -41,7 +41,6 @@ import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
-import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import java.util.List;
@@ -56,6 +55,7 @@ import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import com.groupon.lex.metrics.resolver.NameBoundResolver;
 
 /**
  *
@@ -69,7 +69,7 @@ public class Configuration {
                             new TreeSet(Arrays.asList(new ObjectName("metrics:name=*"),
                                     new ObjectName("java.lang:*"),
                                     new ObjectName("java.lang.*:*"))),
-                            EMPTY_LIST)),
+                            NameBoundResolver.EMPTY)),
                     emptyList());
             cfg.has_config_ = false;
             return cfg;

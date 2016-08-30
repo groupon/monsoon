@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.collector.httpget;
 
 import com.groupon.lex.metrics.GroupGenerator;
+import static com.groupon.lex.metrics.GroupGenerator.failedResult;
 import static com.groupon.lex.metrics.GroupGenerator.successResult;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Metric;
@@ -309,9 +310,15 @@ public class UrlGetCollector implements GroupGenerator {
     @Override
     public GroupCollection getGroups() {
         /* Collect all URLs. */
-        final List<Future<MetricGroup>> urls = patterns_.getUrls()
-                .map(x -> do_request_(x.getKey(), x.getValue()))
-                .collect(Collectors.toList());
+        final List<Future<MetricGroup>> urls;
+        try {
+            urls = patterns_.getUrls()
+                    .map(x -> do_request_(x.getKey(), x.getValue()))
+                    .collect(Collectors.toList());
+        } catch (Exception ex) {
+            LOG.log(Level.WARNING, "unable to load URLs", ex);
+            return failedResult();
+        }
 
         /* Collect. */
         return successResult(urls.stream()
