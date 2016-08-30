@@ -22,19 +22,19 @@ import java.nio.file.Path;
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
 import static java.nio.file.StandardOpenOption.READ;
 import static java.nio.file.StandardOpenOption.WRITE;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.Spliterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
-import org.dcache.xdr.OncRpcException;
-import org.dcache.xdr.Xdr;
-import org.dcache.xdr.XdrBufferDecodingStream;
+import org.acplt.oncrpc.OncRpcException;
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferEncodingStream;
 import org.joda.time.DateTime;
 
 public class WriteableTSDataFile implements TSData {
@@ -91,26 +91,28 @@ public class WriteableTSDataFile implements TSData {
          * Since FileChannel.write() doesn't guarantee all of the buffer will be written,
          * this function loops until all bytes are flushed out.
          */
-        private void write_buffer_to_file_(ByteBuffer buf, long offset) throws IOException {
+        private void write_buffer_to_file_(List<ByteBuffer> bufs, long offset) throws IOException {
             final FileChannel fd = fd_.get();
-            while (buf.hasRemaining()) {
-                final int written = fd.write(buf, offset);
-                if (written < 0)
-                    throw new IOException("unable to write");
-                offset += written;
+            for (ByteBuffer buf : bufs) {
+                while (buf.hasRemaining()) {
+                    final int written = fd.write(buf, offset);
+                    if (written < 0)
+                        throw new IOException("unable to write");
+                    offset += written;
+                }
             }
         }
 
         private void rewrite_header_() throws IOException, OncRpcException {
-            Xdr xdr = new Xdr(hdr_size_);
+            XdrBufferEncodingStream xdr = new XdrBufferEncodingStream(hdr_size_);
             xdr.beginEncoding();
             writeMimeHeader(xdr);
             hdr_.xdrEncode(xdr);
             xdr.endEncoding();
 
-            if (xdr.asBuffer().remaining() != hdr_size_)
-                throw new IllegalStateException("header was shorter than usual, I'm coming up " + (hdr_size_ - xdr.asBuffer().remaining()) + " bytes short");
-            write_buffer_to_file_(xdr.asBuffer().toByteBuffer(), 0);
+            if (xdr.getBuffersLength() != hdr_size_)
+                throw new IllegalStateException("header was shorter than usual, I'm coming up " + (hdr_size_ - xdr.getBuffersLength()) + " bytes short");
+            write_buffer_to_file_(xdr.getBuffers(), 0);
         }
 
         public void updateTimestamp(DateTime new_end_ts) throws IOException {
@@ -156,12 +158,20 @@ public class WriteableTSDataFile implements TSData {
          * This means streaming the entire file through the xdr decoder.
          */
         XdrBufferDecodingStream decoder = new XdrBufferDecodingStream(new PositionalReader(fd_));
-        new tsfile_mimeheader(decoder);  // Read MIME header and skip it.
-        new tsfile_header(decoder);  // Read header and skip it.
+        try {
+            new tsfile_mimeheader(decoder);  // Read MIME header and skip it.
+            new tsfile_header(decoder);  // Read header and skip it.
+        } catch (OncRpcException ex) {
+            throw new IOException("RPC decoding error", ex);
+        }
         final tsfile_data tsfd = new tsfile_data();
-        while (!decoder.atEof()) {
-            tsfd.xdrDecode(decoder);  // Load record.
-            from_xdr_.data(tsfd);  // Update from_xdr, discard decoding result.
+        try {
+            while (!decoder.atEof()) {
+                tsfd.xdrDecode(decoder);  // Load record.
+                from_xdr_.data(tsfd);  // Update from_xdr, discard decoding result.
+            }
+        } catch (OncRpcException ex) {
+            throw new IOException("RPC decoding error", ex);
         }
     }
 
@@ -171,12 +181,12 @@ public class WriteableTSDataFile implements TSData {
     }
 
     public static WriteableTSDataFile newFile(Path file, DateTime begin, DateTime end) throws IOException {
-        Xdr xdr = new Xdr(Xdr.INITIAL_XDR_SIZE);
+        XdrBufferEncodingStream xdr = new XdrBufferEncodingStream();
         tsfile_header header = new tsfile_header();
         header.first = ToXdr.timestamp(begin);
         header.last = ToXdr.timestamp(end);
         try {
-            xdr.beginDecoding();
+            xdr.beginEncoding();
             writeMimeHeader(xdr);
             header.xdrEncode(xdr);
             xdr.endEncoding();
@@ -186,7 +196,7 @@ public class WriteableTSDataFile implements TSData {
 
         final GCCloseable<FileChannel> fd = new GCCloseable<>(FileChannel.open(file, READ, WRITE, CREATE_NEW));
         try {
-            write_buffers_(fd.get(), xdr.asBuffer().toByteBuffer(), null, null);
+            write_buffers_(fd.get(), xdr.getBuffers(), null, null);
             return new WriteableTSDataFile(file, fd);
         } catch (IOException | RuntimeException ex) {
             Files.delete(file);
@@ -233,8 +243,7 @@ public class WriteableTSDataFile implements TSData {
         return get_readonly_().toArray(a);
     }
 
-    private static boolean write_buffers_(FileChannel fd, ByteBuffer bufs_arg[], HeaderRegenerator header_regenerator, DateTime new_end) throws IOException {
-        ByteBuffer bufs[] = Arrays.copyOf(bufs_arg, bufs_arg.length);
+    private static boolean write_buffers_(FileChannel fd, List<ByteBuffer> bufs, HeaderRegenerator header_regenerator, DateTime new_end) throws IOException {
         boolean wrote_something = false;
 
         final long rollback;
@@ -269,13 +278,9 @@ public class WriteableTSDataFile implements TSData {
         return wrote_something;
     }
 
-    private static boolean write_buffers_(FileChannel fd, ByteBuffer buf_arg, HeaderRegenerator header_regenerator, DateTime new_end) throws IOException {
-        return write_buffers_(fd, new ByteBuffer[]{ buf_arg }, header_regenerator, new_end);
-    }
-
-    private synchronized boolean write_buffers_(ByteBuffer bufs_arg[], DateTime new_end) {
+    private synchronized boolean write_buffers_(List<ByteBuffer> bufs, DateTime new_end) {
         try {
-            boolean wrote_something = write_buffers_(fd_.get(), bufs_arg, header_regenerator_, new_end);
+            boolean wrote_something = write_buffers_(fd_.get(), bufs, header_regenerator_, new_end);
             if (wrote_something)
                 readonly_.clear();
             return wrote_something;
@@ -284,25 +289,21 @@ public class WriteableTSDataFile implements TSData {
         }
     }
 
-    private boolean write_buffers_(ByteBuffer buf_arg, DateTime new_end) {
-        return write_buffers_(new ByteBuffer[]{ buf_arg }, new_end);
-    }
-
     @Override
     public boolean add(TimeSeriesCollection e) {
         if (e.isEmpty()) return false;
 
-        Xdr xdr = new Xdr(Xdr.INITIAL_XDR_SIZE);
+        XdrBufferEncodingStream xdr = new XdrBufferEncodingStream();
         final ToXdr to_xdr = new ToXdr(from_xdr_);
-        xdr.beginEncoding();
         try {
+            xdr.beginEncoding();
             to_xdr.data(e).xdrEncode(xdr);
-        } catch (IOException ex) {
+            xdr.endEncoding();
+        } catch (IOException | OncRpcException ex) {
             throw new RuntimeException(ex);
         }
-        xdr.endEncoding();
 
-        return write_buffers_(xdr.asBuffer().toByteBuffer(), e.getTimestamp());
+        return write_buffers_(xdr.getBuffers(), e.getTimestamp());
     }
 
     @Override
@@ -314,24 +315,28 @@ public class WriteableTSDataFile implements TSData {
     public boolean addAll(Collection<? extends TimeSeriesCollection> c) {
         if (c.isEmpty()) return false;
 
-        final Xdr xdr = new Xdr(Xdr.INITIAL_XDR_SIZE);
+        final XdrBufferEncodingStream xdr = new XdrBufferEncodingStream();
         final ToXdr to_xdr = new ToXdr(from_xdr_);
-        xdr.beginEncoding();
-        c.stream()
-                .filter(tsc -> !tsc.isEmpty())
-                .sorted(Comparator.<TimeSeriesCollection, DateTime>comparing(TimeSeriesCollection::getTimestamp))
-                .map(to_xdr::data)
-                .forEach((dp) -> {
-                    try {
-                        dp.xdrEncode(xdr);
-                    } catch (IOException ex) {
-                        throw new RuntimeException(ex);
-                    }
-                });
-        xdr.endEncoding();
+        try {
+            xdr.beginEncoding();
+            c.stream()
+                    .filter(tsc -> !tsc.isEmpty())
+                    .sorted(Comparator.<TimeSeriesCollection, DateTime>comparing(TimeSeriesCollection::getTimestamp))
+                    .map(to_xdr::data)
+                    .forEach((dp) -> {
+                        try {
+                            dp.xdrEncode(xdr);
+                        } catch (IOException | OncRpcException ex) {
+                            throw new RuntimeException(ex);
+                        }
+                    });
+            xdr.endEncoding();
+        } catch (IOException | OncRpcException ex) {
+            throw new RuntimeException(ex);
+        }
 
         DateTime new_end = c.stream().map(TimeSeriesCollection::getTimestamp).max(Comparator.naturalOrder()).get();
-        return write_buffers_(xdr.asBuffer().toByteBuffer(), new_end);
+        return write_buffers_(xdr.getBuffers(), new_end);
     }
 
     @Override

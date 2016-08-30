@@ -7,9 +7,9 @@ package com.groupon.lex.metrics.history.xdr;
 
 import java.io.IOException;
 import java.util.Arrays;
-import org.dcache.xdr.OncRpcException;
-import org.dcache.xdr.XdrDecodingStream;
-import org.dcache.xdr.XdrEncodingStream;
+import org.acplt.oncrpc.OncRpcException;
+import org.acplt.oncrpc.XdrDecodingStream;
+import org.acplt.oncrpc.XdrEncodingStream;
 
 /**
  *

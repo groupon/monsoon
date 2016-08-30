@@ -21,7 +21,8 @@ import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.dcache.xdr.XdrBufferDecodingStream;
+import org.acplt.oncrpc.OncRpcException;
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import org.joda.time.DateTime;
 
 /**
@@ -57,7 +58,12 @@ public class UnmappedReadonlyTSDataFile implements TSData {
         else
             stream = new XdrBufferDecodingStream(new UnmappedBufferSupplier());
 
-        final tsfile_mimeheader mimeheader = new tsfile_mimeheader(stream);
+        final tsfile_mimeheader mimeheader;
+        try {
+            mimeheader = new tsfile_mimeheader(stream);
+        } catch (OncRpcException ex) {
+            throw new IOException("RPC decoding error", ex);
+        }
         version_ = Const.validateHeaderOrThrow(mimeheader);
 
         final Parser.BeginEnd header = Parser.fromVersion(version_).header(stream);

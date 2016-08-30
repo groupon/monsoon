@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.READ;
 import static java.nio.file.StandardOpenOption.WRITE;
+import java.util.Collection;
 import static java.util.Collections.singletonMap;
 import java.util.List;
 import java.util.function.Function;
@@ -127,4 +128,14 @@ public class FileSupport {
         }
     }
 
+    public static ByteBuffer createSingleBuffer(Collection<ByteBuffer> bufs) {
+        final int totalLength = bufs.stream()
+                .mapToInt(ByteBuffer::limit)
+                .sum();
+        final ByteBuffer out = ByteBuffer.allocateDirect(totalLength);
+
+        bufs.forEach(out::put);
+        out.flip();
+        return out;
+    }
 }

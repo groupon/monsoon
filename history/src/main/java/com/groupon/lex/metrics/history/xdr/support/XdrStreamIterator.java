@@ -10,7 +10,7 @@ import java.util.NoSuchElementException;
 import static java.util.Objects.requireNonNull;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.dcache.xdr.XdrBufferDecodingStream;
+import org.acplt.oncrpc.OncRpcException;
 
 /**
  *
@@ -40,7 +40,12 @@ public class XdrStreamIterator implements Iterator<TimeSeriesCollection> {
     }
 
     private static Parser<?> skip_header_(XdrBufferDecodingStream decoder) throws IOException {
-        final int ver = Const.validateHeaderOrThrow(decoder);
+        final int ver;
+        try {
+            ver = Const.validateHeaderOrThrow(decoder);
+        } catch (OncRpcException ex) {
+            throw new IOException("RPC decoding error", ex);
+        }
         final Parser<?> parser = Parser.fromVersion(ver);
         final Parser.BeginEnd hdr = parser.header(decoder);
         LOG.log(Level.FINE, "header version {0}.{1}: {2}", new Object[]{Const.version_major(ver), Const.version_minor(ver), hdr});
