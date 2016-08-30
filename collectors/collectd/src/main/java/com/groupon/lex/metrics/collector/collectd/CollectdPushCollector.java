@@ -29,7 +29,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.collector.httpget;
+package com.groupon.lex.metrics.collector.collectd;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -44,7 +44,7 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.SimpleMetric;
 import com.groupon.lex.metrics.SimpleMetricGroup;
 import com.groupon.lex.metrics.Tags;
-import com.groupon.lex.metrics.collector.httpget.grammar.CollectdTags;
+import com.groupon.lex.metrics.collector.collectd.grammar.CollectdTags;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;

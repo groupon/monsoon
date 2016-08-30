@@ -34,7 +34,7 @@ package com.groupon.lex.metrics.config;
 import static com.groupon.lex.metrics.ConfigSupport.quotedString;
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.collector.httpget.CollectdPushCollector;
+import com.groupon.lex.metrics.collector.collectd.CollectdPushCollector;
 
 /**
  *

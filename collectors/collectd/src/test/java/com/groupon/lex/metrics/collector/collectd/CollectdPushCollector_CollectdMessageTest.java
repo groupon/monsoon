@@ -29,7 +29,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.collector.httpget;
+package com.groupon.lex.metrics.collector.collectd;
 
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Metric;

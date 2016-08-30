@@ -1,4 +1,4 @@
-package com.groupon.lex.metrics.collector.httpget.grammar;
+package com.groupon.lex.metrics.collector.collectd.grammar;
 
 import com.groupon.lex.metrics.lib.Any2;
 import java.util.ArrayList;
