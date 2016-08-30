@@ -34,41 +34,56 @@ package com.groupon.lex.metrics.config.impl;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.Path;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
+import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import com.groupon.lex.metrics.timeseries.TimeSeriesTransformer;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import com.groupon.lex.metrics.transformers.NameResolver;
-import static java.util.Collections.singletonMap;
-import static java.util.Collections.unmodifiableMap;
+import java.util.Collection;
+import static java.util.Collections.EMPTY_MAP;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Objects;
-import static java.util.Objects.requireNonNull;
+import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Stream;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.Value;
 
 /**
  * Creates a new metric, by applying an expression.
  * @author ariane
  */
+@Value
 public class DerivedMetricTransformerImpl implements TimeSeriesTransformer {
-    private final NameResolver group_;
-    private final Map<NameResolver, TimeSeriesMetricExpression> mapping_;
+    @NonNull
+    private final NameResolver group;
+    @NonNull
+    private final Map<String, TimeSeriesMetricExpression> tags;
+    @NonNull
+    private final Map<NameResolver, TimeSeriesMetricExpression> mapping;
 
-    public final NameResolver getGroup() { return group_; }
-    public final Map<NameResolver, TimeSeriesMetricExpression> getMapping() { return mapping_; }
-
-    public DerivedMetricTransformerImpl(NameResolver group, NameResolver metric, TimeSeriesMetricExpression value_expr) {
-        this(group, singletonMap(requireNonNull(metric), requireNonNull(value_expr)));
+    private static <T, U> Stream<Map.Entry<U, TimeSeriesMetricDeltaSet>> resolveMapping(Context ctx, Map<T, TimeSeriesMetricExpression> mapping, Function<? super T, Optional<? extends U>> keyMapper) {
+        return mapping.entrySet().stream()
+                .map(t_expr -> {
+                    return keyMapper.apply(t_expr.getKey())
+                            .map(key -> SimpleMapEntry.create(key, t_expr.getValue()));
+                })
+                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
+                .map(u_expr -> {
+                    return SimpleMapEntry.create(u_expr.getKey(), u_expr.getValue().apply(ctx));
+                });
     }
 
-    public DerivedMetricTransformerImpl(NameResolver group, Map<NameResolver, TimeSeriesMetricExpression> mapping) {
-        group_ = requireNonNull(group);
-        mapping_ = unmodifiableMap(new HashMap<>(requireNonNull(mapping)));
+    private static Optional<MetricName> resolveMetricName(Context ctx, NameResolver resolver) {
+        return resolver.apply(ctx)
+                .map(Path::getPath)
+                .map(MetricName::valueOf);
     }
 
     @Override
@@ -76,58 +91,74 @@ public class DerivedMetricTransformerImpl implements TimeSeriesTransformer {
         final SimpleGroupPath group_name = getGroup().apply(ctx)
                 .map(path -> SimpleGroupPath.valueOf(path.getPath()))
                 .orElseThrow(() -> new IllegalArgumentException("unable to resolve group name"));
-        mapping_.entrySet().stream()
-                .map(name_expr -> {
-                    return name_expr.getKey().apply(ctx)
-                            .map(path -> MetricName.valueOf(path.getPath()))
-                            .map(name -> SimpleMapEntry.create(name, name_expr.getValue()));
-                })
-                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
+        final TagData tagData = new TagData(ctx, tags);
+
+        resolveMapping(ctx, mapping, name -> resolveMetricName(ctx, name))
                 .forEach(metric_expr -> {
                     final MetricName metric = metric_expr.getKey();
-                    final TimeSeriesMetricExpression expr = metric_expr.getValue();
-
-                    expr
-                            .apply(ctx)
-                            .streamAsMap()
-                            .forEach((Entry<Tags, MetricValue> entry) -> {
-                                final GroupName grp = GroupName.valueOf(group_name, entry.getKey());
-                                final MetricValue tsdelta = entry.getValue();
-                                ctx.getTSData().getCurrentCollection()
-                                        .addMetric(grp, metric, tsdelta);
-                            });
+                    metric_expr.getValue().streamAsMap()
+                            .forEach((Map.Entry<Tags, MetricValue> resolvedMetric) -> addMetricMappingToCtx(ctx, group_name, metric, tagData, resolvedMetric));
                 });
     }
 
     @Override
-    public int hashCode() {
-        int hash = 5;
-        hash = 61 * hash + Objects.hashCode(this.group_);
-        hash = 61 * hash + Objects.hashCode(this.mapping_);
-        return hash;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final DerivedMetricTransformerImpl other = (DerivedMetricTransformerImpl) obj;
-        if (!Objects.equals(this.group_, other.group_)) {
-            return false;
-        }
-        if (!Objects.equals(this.mapping_, other.mapping_)) {
-            return false;
-        }
-        return true;
-    }
-
-    @Override
     public ExpressionLookBack getLookBack() {
-        return ExpressionLookBack.EMPTY.andThen(mapping_.values().stream()
+        return ExpressionLookBack.EMPTY.andThen(Stream.of(tags, mapping)
+                .map(Map::values)
+                .flatMap(Collection::stream)
                 .map(TimeSeriesMetricExpression::getLookBack));
+    }
+
+    private static void addMetricMappingToCtx(Context ctx, SimpleGroupPath groupPath, MetricName metric, TagData tagData, Map.Entry<Tags, MetricValue> resolvedMetric) {
+        final GroupName group;
+        if (tagData.isEmpty()) {
+            group = GroupName.valueOf(groupPath, resolvedMetric.getKey());
+        } else {
+            final Map<String, MetricValue> tagMap = new HashMap<>();
+            tagMap.putAll(resolvedMetric.getKey().asMap());
+            tagData.getExtraTagsForTags(resolvedMetric.getKey())
+                    .forEach((tagValue) -> tagMap.put(tagValue.getKey(), tagValue.getValue()));
+            group = GroupName.valueOf(groupPath, tagMap);
+        }
+
+        final MetricValue metricValue = resolvedMetric.getValue();
+        ctx.getTSData().getCurrentCollection()
+                .addMetric(group, metric, metricValue);
+    }
+
+    @Getter
+    private static class TagData {
+        private final Map<String, MetricValue> scalarTags = new HashMap<>();
+        private final Map<Tags, Map<String, MetricValue>> vectorTags = new HashMap<>();
+
+        /** Initialize TagData from tag expressions. */
+        public TagData(Context ctx, Map<String, TimeSeriesMetricExpression> tagExpressions) {
+            resolveMapping(ctx, tagExpressions, Optional::of)
+                    .forEach(this::addTag);
+        }
+
+        public boolean isEmpty() {
+            return scalarTags.isEmpty() && vectorTags.isEmpty();
+        }
+
+        /** Register the resolution of a tag expression. */
+        public void addTag(Map.Entry<String, TimeSeriesMetricDeltaSet> tag) {
+            tag.getValue().asScalar()
+                    .ifPresent(scalar -> scalarTags.put(tag.getKey(), scalar));
+            tag.getValue().asVector()
+                    .ifPresent(vector -> {
+                        vector.forEach((tags, value) -> {
+                            vectorTags.computeIfAbsent(tags, (ignored) -> new HashMap<>())
+                                    .put(tag.getKey(), value);
+                        });
+                    });
+        }
+
+        /** Returns overridden/added tags for a metric with the given resolved tag set. */
+        public Stream<Map.Entry<String, MetricValue>> getExtraTagsForTags(Tags tags) {
+            return Stream.concat(
+                    scalarTags.entrySet().stream(),
+                    vectorTags.getOrDefault(tags, EMPTY_MAP).entrySet().stream());
+        }
     }
 }

@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -31,54 +31,82 @@
  */
 package com.groupon.lex.metrics.config;
 
+import com.groupon.lex.metrics.ConfigSupport;
 import com.groupon.lex.metrics.config.impl.DerivedMetricTransformerImpl;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import com.groupon.lex.metrics.timeseries.TimeSeriesTransformer;
 import com.groupon.lex.metrics.transformers.NameResolver;
+import gnu.trove.map.hash.THashMap;
+import static java.util.Collections.unmodifiableMap;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
+import lombok.Data;
+import lombok.NonNull;
 
 /**
  *
  * @author ariane
  */
+@Data
 public class DerivedMetricStatement implements RuleStatement {
-    private final DerivedMetricTransformerImpl impl_;
-
-    public DerivedMetricStatement(NameResolver group, NameResolver metric, TimeSeriesMetricExpression value_expr) {
-        impl_ = new DerivedMetricTransformerImpl(group, metric, value_expr);
-    }
-
-    public DerivedMetricStatement(NameResolver group, Map<NameResolver, TimeSeriesMetricExpression> metric_value_exprs) {
-        impl_ = new DerivedMetricTransformerImpl(group, metric_value_exprs);
-    }
+    private final static String INDENT = "    ";
+    @NonNull
+    private NameResolver group;
+    @NonNull
+    private Map<String, TimeSeriesMetricExpression> tags;
+    @NonNull
+    private Map<NameResolver, TimeSeriesMetricExpression> mapping;
 
     @Override
     public TimeSeriesTransformer get() {
-        return impl_;
+        // Use copies of the internal map.
+        return new DerivedMetricTransformerImpl(group, unmodifiableMap(new THashMap<>(tags)), unmodifiableMap(new THashMap<>(mapping)));
     }
 
     @Override
     public StringBuilder configString() {
         final StringBuilder sb = new StringBuilder()
                 .append("define ")
-                .append(impl_.getGroup().configString())
+                .append(getGroup().configString())
                 .append(' ');
 
-        if (impl_.getMapping().size() == 1) {
-            Map.Entry<NameResolver, TimeSeriesMetricExpression> entry = impl_.getMapping().entrySet().stream().findAny().get();
+        if (!getTags().isEmpty()) {
+            final boolean multiLine = getTags().size() != 1;  // Don't do newlines for single tag.
+            final Collector<CharSequence, ?, String> joiner;
+
+            if (multiLine)
+                joiner = Collectors.joining(",\n", "tag (\n", ") ");
+            else
+                joiner = Collectors.joining(", ", "tag (", ") ");
+
+            sb.append(getTags().entrySet().stream()
+                    .map(tag_mapping -> {
+                        final String tagIdent = ConfigSupport.maybeQuoteIdentifier(tag_mapping.getKey()).toString();
+                        final String tagExpr = tag_mapping.getValue().configString().toString();
+                        return (multiLine ? INDENT : "") + tagIdent + " = " + tagExpr;
+                    })
+                    .collect(joiner));
+        }
+
+        if (getMapping().size() == 1) {
+            Map.Entry<NameResolver, TimeSeriesMetricExpression> entry = getMapping().entrySet().stream().findAny().get();
             sb
                     .append(entry.getKey().configString())
                     .append(" = ")
                     .append(entry.getValue().configString())
                     .append(";\n");
-        } else if (impl_.getMapping().isEmpty()) {
+        } else if (getMapping().isEmpty()) {
             sb.append("{}\n");
         } else {
-            sb.append(impl_.getMapping().entrySet().stream()
+            sb.append(getMapping().entrySet().stream()
                     .sorted(Comparator.comparing(entry -> entry.getKey().configString().toString()))
-                    .map(entry -> "    " + entry.getKey().configString() + " = " + entry.getValue().configString() + ";")
+                    .map(entry -> {
+                        final String metricName = entry.getKey().configString().toString();
+                        final String metricExpr = entry.getValue().configString().toString();
+                        return INDENT + metricName + " = " + metricExpr + ";";
+                    })
                     .collect(Collectors.joining("\n", "{\n", "\n}")));
         }
         return sb;
