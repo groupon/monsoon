@@ -69,6 +69,8 @@ Most simple arithmatic and boolean logic has been implemented.
   Describes the percentile aggregate.
 - [str function](expressions/str.md)
   Describes the string concatenation function.
+- [name function](expressions/name.md)
+  Describes the name function, that takes (part of) a (group/metric) name and returns it as a metric value.
 - [rate function](expressions/rate.md)
   Describes the rate function, which is used to convert a monotonic increasing counter into a rate per second value.
 - [regexp function(expressions/regexp.md)
