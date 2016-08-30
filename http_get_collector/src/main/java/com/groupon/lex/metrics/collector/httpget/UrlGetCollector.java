@@ -38,7 +38,6 @@ import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.SimpleMetric;
 import com.groupon.lex.metrics.SimpleMetricGroup;
@@ -91,6 +90,21 @@ public class UrlGetCollector implements GroupGenerator {
     private static Reference<GCCloseable<CloseableHttpAsyncClient>> http_client_ = new WeakReference<>(null);  // Retrieve it via get_http_client_().
     private final GCCloseable<CloseableHttpAsyncClient> httpClient = get_http_client_();
 
+    private static final MetricName MN_STATUS_CODE = MetricName.valueOf("status", "code");
+    private static final MetricName MN_STATUS_LINE = MetricName.valueOf("status", "line");
+    private static final MetricName MN_PROTOCOL_NAME = MetricName.valueOf("protocol", "name");
+    private static final MetricName MN_PROTOCOL_MAJOR = MetricName.valueOf("protocol", "major");
+    private static final MetricName MN_PROTOCOL_MINOR = MetricName.valueOf("protocol", "minor");
+    private static final MetricName MN_LATENCY = MetricName.valueOf("latency");
+    private static final MetricName MN_LOCALE_COUNTRY = MetricName.valueOf("locale", "country");
+    private static final MetricName MN_LOCALE_LANGUAGE = MetricName.valueOf("locale", "language");
+    private static final MetricName MN_CONTENT_CHUNKED = MetricName.valueOf("content", "chunked");
+    private static final MetricName MN_CONTENT_LENGTH = MetricName.valueOf("content", "length");
+    private static final MetricName MN_CONTENT_TYPE = MetricName.valueOf("content", "type");
+    private static final MetricName MN_CONTENT_CHARSET = MetricName.valueOf("content", "charset");
+    private static final MetricName MN_CONTENT_MIMETYPE = MetricName.valueOf("content", "mimetype");
+    private static final MetricName MN_UP = MetricName.valueOf("up");
+
     private static synchronized GCCloseable<CloseableHttpAsyncClient> get_http_client_() {
         GCCloseable<CloseableHttpAsyncClient> result = http_client_.get();
         if (result == null) {
@@ -138,7 +152,7 @@ public class UrlGetCollector implements GroupGenerator {
             /* Collect all headers. */
             final Stream<SimpleMetric> hdr_stream = Arrays.stream(response.getAllHeaders())
                     .map((Header hdr) -> {
-                        final MetricName metric_name = NameCache.singleton.newMetricName("header", hdr.getName());
+                        final MetricName metric_name = MetricName.valueOf("header", hdr.getName());
                         try {
                             long intHeader = Long.valueOf(hdr.getValue());
                             return new SimpleMetric(metric_name, MetricValue.fromIntValue(intHeader));
@@ -155,33 +169,33 @@ public class UrlGetCollector implements GroupGenerator {
                     });
             /* Collect individual metrics. */
             final Stream<SimpleMetric> response_stream = Stream.of(
-                    new SimpleMetric(NameCache.singleton.newMetricName("status", "code"),
+                    new SimpleMetric(MN_STATUS_CODE,
                             Optional.ofNullable(response.getStatusLine().getStatusCode())
                                     .map(MetricValue::fromIntValue)
                                     .orElse(MetricValue.EMPTY)),
-                    new SimpleMetric(NameCache.singleton.newMetricName("status", "line"),
+                    new SimpleMetric(MN_STATUS_LINE,
                             Optional.ofNullable(response.getStatusLine().getReasonPhrase())
                                     .map(MetricValue::fromStrValue)
                                     .orElse(MetricValue.EMPTY)),
-                    new SimpleMetric(NameCache.singleton.newMetricName("protocol", "name"),
+                    new SimpleMetric(MN_PROTOCOL_NAME,
                             Optional.ofNullable(response.getProtocolVersion().getProtocol())
                                     .map(MetricValue::fromStrValue)
                                     .orElse(MetricValue.EMPTY)),
-                    new SimpleMetric(NameCache.singleton.newMetricName("protocol", "major"),
+                    new SimpleMetric(MN_PROTOCOL_MAJOR,
                             Optional.ofNullable(response.getProtocolVersion().getMajor())
                                     .map(MetricValue::fromIntValue)
                                     .orElse(MetricValue.EMPTY)),
-                    new SimpleMetric(NameCache.singleton.newMetricName("protocol", "minor"),
+                    new SimpleMetric(MN_PROTOCOL_MINOR,
                             Optional.ofNullable(response.getProtocolVersion().getMinor())
                                     .map(MetricValue::fromIntValue)
                                     .orElse(MetricValue.EMPTY)),
-                    new SimpleMetric(NameCache.singleton.newMetricName("latency"),
+                    new SimpleMetric(MN_LATENCY,
                             MetricValue.fromIntValue(new Interval(begin_ts, end_ts).toDurationMillis())),
-                    new SimpleMetric(NameCache.singleton.newMetricName("locale", "country"),
+                    new SimpleMetric(MN_LOCALE_COUNTRY,
                             Optional.ofNullable(response.getLocale().getCountry())
                                     .map(MetricValue::fromStrValue)
                                     .orElse(MetricValue.EMPTY)),
-                    new SimpleMetric(NameCache.singleton.newMetricName("locale", "language"),
+                    new SimpleMetric(MN_LOCALE_LANGUAGE,
                             Optional.ofNullable(response.getLocale().getLanguage())
                                     .map(MetricValue::fromStrValue)
                                     .orElse(MetricValue.EMPTY)));
@@ -199,28 +213,28 @@ public class UrlGetCollector implements GroupGenerator {
                             }));
             final ContentType content_type = ContentType.get(response.getEntity());
             final Stream<SimpleMetric> content_stream = Stream.of(
-                    new SimpleMetric(NameCache.singleton.newMetricName("content", "chunked"),
+                    new SimpleMetric(MN_CONTENT_CHUNKED,
                              Optional.ofNullable(response.getEntity().isChunked())
                                     .map(MetricValue::fromBoolean)
                                     .orElse(MetricValue.EMPTY)),
-                    new SimpleMetric(NameCache.singleton.newMetricName("content", "length"), content_len.map(MetricValue::fromIntValue).orElse(MetricValue.EMPTY)),
-                    new SimpleMetric(NameCache.singleton.newMetricName("content", "type"),
+                    new SimpleMetric(MN_CONTENT_LENGTH, content_len.map(MetricValue::fromIntValue).orElse(MetricValue.EMPTY)),
+                    new SimpleMetric(MN_CONTENT_TYPE,
                             Optional.ofNullable(response.getEntity().getContentType())
                                     .map(Header::getValue)
                                     .map(MetricValue::fromStrValue)
                                     .orElse(MetricValue.EMPTY)),
-                    new SimpleMetric(NameCache.singleton.newMetricName("content", "charset"),
+                    new SimpleMetric(MN_CONTENT_CHARSET,
                             Optional.ofNullable(content_type.getCharset())
                                     .map(Charset::name)
                                     .map(MetricValue::fromStrValue)
                                     .orElse(MetricValue.EMPTY)),
-                    new SimpleMetric(NameCache.singleton.newMetricName("content", "mimetype"),
+                    new SimpleMetric(MN_CONTENT_MIMETYPE,
                             Optional.ofNullable(content_type.getMimeType())
                                     .map(MetricValue::fromStrValue)
                                     .orElse(MetricValue.EMPTY))
                     );
             final Stream<SimpleMetric> up_stream = Stream.of(
-                    new SimpleMetric(NameCache.singleton.newMetricName("up"), MetricValue.TRUE)
+                    new SimpleMetric(MN_UP, MetricValue.TRUE)
                     );
 
             return Stream.of(hdr_stream, response_stream, content_stream, stream_result, up_stream).flatMap(Function.identity());
@@ -241,8 +255,8 @@ public class UrlGetCollector implements GroupGenerator {
             output_ = requireNonNull(output);
             args_ = requireNonNull(args);
             url_ = requireNonNull(url);
-            name_ = NameCache.singleton.newGroupName(
-                    NameCache.singleton.newSimpleGroupPath(Stream.of(base_group_name_, args.getPath())
+            name_ = GroupName.valueOf(
+                    SimpleGroupPath.valueOf(Stream.of(base_group_name_, args.getPath())
                             .map(SimpleGroupPath::getPath)
                             .flatMap(List::stream)
                             .collect(Collectors.toList())),
@@ -251,7 +265,7 @@ public class UrlGetCollector implements GroupGenerator {
 
         private void fail_() {
             final Stream<Metric> metrics = Stream.of(
-                        new SimpleMetric(NameCache.singleton.newMetricName("up"), MetricValue.FALSE)
+                        new SimpleMetric(MN_UP, MetricValue.FALSE)
                         );
             output_.complete(new SimpleMetricGroup(name_, metrics));
         }
@@ -264,7 +278,7 @@ public class UrlGetCollector implements GroupGenerator {
             } catch (IOException ex) {
                 LOG.log(Level.WARNING, "error processing response for " + url_ + ", args " + args_, ex);
                 metrics = Stream.of(
-                        new SimpleMetric(NameCache.singleton.newMetricName("up"), MetricValue.FALSE)
+                        new SimpleMetric(MN_UP, MetricValue.FALSE)
                         );
             }
 

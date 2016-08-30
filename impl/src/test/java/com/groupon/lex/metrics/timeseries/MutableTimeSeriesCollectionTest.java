@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -57,13 +57,13 @@ import org.junit.Test;
  * @author ariane
  */
 public class MutableTimeSeriesCollectionTest {
-    private final static MetricName ts_metric_value__name = new MetricName("magic word");
+    private final static MetricName ts_metric_value__name = MetricName.valueOf("magic word");
     private final static MetricValue ts_metric_value__value = MetricValue.fromStrValue("abracadabra");
     private static final DateTime t0 = new DateTime(2015, 10, 21, 11, 28, 7, DateTimeZone.UTC);
     private static final DateTime t0_ts = t0.minus(Duration.standardSeconds(5));
-    private static final SimpleGroupPath group_name = new SimpleGroupPath("com", "groupon", "lex", "jmx-monitord", "Awesomoium");
-    private static final MutableTimeSeriesValue ts_value = new MutableTimeSeriesValue(t0_ts, new GroupName(group_name, EMPTY_MAP), singletonMap(ts_metric_value__name, ts_metric_value__value));
-    private static final MutableTimeSeriesValue absent_value = new MutableTimeSeriesValue(t0, new GroupName("not", "here"), singletonMap(new MetricName("foo"), MetricValue.TRUE));
+    private static final SimpleGroupPath group_name = SimpleGroupPath.valueOf("com", "groupon", "lex", "jmx-monitord", "Awesomoium");
+    private static final MutableTimeSeriesValue ts_value = new MutableTimeSeriesValue(t0_ts, GroupName.valueOf(group_name, EMPTY_MAP), singletonMap(ts_metric_value__name, ts_metric_value__value));
+    private static final MutableTimeSeriesValue absent_value = new MutableTimeSeriesValue(t0, GroupName.valueOf("not", "here"), singletonMap(MetricName.valueOf("foo"), MetricValue.TRUE));
 
     @Test
     public void constructor() {
@@ -84,7 +84,7 @@ public class MutableTimeSeriesCollectionTest {
                         .collect(Collectors.toList()),
                 hasItem(ts_value));
         assertThat(ts_data.getGroups(),
-                hasItem(new GroupName(group_name, EMPTY_MAP)));
+                hasItem(GroupName.valueOf(group_name, EMPTY_MAP)));
         assertFalse(ts_data.isEmpty());
     }
 
@@ -115,7 +115,7 @@ public class MutableTimeSeriesCollectionTest {
 
         assertThat(ts_data.getTSValue(group_name).stream().collect(Collectors.toList()),
                 hasItem(ts_value));
-        assertTrue(ts_data.getTSValue(new SimpleGroupPath("can't", "touch", "this")).stream().collect(Collectors.toList()).isEmpty());
+        assertTrue(ts_data.getTSValue(SimpleGroupPath.valueOf("can't", "touch", "this")).stream().collect(Collectors.toList()).isEmpty());
     }
 
     @Test
@@ -132,20 +132,20 @@ public class MutableTimeSeriesCollectionTest {
     @Test
     public void overwrite_existing_group() {
         TimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
-        ts_data.add(new MutableTimeSeriesValue(t0, new GroupName(group_name), singletonMap(new MetricName("foo"), MetricValue.fromStrValue("bar"))));
+        ts_data.add(new MutableTimeSeriesValue(t0, GroupName.valueOf(group_name), singletonMap(MetricName.valueOf("foo"), MetricValue.fromStrValue("bar"))));
 
         assertThat(ts_data.getTSValue(group_name).stream().collect(Collectors.toList()),
-                hasItem(new MutableTimeSeriesValue(t0, new GroupName(group_name), singletonMap(new MetricName("foo"), MetricValue.fromStrValue("bar")))));
+                hasItem(new MutableTimeSeriesValue(t0, GroupName.valueOf(group_name), singletonMap(MetricName.valueOf("foo"), MetricValue.fromStrValue("bar")))));
     }
 
     @Test
     public void add_metric() {
         TimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
-        ts_data.addMetric(new GroupName(group_name), new MetricName("foo"), MetricValue.fromStrValue("bar"));
+        ts_data.addMetric(GroupName.valueOf(group_name), MetricName.valueOf("foo"), MetricValue.fromStrValue("bar"));
         TimeSeriesValueSet group = ts_data.getTSValue(group_name);
 
         assertTrue(!group.isEmpty());
-        assertThat(group.findMetric(new MetricName("foo")).streamValues()
+        assertThat(group.findMetric(MetricName.valueOf("foo")).streamValues()
                         .collect(Collectors.toList()),
                 hasItem(MetricValue.fromStrValue("bar")));
         assertThat(group.findMetric(ts_metric_value__name).streamValues()
@@ -156,16 +156,16 @@ public class MutableTimeSeriesCollectionTest {
     @Test
     public void rename_group() {
         TimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
-        final TimeSeriesValue EXPECT_TS_AFTER_RENAME = new MutableTimeSeriesValue(t0_ts, new GroupName("post", "rename"), singletonMap(ts_metric_value__name, ts_metric_value__value));
+        final TimeSeriesValue EXPECT_TS_AFTER_RENAME = new MutableTimeSeriesValue(t0_ts, GroupName.valueOf("post", "rename"), singletonMap(ts_metric_value__name, ts_metric_value__value));
 
-        ts_data.renameGroup(new GroupName(group_name), new GroupName("post", "rename"));
+        ts_data.renameGroup(GroupName.valueOf(group_name), GroupName.valueOf("post", "rename"));
 
         assertEquals(t0, ts_data.getTimestamp());
         assertThat(ts_data.getTSValues().stream()
                         .collect(Collectors.toList()),
                 hasItem(EXPECT_TS_AFTER_RENAME));
         assertThat(ts_data.getGroups(),
-                hasItem(new GroupName("post", "rename")));
+                hasItem(GroupName.valueOf("post", "rename")));
         assertFalse(ts_data.isEmpty());
     }
 

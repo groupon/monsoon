@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -33,7 +33,7 @@ package com.groupon.lex.metrics.config.impl;
 
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.NameCache;
+import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.config.AlertStatement;
 import com.groupon.lex.metrics.lib.Any2;
@@ -112,13 +112,13 @@ public class AlertTransformerImpl implements TimeSeriesTransformer {
         final TimeSeriesCollectionPair ts_data = ctx.getTSData();
         final Map<String, Any2<TimeSeriesMetricDeltaSet, List<TimeSeriesMetricDeltaSet>>> attr_map = calculate_attributes_(ctx);
         return alert_defn_.getName().apply(ctx)
-                .map(path -> NameCache.singleton.newSimpleGroupPath(path.getPath()))
+                .map(path -> SimpleGroupPath.valueOf(path.getPath()))
                 .map((name) -> {
                     return alert_defn_.getPredicate().apply(ctx)
                             .streamAsMap()
                             .map((tag_val) -> SimpleMapEntry.create(tag_val.getKey(), tag_val.getValue().asBool()))
                             .map((tag_bool) -> {
-                                final GroupName alert_name = NameCache.singleton.newGroupName(name, tag_bool.getKey());
+                                final GroupName alert_name = GroupName.valueOf(name, tag_bool.getKey());
                                 final Optional<Boolean> triggering = tag_bool.getValue();
                                 Map<String, Any2<MetricValue, List<MetricValue>>> attrs = lookup_attributes_(alert_name.getTags(), attr_map);
                                 return new Alert(ts_data.getCurrentCollection().getTimestamp(), alert_name, alert_defn_::configString, triggering, alert_defn_.getFireDuration(), alert_defn_.getMessage(), attrs);

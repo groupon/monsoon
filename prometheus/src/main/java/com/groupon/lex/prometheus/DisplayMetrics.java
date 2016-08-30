@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -30,7 +30,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.groupon.lex.prometheus;
-import com.groupon.lex.metrics.MetricRegistryInstance;
+import com.groupon.lex.metrics.PullProcessorPipeline;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -47,11 +47,11 @@ import org.eclipse.jetty.server.handler.AbstractHandler;
  * @author nolofsson
  */
 public class DisplayMetrics extends AbstractHandler {
-    private final MetricRegistryInstance registry_;
-    public DisplayMetrics(MetricRegistryInstance registry ){
+    private final PullProcessorPipeline registry_;
+    public DisplayMetrics(PullProcessorPipeline registry ){
         registry_ = registry;
-    }   
-    
+    }
+
     /**
      *
      * @param target
@@ -64,25 +64,25 @@ public class DisplayMetrics extends AbstractHandler {
     public void handle(String target,
                        Request baseRequest,
                        HttpServletRequest request,
-                       HttpServletResponse response) 
+                       HttpServletResponse response)
         throws IOException, ServletException {
-        
+
         Stream<PrometheusMetric> metrics;
         try {
-            metrics = PrometheusMetrics.filteredMetrics(registry_);         
+            metrics = PrometheusMetrics.filteredMetrics(registry_);
         } catch (Exception ex) {
             Logger.getLogger(DisplayMetrics.class.getName()).log(Level.SEVERE, null, ex);
             response.sendError(500, ex.toString());
             return;
         }
-        
+
         response.setContentType("text/plain;charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
         baseRequest.setHandled(true);
         try {
             for (PrometheusMetric m: metrics.collect(Collectors.toList())) {
                 response.getWriter().println(m);
-            }      
+            }
         } catch (IOException ex) {
             Logger.getLogger(PrometheusServer.class.getName()).log(Level.SEVERE, null, ex);
             response.sendError(500, ex.toString());

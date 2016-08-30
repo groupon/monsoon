@@ -65,15 +65,15 @@ public abstract class AbstractAlertTest {
     private static final Logger LOG = Logger.getLogger(AbstractAlertTest.class.getName());
 
     protected DataPointStream newDatapoint(GroupName group, String metric, Number... values) {
-        return newDatapoint(group, new MetricName(metric), values);
+        return newDatapoint(group, MetricName.valueOf(metric), values);
     }
 
     protected DataPointStream newDatapoint(GroupName group, String var, Boolean... values) {
-        return newDatapoint(group, new MetricName(var), values);
+        return newDatapoint(group, MetricName.valueOf(var), values);
     }
 
     protected DataPointStream newDatapoint(GroupName group, String var, String... values) {
-        return newDatapoint(group, new MetricName(var), values);
+        return newDatapoint(group, MetricName.valueOf(var), values);
     }
 
     protected DataPointStream newDatapoint(GroupName group, MetricName metric, Number... values) {
@@ -150,7 +150,7 @@ public abstract class AbstractAlertTest {
 
         try {
             final PushMetricRegistryInstance registry = Configuration.readFromFile(null, new StringReader(configuration))
-                    .create(datetime_supplier, (pattern, handler) -> {});
+                    .create(PushMetricRegistryInstance::new, datetime_supplier, (pattern, handler) -> {});
             registry.add(new ReplayCollector(input));
             return new AlertValidator(registry);
         } catch (ConfigurationException ex) {

@@ -33,7 +33,7 @@ import org.junit.Test;
  * @author ariane
  */
 public class XdrReadBackTest {
-    private static final SimpleGroupPath GROUP = new SimpleGroupPath("com", "test");
+    private static final SimpleGroupPath GROUP = SimpleGroupPath.valueOf("com", "test");
     private TimeSeriesCollection tsv_;
 
     private static byte[] to_byte_array(ByteBuffer buffer) {
@@ -84,13 +84,13 @@ public class XdrReadBackTest {
     @Before
     public void setup() {
         final Map<MetricName, MetricValue> metrics = new HashMap<MetricName, MetricValue>() {{
-            put(new MetricName("boolean"), MetricValue.fromBoolean(true));
-            put(new MetricName("integer"), MetricValue.fromIntValue(17));
-            put(new MetricName("float"), MetricValue.fromDblValue(Math.E));
-            put(new MetricName("string"), MetricValue.fromStrValue("chocoladevla"));
+            put(MetricName.valueOf("boolean"), MetricValue.fromBoolean(true));
+            put(MetricName.valueOf("integer"), MetricValue.fromIntValue(17));
+            put(MetricName.valueOf("float"), MetricValue.fromDblValue(Math.E));
+            put(MetricName.valueOf("string"), MetricValue.fromStrValue("chocoladevla"));
         }};
         final DateTime now = DateTime.now(DateTimeZone.UTC);
-        tsv_ = new FileTimeSeriesCollection(now, Stream.of(new MutableTimeSeriesValue(now, new GroupName(GROUP), metrics)));
+        tsv_ = new FileTimeSeriesCollection(now, Stream.of(new MutableTimeSeriesValue(now, GroupName.valueOf(GROUP), metrics)));
     }
 
     @Test

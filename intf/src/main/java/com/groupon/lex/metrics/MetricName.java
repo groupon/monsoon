@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -31,6 +31,9 @@
  */
 package com.groupon.lex.metrics;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,22 +41,35 @@ import static java.util.Collections.unmodifiableList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  *
  * @author ariane
  */
 public class MetricName implements Serializable, Comparable<MetricName>, Path {
+    private static final Function<List<String>, MetricName> CACHE = CacheBuilder.newBuilder()
+            .softValues()
+            .build(CacheLoader.from((List<String> list) -> new MetricName(list)))::getUnchecked;
     private final List<String> path_;
 
-    /** Recommend using NameCache.newMetricName instead. */
-    public MetricName(String... path) {
-        this(Arrays.asList(path));
+    /** Use valueOf() instead. */
+    private MetricName(List<String> path) {
+        path_ = unmodifiableList(new ArrayList<>(path));
     }
 
-    /** Recommend using NameCache.newMetricName instead. */
-    public MetricName(List<String> path) {
-        path_ = unmodifiableList(new ArrayList<>(path));
+    public static MetricName valueOf(String... path) {
+        return valueOf(Arrays.asList(path));
+    }
+
+    public static MetricName valueOf(List<String> path) {
+        try {
+            return CACHE.apply(path);
+        } catch (UncheckedExecutionException e) {
+            if (e.getCause() instanceof RuntimeException)
+                throw (RuntimeException)e.getCause();
+            throw e;
+        }
     }
 
     @Override

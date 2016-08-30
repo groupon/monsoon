@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -60,21 +60,21 @@ import org.joda.time.Duration;
  */
 public class MonitorMonitor implements TimeSeriesTransformer {
     public static final String ROOT_GROUP = "monsoon";
-    public static final GroupName MONITOR_GROUP = new GroupName(ROOT_GROUP);
-    public static final GroupName MONITOR_DOWN_ALERT = new GroupName(ROOT_GROUP, "down");
-    public static final GroupName HAS_CONFIG_ALERT = new GroupName(ROOT_GROUP, "configuration_missing");
+    public static final GroupName MONITOR_GROUP = GroupName.valueOf(ROOT_GROUP);
+    public static final GroupName MONITOR_DOWN_ALERT = GroupName.valueOf(ROOT_GROUP, "down");
+    public static final GroupName HAS_CONFIG_ALERT = GroupName.valueOf(ROOT_GROUP, "configuration_missing");
     public static final GroupName MONITOR_FAIL_ALERT = MONITOR_GROUP;
-    public static final MetricName FAILED_COLLECTIONS_METRIC = new MetricName("failed_collections");
-    public static final MetricName GROUP_COUNT_METRIC = new MetricName("groups");
-    public static final MetricName METRIC_COUNT_METRIC = new MetricName("metric");
-    public static final MetricName CONFIG_PRESENT_METRIC = new MetricName("has_config_file");
-    public static final MetricName SCRAPE_DURATION = new MetricName("timing", "collectors");
-    public static final MetricName RULE_EVAL_DURATION = new MetricName("timing", "rule_eval");
-    public static final MetricName PROCESSOR_DURATION = new MetricName("timing", "processor");
-    public static final MetricName UPTIME_DURATION = new MetricName("scrape", "uptime");
-    public static final MetricName SCRAPE_COUNT = new MetricName("scrape", "count");
-    public static final MetricName SCRAPE_INTERVAL = new MetricName("scrape", "interval");
-    public static final MetricName SCRAPE_TS = new MetricName("scrape", "ts");
+    public static final MetricName FAILED_COLLECTIONS_METRIC = MetricName.valueOf("failed_collections");
+    public static final MetricName GROUP_COUNT_METRIC = MetricName.valueOf("groups");
+    public static final MetricName METRIC_COUNT_METRIC = MetricName.valueOf("metric");
+    public static final MetricName CONFIG_PRESENT_METRIC = MetricName.valueOf("has_config_file");
+    public static final MetricName SCRAPE_DURATION = MetricName.valueOf("timing", "collectors");
+    public static final MetricName RULE_EVAL_DURATION = MetricName.valueOf("timing", "rule_eval");
+    public static final MetricName PROCESSOR_DURATION = MetricName.valueOf("timing", "processor");
+    public static final MetricName UPTIME_DURATION = MetricName.valueOf("scrape", "uptime");
+    public static final MetricName SCRAPE_COUNT = MetricName.valueOf("scrape", "count");
+    public static final MetricName SCRAPE_INTERVAL = MetricName.valueOf("scrape", "interval");
+    public static final MetricName SCRAPE_TS = MetricName.valueOf("scrape", "ts");
     public static final Duration MON_ALERT_DURATION = Duration.standardMinutes(5);
     private final MetricRegistryInstance registry_;
     private final AtomicReference<DateTime> first_scrape_ts_ = new AtomicReference<>();

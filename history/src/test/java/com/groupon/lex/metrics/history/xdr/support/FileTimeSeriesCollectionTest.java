@@ -44,7 +44,7 @@ public class FileTimeSeriesCollectionTest {
     @Before
     public void setup() {
         ts = DateTime.now(DateTimeZone.UTC);
-        tsv = new MutableTimeSeriesValue(ts, new GroupName(new SimpleGroupPath("foo", "bar")), singletonMap(new MetricName("x"), MetricValue.fromStrValue("y")));
+        tsv = new MutableTimeSeriesValue(ts, GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")), singletonMap(MetricName.valueOf("x"), MetricValue.fromStrValue("y")));
         tsc = new FileTimeSeriesCollection(ts, Stream.of(tsv));
         copy = FromXdr.datapoints(ToXdr.datapoints(tsc));
     }
@@ -88,17 +88,17 @@ public class FileTimeSeriesCollectionTest {
 
     @Test(expected = UnsupportedOperationException.class)
     public void add_metrics() {
-        tsc.addMetrics(tsv.getGroup(), singletonMap(new MetricName("y"), MetricValue.fromIntValue(17)));
+        tsc.addMetrics(tsv.getGroup(), singletonMap(MetricName.valueOf("y"), MetricValue.fromIntValue(17)));
     }
 
     @Test(expected = UnsupportedOperationException.class)
     public void add_metric() {
-        tsc.addMetric(tsv.getGroup(), new MetricName("y"), MetricValue.fromIntValue(17));
+        tsc.addMetric(tsv.getGroup(), MetricName.valueOf("y"), MetricValue.fromIntValue(17));
     }
 
     @Test(expected = UnsupportedOperationException.class)
     public void rename_group() {
-        tsc.renameGroup(tsv.getGroup(), new GroupName(new SimpleGroupPath("x", "y")));
+        tsc.renameGroup(tsv.getGroup(), GroupName.valueOf(SimpleGroupPath.valueOf("x", "y")));
     }
 
     @Test

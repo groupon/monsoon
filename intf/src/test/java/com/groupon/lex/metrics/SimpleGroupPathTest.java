@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -36,7 +36,6 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
@@ -48,7 +47,7 @@ import org.junit.Test;
 public class SimpleGroupPathTest {
     @Test
     public void empty() {
-        SimpleGroupPath p = new SimpleGroupPath();
+        SimpleGroupPath p = SimpleGroupPath.valueOf();
 
         assertTrue(p.getPath().isEmpty());
         assertEquals("", p.configString().toString());
@@ -57,7 +56,7 @@ public class SimpleGroupPathTest {
 
     @Test
     public void not_empty() {
-        SimpleGroupPath p = new SimpleGroupPath("foo");
+        SimpleGroupPath p = SimpleGroupPath.valueOf("foo");
 
         assertFalse(p.getPath().isEmpty());
         assertThat(p.getPath(), hasItem("foo"));
@@ -67,17 +66,16 @@ public class SimpleGroupPathTest {
 
     @Test
     public void long_name_and_escapes() {
-        SimpleGroupPath p = new SimpleGroupPath("\r", "", "\b");
+        SimpleGroupPath p = SimpleGroupPath.valueOf("\r", "", "\b");
 
         assertEquals("'\\r'.''.'\\b'", p.configString().toString());
     }
 
     @Test
     public void equality() {
-        SimpleGroupPath p0 = new SimpleGroupPath("foo", "bar");
-        SimpleGroupPath p1 = new SimpleGroupPath(Arrays.asList("foo", "bar"));
+        SimpleGroupPath p0 = SimpleGroupPath.valueOf("foo", "bar");
+        SimpleGroupPath p1 = SimpleGroupPath.valueOf(Arrays.asList("foo", "bar"));
 
-        assertNotSame(p0, p1);
         assertEquals(p0, p1);
         assertEquals(p0.hashCode(), p1.hashCode());
         assertEquals(0, p0.compareTo(p1));
@@ -85,10 +83,10 @@ public class SimpleGroupPathTest {
 
     @Test
     public void inequality() {
-        SimpleGroupPath p0 = new SimpleGroupPath();
-        SimpleGroupPath p1 = new SimpleGroupPath("a");
-        SimpleGroupPath p2 = new SimpleGroupPath("a", "b");
-        SimpleGroupPath p3 = new SimpleGroupPath("b");
+        SimpleGroupPath p0 = SimpleGroupPath.valueOf();
+        SimpleGroupPath p1 = SimpleGroupPath.valueOf("a");
+        SimpleGroupPath p2 = SimpleGroupPath.valueOf("a", "b");
+        SimpleGroupPath p3 = SimpleGroupPath.valueOf("b");
 
         assertNotEquals(p0, p1);
         assertNotEquals(p0, p2);
@@ -109,10 +107,10 @@ public class SimpleGroupPathTest {
 
     @Test
     public void compare() {
-        SimpleGroupPath p0 = new SimpleGroupPath();
-        SimpleGroupPath p1 = new SimpleGroupPath("a");
-        SimpleGroupPath p2 = new SimpleGroupPath("a", "b");
-        SimpleGroupPath p3 = new SimpleGroupPath("b");
+        SimpleGroupPath p0 = SimpleGroupPath.valueOf();
+        SimpleGroupPath p1 = SimpleGroupPath.valueOf("a");
+        SimpleGroupPath p2 = SimpleGroupPath.valueOf("a", "b");
+        SimpleGroupPath p3 = SimpleGroupPath.valueOf("b");
 
         assertTrue(p0.compareTo(p1) < 0);
         assertTrue(p0.compareTo(p2) < 0);
@@ -138,7 +136,7 @@ public class SimpleGroupPathTest {
 
     @Test
     public void equal_across_types() {
-        assertFalse(new SimpleGroupPath().equals(null));
-        assertFalse(new SimpleGroupPath().equals(new Object()));
+        assertFalse(SimpleGroupPath.valueOf().equals(null));
+        assertFalse(SimpleGroupPath.valueOf().equals(new Object()));
     }
 }

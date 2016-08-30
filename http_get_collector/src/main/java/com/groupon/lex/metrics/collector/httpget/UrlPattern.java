@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -35,7 +35,6 @@ import com.groupon.lex.metrics.TupledElements;
 import com.groupon.lex.metrics.lib.StringTemplate;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
@@ -74,7 +73,7 @@ public class UrlPattern {
     public Collection<TupledElements> getTemplateArgs() { return unmodifiableCollection(template_args_); }
 
     private Entry<GroupName, String> apply_args_(Map<Any2<String, Integer>, String> args) {
-        final SimpleGroupPath path = NameCache.singleton.newSimpleGroupPath(args.entrySet().stream()
+        final SimpleGroupPath path = SimpleGroupPath.valueOf(args.entrySet().stream()
                 .map(e -> e.getKey().getRight().map(k -> SimpleMapEntry.create(k, e.getValue())))
                 .flatMap(o -> o.map(Stream::of).orElseGet(Stream::empty))
                 .sorted(Comparator.comparing(Entry::getKey))
@@ -83,7 +82,7 @@ public class UrlPattern {
         final Stream<Entry<String, MetricValue>> tagMap = args.entrySet().stream()
                 .map(e -> e.getKey().getLeft().map(k -> SimpleMapEntry.create(k, MetricValue.fromStrValue(e.getValue()))))
                 .flatMap(o -> o.map(Stream::of).orElseGet(Stream::empty));
-        return SimpleMapEntry.create(NameCache.singleton.newGroupName(path, tagMap), url_template_.apply(args));
+        return SimpleMapEntry.create(GroupName.valueOf(path, tagMap), url_template_.apply(args));
     }
 
     public Stream<Map.Entry<GroupName, String>> getUrls() {

@@ -21,14 +21,14 @@ import org.junit.Test;
  * @author ariane
  */
 public class IdentifierNameResolverTest {
-    private final SimpleGroupPath group_path = new SimpleGroupPath("foo", "bar");
+    private final SimpleGroupPath group_path = SimpleGroupPath.valueOf("foo", "bar");
     private final static String IDENTIFIER = "ident";
     TimeSeriesValue tsv0;
     private Context ctx;
 
     @Before
     public void setup() {
-        final GroupName group_name = new GroupName(group_path);
+        final GroupName group_name = GroupName.valueOf(group_path);
         final TimeSeriesCollectionPair ts_data = new TimeSeriesCollectionPairInstance();
         tsv0 = new MutableTimeSeriesValue(ts_data.getCurrentCollection().getTimestamp(), group_name, EMPTY_MAP);
         ts_data.getCurrentCollection().add(tsv0);
@@ -43,84 +43,84 @@ public class IdentifierNameResolverTest {
     public void resolve() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER);
 
-        assertEquals(group_path, resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(group_path, resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test
     public void resolve_by_index() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER, Optional.of(new SubSelectIndex(1)));
 
-        assertEquals(new SimpleGroupPath("bar"), resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(SimpleGroupPath.valueOf("bar"), resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test
     public void resolve_by_negative_index() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER, Optional.of(new SubSelectIndex(-1)));
 
-        assertEquals(new SimpleGroupPath("bar"), resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(SimpleGroupPath.valueOf("bar"), resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test
     public void resolve_by_range_b_e() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER, Optional.of(new SubSelectRange(Optional.of(0), Optional.of(1))));
 
-        assertEquals(new SimpleGroupPath("foo"), resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(SimpleGroupPath.valueOf("foo"), resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test
     public void resolve_by_range_neg_b_e() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER, Optional.of(new SubSelectRange(Optional.of(-1), Optional.of(2))));
 
-        assertEquals(new SimpleGroupPath("bar"), resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(SimpleGroupPath.valueOf("bar"), resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test
     public void resolve_by_range_b_neg_e() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER, Optional.of(new SubSelectRange(Optional.of(0), Optional.of(-1))));
 
-        assertEquals(new SimpleGroupPath("foo"), resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(SimpleGroupPath.valueOf("foo"), resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test
     public void resolve_by_range_neg_b_neg_e() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER, Optional.of(new SubSelectRange(Optional.of(-2), Optional.of(-1))));
 
-        assertEquals(new SimpleGroupPath("foo"), resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(SimpleGroupPath.valueOf("foo"), resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test
     public void resolve_by_range_absent_b_e() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER, Optional.of(new SubSelectRange(Optional.empty(), Optional.of(1))));
 
-        assertEquals(new SimpleGroupPath("foo"), resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(SimpleGroupPath.valueOf("foo"), resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test
     public void resolve_by_range_b_absent_e() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER, Optional.of(new SubSelectRange(Optional.of(-1), Optional.empty())));
 
-        assertEquals(new SimpleGroupPath("bar"), resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(SimpleGroupPath.valueOf("bar"), resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test
     public void resolve_by_range_absent_b_absent_e() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER, Optional.of(new SubSelectRange(Optional.empty(), Optional.empty())));
 
-        assertEquals(new SimpleGroupPath("foo", "bar"), resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(SimpleGroupPath.valueOf("foo", "bar"), resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test
     public void too_high_index() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER, Optional.of(new SubSelectIndex(3)));
 
-        assertEquals(new SimpleGroupPath(), resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(SimpleGroupPath.valueOf(), resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test
     public void too_high_range() {
         final IdentifierNameResolver resolver = new IdentifierNameResolver(IDENTIFIER, Optional.of(new SubSelectRange(Optional.empty(), Optional.of(3))));
 
-        assertEquals(new SimpleGroupPath(), resolver.apply(ctx).map(p -> new SimpleGroupPath(p.getPath())).get());
+        assertEquals(SimpleGroupPath.valueOf(), resolver.apply(ctx).map(p -> SimpleGroupPath.valueOf(p.getPath())).get());
     }
 
     @Test(expected = IllegalArgumentException.class)

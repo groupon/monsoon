@@ -42,7 +42,6 @@ parser grammar ConfigBnf;
  *     import com.groupon.lex.metrics.expression.*;
  *     import com.groupon.lex.metrics.timeseries.*;
  *     import com.groupon.lex.metrics.timeseries.expression.*;
- *     import com.groupon.lex.metrics.NameCache;
  *     import com.groupon.lex.metrics.MetricValue;
  *     import com.groupon.lex.metrics.GroupName;
  *     import com.groupon.lex.metrics.PathMatcher;
@@ -290,7 +289,7 @@ group            returns [ GroupExpression s ]
                  ;
 lit_group_name   returns [ SimpleGroupPath s ]
                  : s1=raw_dotted_identifier
-                   { $s = NameCache.singleton.newSimpleGroupPath($s1.s); }
+                   { $s = SimpleGroupPath.valueOf($s1.s); }
                  ;
 name             returns [ NameResolver s ]
                  @init{

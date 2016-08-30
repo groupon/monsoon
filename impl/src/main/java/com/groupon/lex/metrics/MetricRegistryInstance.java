@@ -31,22 +31,34 @@
  */
 package com.groupon.lex.metrics;
 
+import com.groupon.lex.metrics.api.endpoints.ListMetrics;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
+import com.groupon.lex.metrics.misc.MonitorMonitor;
+import com.groupon.lex.metrics.timeseries.Alert;
+import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
+import com.groupon.lex.metrics.timeseries.TimeSeriesTransformer;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.expression.Context;
+import com.groupon.lex.metrics.timeseries.expression.MutableContext;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.NonNull;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 
@@ -54,18 +66,30 @@ import org.joda.time.Duration;
  *
  * @author ariane
  */
-public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
+public abstract class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
     private static final Logger logger = Logger.getLogger(MetricRegistryInstance.class.getName());
     private final Collection<GroupGenerator> generators_ = new ArrayList<>();
     private long failed_collections_ = 0;
     private final boolean has_config_;
     private Optional<Duration> scrape_duration_ = Optional.empty();
+    private Optional<Duration> rule_eval_duration_ = Optional.empty();
     private Optional<Duration> processor_duration_ = Optional.empty();
     private final EndpointRegistration api_;
+    private final Collection<TimeSeriesTransformer> decorators_ = new ArrayList<>();
+    private Supplier<DateTime> now_;
+    private final ListMetrics list_metrics_;
+
+    protected MetricRegistryInstance(@NonNull Supplier<DateTime> now, boolean has_config, @NonNull EndpointRegistration api) {
+        api_ = api;
+        has_config_ = has_config;
+        decorators_.add(new MonitorMonitor(this));
+        now_ = requireNonNull(now);
+        list_metrics_ = new ListMetrics();
+        getApi().addEndpoint("/monsoon/metrics", list_metrics_);
+    }
 
     protected MetricRegistryInstance(boolean has_config, EndpointRegistration api) {
-        api_ = requireNonNull(api);
-        has_config_ = has_config;
+        this(TimeSeriesCollection::now, has_config, api);
     }
 
     @Override
@@ -94,7 +118,7 @@ public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
      * Retrieve timing for rule evaluation.
      * @return The duration it took to evaluate all rules.
      */
-    public Optional<Duration> getRuleEvalDuration() { return Optional.empty(); }
+    public Optional<Duration> getRuleEvalDuration() { return rule_eval_duration_; }
     /**
      * Retrieve timing for processor to handle the data.
      * @return The duration it took for the processor, to push all the data out.
@@ -106,11 +130,11 @@ public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
      */
     public void updateProcessorDuration(Duration duration) { processor_duration_ = Optional.of(duration); }
 
-    public Stream<TimeSeriesValue> streamGroups() {
-        return streamGroups(TimeSeriesCollection.now());
+    private Stream<TimeSeriesValue> streamGroups() {
+        return streamGroups(now());
     }
 
-    public synchronized Stream<TimeSeriesValue> streamGroups(DateTime now) {
+    private synchronized Stream<TimeSeriesValue> streamGroups(DateTime now) {
         final long t0 = System.nanoTime();
 
         List<GroupGenerator.GroupCollection> collections = generators_.parallelStream()
@@ -140,15 +164,8 @@ public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
         return streamGroups().map(TimeSeriesValue::getGroup).toArray(GroupName[]::new);
     }
 
-    /**
-     * Create a plain, uninitialized metric registry.
-     *
-     * The metric registry is registered under its mbeanObjectName(package_name).
-     * @param has_config True if the metric registry will be configured.
-     * @return An empty metric registry.
-     */
-    public static synchronized MetricRegistryInstance create(boolean has_config, EndpointRegistration api) {
-        return new MetricRegistryInstance(has_config, api);
+    public synchronized void decorate(TimeSeriesTransformer decorator) {
+        decorators_.add(Objects.requireNonNull(decorator));
     }
 
     /**
@@ -173,7 +190,60 @@ public class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
     }
 
     @Override
-    public boolean hasConfig() {
-        return has_config_;
+    public boolean hasConfig() { return has_config_; }
+    public DateTime now() { return requireNonNull(now_.get()); }
+
+    /**
+     * Apply all timeseries decorators.
+     * @param ctx Input timeseries.
+     */
+    protected void apply_rules_and_decorators_(Context ctx) {
+        decorators_.forEach(tf -> tf.transform(ctx));
+    }
+
+    public ExpressionLookBack getDecoratorLookBack() {
+        return ExpressionLookBack.EMPTY.andThen(decorators_.stream().map(TimeSeriesTransformer::getLookBack));
+    }
+
+    public static interface CollectionContext {
+        public Consumer<Alert> alertManager();
+        public TimeSeriesCollectionPair tsdata();
+        public void commit();
+    }
+
+    protected abstract CollectionContext beginCollection(DateTime now);
+
+    /**
+     * Run an update cycle.
+     * An update cycle consists of:
+     * - gathering raw metrics
+     * - creating a new, minimal context
+     * - applying decorators against the current and previous values
+     * - storing the collection values as the most recent capture
+     */
+    public TimeSeriesCollection updateCollection() {
+        // Scrape metrics from all collectors.
+        final DateTime now = now();
+        final CollectionContext cctx = beginCollection(now);
+        final TimeSeriesCollectionPair tsdata = cctx.tsdata();
+        streamGroups(now).forEach(tsdata.getCurrentCollection()::add);
+
+        // Build a rule evaluation context.
+        final Context ctx = new MutableContext(tsdata, cctx.alertManager());
+
+        // Apply rules.
+        final long t0 = System.nanoTime();
+        apply_rules_and_decorators_(ctx);
+        final long t_rule_eval = System.nanoTime();
+        rule_eval_duration_ = Optional.of(Duration.millis(TimeUnit.NANOSECONDS.toMillis(t_rule_eval - t0)));
+
+        // Publish new set of metrics.
+        list_metrics_.update(tsdata.getCurrentCollection());
+
+        // Inform derived class that we are done.
+        cctx.commit();
+
+        // Return tsdata.
+        return tsdata.getCurrentCollection();
     }
 }

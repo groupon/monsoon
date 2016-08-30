@@ -132,7 +132,7 @@ public class PipelineBuilder {
             else
                 epr = epr_;
 
-            registry = cfg_.create(epr);
+            registry = cfg_.create(PushMetricRegistryInstance::new, epr);
             for (PushProcessorSupplier pps : processor_suppliers)
                 processors.add(pps.build(api));
 
@@ -161,5 +161,36 @@ public class PipelineBuilder {
      */
     public PushProcessorPipeline build(PushProcessorSupplier processor_supplier) throws Exception {
         return build(singletonList(processor_supplier));
+    }
+
+    /*
+     * Creates a pull processor.
+     *
+     * The API server is started by this method.
+     * The returned pull processor is thread-safe.
+     *
+     * Note that the history will not be used.
+     * @return A PullMetricRegistryInstance that performs a scrape and evaluates rules.
+     * @throws Exception indicating construction failed.
+     */
+    public PullProcessorPipeline build() throws Exception {
+        ApiServer api = null;
+        PullMetricRegistryInstance registry = null;
+        try {
+            final EndpointRegistration epr;
+            if (epr_ == null)
+                epr = api = new ApiServer(api_sockaddr_);
+            else
+                epr = epr_;
+
+            registry = cfg_.create(PullMetricRegistryInstance::new, api);
+
+            api.start();
+            return new PullProcessorPipeline(registry);
+        } catch (Exception ex) {
+            if (api != null) api.close();
+            if (registry != null) registry.close();
+            throw ex;
+        }
     }
 }

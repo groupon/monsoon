@@ -4,10 +4,10 @@ import com.groupon.lex.metrics.history.xdr.support.ImmutableTimeSeriesValue;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import static com.groupon.lex.metrics.ConfigSupport.quotedString;
+import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.NameCache;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.xdr.support.FileTimeSeriesCollection;
@@ -66,19 +66,19 @@ public class FromXdr {
     }
 
     private MetricName metric_name_(path p) {
-        return NameCache.singleton.newMetricName(Arrays.stream(p.elems)
+        return MetricName.valueOf(Arrays.stream(p.elems)
                 .map(elem -> elem.value)
                 .collect(Collectors.toList()));
     }
 
     private SimpleGroupPath group_name_(path p) {
-        return NameCache.singleton.newSimpleGroupPath(Arrays.stream(p.elems)
+        return SimpleGroupPath.valueOf(Arrays.stream(p.elems)
                 .map(elem -> elem.value)
                 .collect(Collectors.toList()));
     }
 
     private Tags tags_(tags t) {
-        return NameCache.singleton.newTags(Arrays.stream(t.elems)
+        return Tags.valueOf(Arrays.stream(t.elems)
                 .map(elem -> SimpleMapEntry.create(elem.key, metric_value_(elem.value))));
     }
 
@@ -91,7 +91,7 @@ public class FromXdr {
                     final MetricValue mvalue = metric_value_(metric.v);
                     return SimpleMapEntry.create(mname, mvalue);
                 });
-        return new ImmutableTimeSeriesValue(ts, NameCache.singleton.newGroupName(group_name, tags), metrics, Map.Entry::getKey, Map.Entry::getValue);
+        return new ImmutableTimeSeriesValue(ts, GroupName.valueOf(group_name, tags), metrics, Map.Entry::getKey, Map.Entry::getValue);
     }
 
     private void update_dict_(dictionary_delta dd) {

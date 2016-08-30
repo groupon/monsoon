@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -78,12 +78,12 @@ public class CollectdPushCollectorTest {
     private HttpServlet collectd_acceptor;
     private DateTime NOW = DateTime.now(DateTimeZone.UTC);
     private String json;
-    private static final GroupName BASE_NAME = new GroupName(new SimpleGroupPath("foo"), singletonMap("host", MetricValue.fromStrValue("localhost")));
-    private static final GroupName UPTIME_NAME = new GroupName(new SimpleGroupPath("foo", "uptime", "0"), BASE_NAME.getTags());
-    private static final GroupName DOWNTIME_NAME = new GroupName(new SimpleGroupPath("foo", "downtime", "0"), BASE_NAME.getTags());
-    private static final MetricName UP_METRIC = new MetricName("up");
-    private static final MetricName UPTIME_METRIC = new MetricName("uptime", "0");
-    private static final MetricName DOWNTIME_METRIC = new MetricName("downtime", "0");
+    private static final GroupName BASE_NAME = GroupName.valueOf(SimpleGroupPath.valueOf("foo"), singletonMap("host", MetricValue.fromStrValue("localhost")));
+    private static final GroupName UPTIME_NAME = GroupName.valueOf(SimpleGroupPath.valueOf("foo", "uptime", "0"), BASE_NAME.getTags());
+    private static final GroupName DOWNTIME_NAME = GroupName.valueOf(SimpleGroupPath.valueOf("foo", "downtime", "0"), BASE_NAME.getTags());
+    private static final MetricName UP_METRIC = MetricName.valueOf("up");
+    private static final MetricName UPTIME_METRIC = MetricName.valueOf("uptime", "0");
+    private static final MetricName DOWNTIME_METRIC = MetricName.valueOf("downtime", "0");
 
     @Mock
     private HttpServletRequest request;
@@ -97,7 +97,7 @@ public class CollectdPushCollectorTest {
                     collectd_path = path;
                     collectd_acceptor = handler;
                 },
-                new SimpleGroupPath("foo"),
+                SimpleGroupPath.valueOf("foo"),
                 "bar");
 
         Gson gson = new Gson();
@@ -128,7 +128,7 @@ public class CollectdPushCollectorTest {
 
     @Test
     public void getBasePath() {
-        assertEquals(new SimpleGroupPath("foo"), collectd.getBasePath());
+        assertEquals(SimpleGroupPath.valueOf("foo"), collectd.getBasePath());
     }
 
     @Test
@@ -179,6 +179,6 @@ public class CollectdPushCollectorTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void empty_api_name_is_disallowed() throws Exception {
-        new CollectdPushCollector((path, handler) -> {}, new SimpleGroupPath("foo"), "");
+        new CollectdPushCollector((path, handler) -> {}, SimpleGroupPath.valueOf("foo"), "");
     }
 }

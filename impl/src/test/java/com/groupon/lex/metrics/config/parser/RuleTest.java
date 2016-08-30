@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -48,7 +48,7 @@ import org.junit.Test;
  * @author ariane
  */
 public class RuleTest extends AbstractAlertTest {
-    private static final GroupName TESTGROUP = new GroupName("com", "groupon", "metrics", "test");
+    private static final GroupName TESTGROUP = GroupName.valueOf("com", "groupon", "metrics", "test");
 
     @Test
     public void setTag_multiple_tags() throws Exception {
@@ -62,7 +62,7 @@ public class RuleTest extends AbstractAlertTest {
                 + "alert test if "
                 + "!tag(" + TESTGROUP.configString() + ", bool);", 60,
                 newDatapoint(TESTGROUP, "a", 0, 1))) {
-            impl.validate(newDatapoint(new GroupName(new SimpleGroupPath("test"), expected_tags),
+            impl.validate(newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"), expected_tags),
                     OK, OK));
         }
     }
@@ -74,7 +74,7 @@ public class RuleTest extends AbstractAlertTest {
                 + "alert test if "
                 + "!tag(" + TESTGROUP.configString() + ", bool);", 60,
                 newDatapoint(TESTGROUP, "a", 0, 1))) {
-            impl.validate(newDatapoint(new GroupName(new SimpleGroupPath("test"), singletonMap("bool", MetricValue.TRUE)),
+            impl.validate(newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"), singletonMap("bool", MetricValue.TRUE)),
                     OK, OK));
         }
     }
@@ -87,9 +87,9 @@ public class RuleTest extends AbstractAlertTest {
                 + "!tag(" + TESTGROUP.configString() + ", bool);", 60,
                 newDatapoint(TESTGROUP, "a", true, false, null))) {
             impl.validate(
-                    newDatapoint(new GroupName(new SimpleGroupPath("test"), singletonMap("bool", MetricValue.TRUE)),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"), singletonMap("bool", MetricValue.TRUE)),
                         OK,      UNKNOWN, UNKNOWN),
-                    newDatapoint(new GroupName(new SimpleGroupPath("test"), singletonMap("bool", MetricValue.FALSE)),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"), singletonMap("bool", MetricValue.FALSE)),
                         UNKNOWN, FIRING,  UNKNOWN));
         }
     }
@@ -100,9 +100,9 @@ public class RuleTest extends AbstractAlertTest {
                   "tag " + TESTGROUP.configString() + " as bool = true;\n"
                 + "alert test if "
                 + "!tag(" + TESTGROUP.configString() + ", bool);", 60,
-                newDatapoint(new GroupName(TESTGROUP.getPath(), singletonMap("bool", MetricValue.TRUE)), "a", true))) {
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("bool", MetricValue.TRUE)), "a", true))) {
             impl.validate(
-                    newDatapoint(new GroupName(new SimpleGroupPath("test"), singletonMap("bool", MetricValue.TRUE)),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"), singletonMap("bool", MetricValue.TRUE)),
                         OK));
         }
     }
@@ -113,11 +113,11 @@ public class RuleTest extends AbstractAlertTest {
                   "tag " + TESTGROUP.configString() + " as bool = true;\n"
                 + "alert test if "
                 + "!tag(" + TESTGROUP.configString() + ", bool);", 60,
-                newDatapoint(new GroupName(TESTGROUP.getPath(), singletonMap("bool", MetricValue.FALSE)), "a", true))) {
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("bool", MetricValue.FALSE)), "a", true))) {
             impl.validate(
-                    newDatapoint(new GroupName(new SimpleGroupPath("test"), singletonMap("bool", MetricValue.TRUE)),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"), singletonMap("bool", MetricValue.TRUE)),
                         OK),
-                    newDatapoint(new GroupName(new SimpleGroupPath("test"), singletonMap("bool", MetricValue.FALSE)),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"), singletonMap("bool", MetricValue.FALSE)),
                         UNKNOWN));
         }
     }
@@ -129,11 +129,11 @@ public class RuleTest extends AbstractAlertTest {
                 + "tag Handler as bool = true;\n"
                 + "alert test if "
                 + "!tag(" + TESTGROUP.configString() + ", bool);", 60,
-                newDatapoint(new GroupName(TESTGROUP.getPath(), singletonMap("bool", MetricValue.FALSE)), "a", true))) {
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("bool", MetricValue.FALSE)), "a", true))) {
             impl.validate(
-                    newDatapoint(new GroupName(new SimpleGroupPath("test"), singletonMap("bool", MetricValue.TRUE)),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"), singletonMap("bool", MetricValue.TRUE)),
                         OK),
-                    newDatapoint(new GroupName(new SimpleGroupPath("test"), singletonMap("bool", MetricValue.FALSE)),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"), singletonMap("bool", MetricValue.FALSE)),
                         UNKNOWN));
         }
     }
@@ -147,7 +147,7 @@ public class RuleTest extends AbstractAlertTest {
                 + "}", 60,
                 newDatapoint(TESTGROUP, "a", true, false, null))) {
             impl.validate(
-                    newDatapoint(new GroupName("test"),
+                    newDatapoint(GroupName.valueOf("test"),
                         FIRING, OK, UNKNOWN));
         }
     }
@@ -161,7 +161,7 @@ public class RuleTest extends AbstractAlertTest {
                 + "}", 60,
                 newDatapoint(TESTGROUP, "a", true, false, null))) {
             impl.validate(
-                    newDatapoint(new GroupName("test"),
+                    newDatapoint(GroupName.valueOf("test"),
                         FIRING, OK, UNKNOWN));
         }
     }
@@ -175,7 +175,7 @@ public class RuleTest extends AbstractAlertTest {
                 + "}", 60,
                 newDatapoint(TESTGROUP, "a", true, false, null))) {
             impl.validate(
-                    newDatapoint(new GroupName("test"),
+                    newDatapoint(GroupName.valueOf("test"),
                         FIRING, OK, UNKNOWN));
         }
     }
@@ -190,7 +190,7 @@ public class RuleTest extends AbstractAlertTest {
                 + "}", 60,
                 newDatapoint(TESTGROUP, "a", true, false, null))) {
             impl.validate(
-                    newDatapoint(new GroupName("test"),
+                    newDatapoint(GroupName.valueOf("test"),
                         FIRING, UNKNOWN, UNKNOWN));
         }
     }
@@ -206,7 +206,7 @@ public class RuleTest extends AbstractAlertTest {
                 + "}", 60,
                 newDatapoint(TESTGROUP, "a", true, false, null))) {
             impl.validate(
-                    newDatapoint(new GroupName(new SimpleGroupPath("test"), singletonMap("tagname", MetricValue.fromStrValue("tagvalue"))),
+                    newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test"), singletonMap("tagname", MetricValue.fromStrValue("tagvalue"))),
                         FIRING, UNKNOWN, UNKNOWN));
         }
     }
@@ -219,19 +219,19 @@ public class RuleTest extends AbstractAlertTest {
                 + "alert test.'mul'   if      " + TESTGROUP.configString() + " x * by(id) " + TESTGROUP.configString() + " y != " + TESTGROUP.configString() + " 'mul';\n"
                 + "alert test.'div'   if 10 * " + TESTGROUP.configString() + " x / by(id) " + TESTGROUP.configString() + " y != " + TESTGROUP.configString() + " 'div';\n"
                 + "alert test.'mod'   if      " + TESTGROUP.configString() + " x % by(id) " + TESTGROUP.configString() + " y != " + TESTGROUP.configString() + " 'mod';\n", 60,
-                newDatapoint(new GroupName(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "x",                1  ,  2  ,  3  ,  4  ,  5  ),
-                newDatapoint(new GroupName(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "y",                2  ,  3  ,  4  ,  5  ,  6  ),
-                newDatapoint(new GroupName(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "plus",             3  ,  5  ,  7  ,  9  , 11  ),
-                newDatapoint(new GroupName(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "minus",           -1  , -1  , -1  , -1  , -1  ),
-                newDatapoint(new GroupName(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "mul",              2  ,  6  , 12  , 20  , 30  ),
-                newDatapoint(new GroupName(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "div",              5  ,  6  ,  7  ,  8  ,  8  ),
-                newDatapoint(new GroupName(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "mod",              1  ,  2  ,  3  ,  4  ,  5  ))) {
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "x",                1  ,  2  ,  3  ,  4  ,  5  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "y",                2  ,  3  ,  4  ,  5  ,  6  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "plus",             3  ,  5  ,  7  ,  9  , 11  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "minus",           -1  , -1  , -1  , -1  , -1  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "mul",              2  ,  6  , 12  , 20  , 30  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "div",              5  ,  6  ,  7  ,  8  ,  8  ),
+                newDatapoint(GroupName.valueOf(TESTGROUP.getPath(), singletonMap("id", MetricValue.fromIntValue(0))), "mod",              1  ,  2  ,  3  ,  4  ,  5  ))) {
             impl.validate(
-                newDatapoint(new GroupName(new SimpleGroupPath("test", "plus" ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
-                newDatapoint(new GroupName(new SimpleGroupPath("test", "minus"), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
-                newDatapoint(new GroupName(new SimpleGroupPath("test", "mul"  ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
-                newDatapoint(new GroupName(new SimpleGroupPath("test", "div"  ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
-                newDatapoint(new GroupName(new SimpleGroupPath("test", "mod"  ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ));
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "plus" ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "minus"), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "mul"  ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "div"  ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ),
+                newDatapoint(GroupName.valueOf(SimpleGroupPath.valueOf("test", "mod"  ), singletonMap("id", MetricValue.fromIntValue(0))),   OK  , OK  , OK  , OK  , OK  ));
         }
     }
 
@@ -244,9 +244,9 @@ public class RuleTest extends AbstractAlertTest {
                 + "    for 5000m\n"
                 + "    message \"foobar\";\n"
                 + "}", 60,
-                newDatapoint(new GroupName("conveyor", "master", "avi"), new MetricName("gauge", "pi.nginx-pool-80.health_score.health_score"), 100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0))) {
+                newDatapoint(GroupName.valueOf("conveyor", "master", "avi"), MetricName.valueOf("gauge", "pi.nginx-pool-80.health_score.health_score"), 100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0))) {
             impl.validate(
-                    newDatapoint(new GroupName("pi.nginx-pool-80.health_score.health_score"),
+                    newDatapoint(GroupName.valueOf("pi.nginx-pool-80.health_score.health_score"),
                         OK, OK, OK, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING, TRIGGERING));
         }
     }

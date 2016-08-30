@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -31,44 +31,58 @@
  */
 package com.groupon.lex.metrics;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.Serializable;
 import static java.util.Collections.emptyMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Stream;
+import lombok.Value;
 
 /**
  *
  * @author ariane
  */
 public final class GroupName implements Serializable, Comparable<GroupName>, Tagged {
+    private static final Function<GroupNameArgs, GroupName> CACHE = CacheBuilder.newBuilder()
+            .softValues()
+            .build(CacheLoader.from((GroupNameArgs in) -> new GroupName(in.getPath(), in.getTags())))::getUnchecked;
     private final SimpleGroupPath path_;
     private final Tags tags_;
 
-    /** Recommend using NameCache.newGroupName instead. */
-    public GroupName(String... path) {
-        this(NameCache.singleton.newSimpleGroupPath(path));
-    }
-
-    /** Recommend using NameCache.newGroupName instead. */
-    public GroupName(SimpleGroupPath path) {
-        this(path, emptyMap());
-    }
-
-    /** Recommend using NameCache.newGroupName instead. */
-    public GroupName(SimpleGroupPath path, Tags tags) {
+    /** Use valueOf() instead. */
+    private GroupName(SimpleGroupPath path, Tags tags) {
         path_ = Objects.requireNonNull(path);
         tags_ = Objects.requireNonNull(tags);
     }
 
-    /** Recommend using NameCache.newGroupName instead. */
-    public GroupName(SimpleGroupPath path, Map<String, MetricValue> tags) {
-        this(path, NameCache.singleton.newTags(tags));
+    public static GroupName valueOf(String... path) {
+        return valueOf(SimpleGroupPath.valueOf(path));
     }
 
-    /** Recommend using NameCache.newGroupName instead. */
-    public GroupName(SimpleGroupPath path, Stream<Map.Entry<String, MetricValue>> tags) {
-        this(path, NameCache.singleton.newTags(tags));
+    public static GroupName valueOf(SimpleGroupPath path) {
+        return valueOf(path, emptyMap());
+    }
+
+    public static GroupName valueOf(SimpleGroupPath path, Tags tags) {
+        try {
+            return CACHE.apply(new GroupNameArgs(path, tags));
+        } catch (UncheckedExecutionException e) {
+            if (e.getCause() instanceof RuntimeException)
+                throw (RuntimeException)e.getCause();
+            throw e;
+        }
+    }
+
+    public static GroupName valueOf(SimpleGroupPath path, Map<String, MetricValue> tags) {
+        return valueOf(path, Tags.valueOf(tags));
+    }
+
+    public static GroupName valueOf(SimpleGroupPath path, Stream<Map.Entry<String, MetricValue>> tags) {
+        return valueOf(path, Tags.valueOf(tags));
     }
 
     @Override
@@ -131,5 +145,11 @@ public final class GroupName implements Serializable, Comparable<GroupName>, Tag
             cmp = getTags().compareTo(o.getTags());
 
         return cmp;
+    }
+
+    @Value
+    private static class GroupNameArgs {
+        SimpleGroupPath path;
+        Tags tags;
     }
 }

@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -49,14 +49,14 @@ import org.junit.Test;
  */
 public class SimpleMetricGroupTest {
     private static final String REPLACE_NAME = "replace me";
-    private static final GroupName GROUP_NAME = new GroupName(new SimpleGroupPath("com", "groupon", "lex", "jmx-monitord", "Awesomium"));
+    private static final GroupName GROUP_NAME = GroupName.valueOf(SimpleGroupPath.valueOf("com", "groupon", "lex", "jmx-monitord", "Awesomium"));
 
     private static final Collection<SimpleMetric> METRICES = unmodifiableList(Arrays.asList(
-            new SimpleMetric(new MetricName("bool metric"), Boolean.TRUE),
-            new SimpleMetric(new MetricName("int metric"), 17),
-            new SimpleMetric(new MetricName("float metric"), 7F),
-            new SimpleMetric(new MetricName("string metric"), "fizzbuzz"),
-            new SimpleMetric(new MetricName(REPLACE_NAME), REPLACE_NAME)
+            new SimpleMetric(MetricName.valueOf("bool metric"), Boolean.TRUE),
+            new SimpleMetric(MetricName.valueOf("int metric"), 17),
+            new SimpleMetric(MetricName.valueOf("float metric"), 7F),
+            new SimpleMetric(MetricName.valueOf("string metric"), "fizzbuzz"),
+            new SimpleMetric(MetricName.valueOf(REPLACE_NAME), REPLACE_NAME)
         ));
 
     private Iterator<SimpleMetric> make_iterator() {
@@ -139,10 +139,10 @@ public class SimpleMetricGroupTest {
 
     @Test
     public void addition() {
-        final Collection<SimpleMetric> expected = new ArrayList<SimpleMetric>(METRICES) {{ add(new SimpleMetric(new MetricName("added metric"), 17)); }};
+        final Collection<SimpleMetric> expected = new ArrayList<SimpleMetric>(METRICES) {{ add(new SimpleMetric(MetricName.valueOf("added metric"), 17)); }};
         SimpleMetricGroup grp = new SimpleMetricGroup(GROUP_NAME, METRICES);
 
-        grp.add(new SimpleMetric(new MetricName("added metric"), 17));
+        grp.add(new SimpleMetric(MetricName.valueOf("added metric"), 17));
 
         assertEquals(to_set_(expected), to_set_(grp.getMetrics()));
     }
@@ -150,11 +150,11 @@ public class SimpleMetricGroupTest {
     @Test
     public void replacing() {
         final Collection<SimpleMetric> expected = new ArrayList<>(METRICES);
-        expected.removeIf((x) -> new MetricName(REPLACE_NAME).equals(x.getName()));
-        expected.add(new SimpleMetric(new MetricName(REPLACE_NAME), "has been replaced"));
+        expected.removeIf((x) -> MetricName.valueOf(REPLACE_NAME).equals(x.getName()));
+        expected.add(new SimpleMetric(MetricName.valueOf(REPLACE_NAME), "has been replaced"));
         SimpleMetricGroup grp = new SimpleMetricGroup(GROUP_NAME, METRICES);
 
-        grp.add(new SimpleMetric(new MetricName(REPLACE_NAME), "has been replaced"));
+        grp.add(new SimpleMetric(MetricName.valueOf(REPLACE_NAME), "has been replaced"));
 
         assertEquals(to_set_(expected), to_set_(grp.getMetrics()));
     }

@@ -58,8 +58,8 @@ import static org.junit.Assert.assertEquals;
  */
 public abstract class AbstractExpressionTest {
     private static final Logger LOG = Logger.getLogger(AbstractExpressionTest.class.getName());
-    protected static final GroupName GROUP = new GroupName("TEST");
-    private static final GroupName ALERT_NAME = new GroupName("TEST_ALERT");
+    protected static final GroupName GROUP = GroupName.valueOf("TEST");
+    private static final GroupName ALERT_NAME = GroupName.valueOf("TEST_ALERT");
 
     protected AbstractExpressionTest() {}
 
@@ -82,19 +82,19 @@ public abstract class AbstractExpressionTest {
     }
 
     protected DataPointStream newDatapoint(String var, Histogram... values) {
-        return newDatapoint(new MetricName(var), values);
+        return newDatapoint(MetricName.valueOf(var), values);
     }
 
     protected DataPointStream newDatapoint(String var, Number... values) {
-        return newDatapoint(new MetricName(var), values);
+        return newDatapoint(MetricName.valueOf(var), values);
     }
 
     protected DataPointStream newDatapoint(String var, Boolean... values) {
-        return newDatapoint(new MetricName(var), values);
+        return newDatapoint(MetricName.valueOf(var), values);
     }
 
     protected DataPointStream newDatapoint(String var, String... values) {
-        return newDatapoint(new MetricName(var), values);
+        return newDatapoint(MetricName.valueOf(var), values);
     }
 
     protected DataPointStream newDatapoint(MetricName var, Histogram... values) {
@@ -127,7 +127,7 @@ public abstract class AbstractExpressionTest {
 
     protected void validateExpression(String expr, DataPointStream... input) throws Exception {
         try (final PushMetricRegistryInstance registry = configurationForExpr(expr, Arrays.stream(input).map(DataPointStream::getIdentifier))
-                .create((pattern, handler) -> {})) {
+                .create(PushMetricRegistryInstance::new, (pattern, handler) -> {})) {
             ReplayCollector replay_collector = new ReplayCollector(input);
             registry.add(replay_collector);
 

@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -77,8 +77,8 @@ public class MBeanGroupInstanceTest {
     @Before
     public void setup() throws Exception {
         seqno = sequence.getAndIncrement();
-        groupname = new GroupName(
-                new SimpleGroupPath("com", "groupon", "lex", "metrics", "jmx", "MBeanGroupInstanceTest"),
+        groupname = GroupName.valueOf(
+                SimpleGroupPath.valueOf("com", "groupon", "lex", "metrics", "jmx", "MBeanGroupInstanceTest"),
                 new HashMap<String, MetricValue>() {{
                     put("seq", MetricValue.fromIntValue(seqno));
                     put("booltag", MetricValue.FALSE);
@@ -116,10 +116,10 @@ public class MBeanGroupInstanceTest {
         /** Create metrics map for easy test asserting. */
         Map<MetricName, MetricValue> metrics_map = Arrays.stream(metrics).collect(Collectors.toMap(Metric::getName, Metric::getValue));
         assertThat(metrics_map, allOf(
-                hasEntry(new MetricName("Boolval"), MetricValue.TRUE),
-                hasEntry(new MetricName("Intval"), MetricValue.fromIntValue(7)),
-                hasEntry(new MetricName("Nested", "dblval"), MetricValue.fromDblValue(17)),
-                hasEntry(new MetricName("Stringval"), MetricValue.fromStrValue("foobar"))));
+                hasEntry(MetricName.valueOf("Boolval"), MetricValue.TRUE),
+                hasEntry(MetricName.valueOf("Intval"), MetricValue.fromIntValue(7)),
+                hasEntry(MetricName.valueOf("Nested", "dblval"), MetricValue.fromDblValue(17)),
+                hasEntry(MetricName.valueOf("Stringval"), MetricValue.fromStrValue("foobar"))));
     }
 
     @Test
@@ -146,8 +146,8 @@ public class MBeanGroupInstanceTest {
 
     @Test
     public void groupname_with_tags() {
-        Tags extra_tags = new Tags(singletonMap("foo", MetricValue.fromStrValue("bar")));
-        GroupName expected_groupname = new GroupName(groupname.getPath(), new Tags(Stream.concat(groupname.getTags().stream(), extra_tags.stream())));
+        Tags extra_tags = Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar")));
+        GroupName expected_groupname = GroupName.valueOf(groupname.getPath(), Tags.valueOf(Stream.concat(groupname.getTags().stream(), extra_tags.stream())));
         final MBeanGroupInstance mbg = new MBeanGroupInstance(jmx, obj_name, EMPTY_LIST, extra_tags);
 
         assertEquals(expected_groupname, mbg.getName());
@@ -155,8 +155,8 @@ public class MBeanGroupInstanceTest {
 
     @Test
     public void groupname_with_subpath() {
-        SimpleGroupPath expected_path = new SimpleGroupPath(Stream.concat(groupname.getPath().getPath().stream(), Stream.of("foo")).collect(Collectors.toList()));
-        GroupName expected_groupname = new GroupName(expected_path, groupname.getTags());
+        SimpleGroupPath expected_path = SimpleGroupPath.valueOf(Stream.concat(groupname.getPath().getPath().stream(), Stream.of("foo")).collect(Collectors.toList()));
+        GroupName expected_groupname = GroupName.valueOf(expected_path, groupname.getTags());
         final MBeanGroupInstance mbg = new MBeanGroupInstance(jmx, obj_name, singletonList("foo"), Tags.EMPTY);
 
         assertEquals(expected_groupname, mbg.getName());

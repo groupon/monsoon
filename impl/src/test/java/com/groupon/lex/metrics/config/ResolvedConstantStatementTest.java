@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -101,7 +101,7 @@ public class ResolvedConstantStatementTest {
     @Mock
     private Context ctx;
 
-    private final TimeSeriesValue tsv = new MutableTimeSeriesValue(DateTime.now(DateTimeZone.UTC), new GroupName("foo"), EMPTY_MAP);
+    private final TimeSeriesValue tsv = new MutableTimeSeriesValue(DateTime.now(DateTimeZone.UTC), GroupName.valueOf("foo"), EMPTY_MAP);
 
     @Test
     public void config_string() {
@@ -136,11 +136,11 @@ public class ResolvedConstantStatementTest {
         when(group.getTSDelta(ctx)).thenReturn(new TimeSeriesValueSet(Stream.of(tsv)));
         when(ctx.getTSData()).thenReturn(ts_data_pair);
         when(ts_data_pair.getCurrentCollection()).thenReturn(ts_data);
-        when(ts_data.addMetrics(tsv.getGroup(), singletonMap(new MetricName("x"), MetricValue.fromIntValue(17)))).thenReturn(ts_data);
+        when(ts_data.addMetrics(tsv.getGroup(), singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(17)))).thenReturn(ts_data);
 
         new ResolvedConstantStatement(group, stmt_single.getMetrics()).get().transform(ctx);
 
-        verify(ts_data, times(1)).addMetrics(tsv.getGroup(), singletonMap(new MetricName("x"), MetricValue.fromIntValue(17)));
+        verify(ts_data, times(1)).addMetrics(tsv.getGroup(), singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(17)));
         verifyNoMoreInteractions(ts_data);
     }
 }
