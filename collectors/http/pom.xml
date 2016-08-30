@@ -7,7 +7,7 @@
     </parent>
     <artifactId>monsoon-collector-http</artifactId>
     <packaging>jar</packaging>
-    <name>Mon-soon collectors: HTTP</name>
+    <name>Mon-soon collector: HTTP</name>
     <url>https://github.com/groupon/monsoon</url>
 
     <scm>
