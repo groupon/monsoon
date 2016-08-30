@@ -46,6 +46,11 @@
         </dependency>
         <dependency>
             <groupId>com.groupon.lex</groupId>
+            <artifactId>monsoon-collector-jmx</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.groupon.lex</groupId>
             <artifactId>monsoon-api</artifactId>
             <version>${project.parent.version}</version>
         </dependency>

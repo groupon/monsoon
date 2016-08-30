@@ -27,6 +27,7 @@
     <modules>
         <module>collectd</module>
         <module>http</module>
+        <module>jmx</module>
     </modules>
 
     <dependencies>
