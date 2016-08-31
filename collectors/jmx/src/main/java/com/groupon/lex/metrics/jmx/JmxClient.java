@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -43,6 +43,7 @@ import javax.management.MBeanServerConnection;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
+import lombok.Getter;
 
 /**
  *
@@ -54,7 +55,8 @@ public class JmxClient implements AutoCloseable {
     }
 
     private static final Logger LOG = Logger.getLogger(JmxClient.class.getName());
-    private final Optional<JMXServiceURL> jmx_url_;
+    @Getter
+    private final Optional<JMXServiceURL> jmxUrl;
     private Optional<JMXConnector> jmx_factory_;
     private MBeanServerConnection conn_;  // conn_ == null -> connection needs recovery
     private final Collection<ConnectionDecorator> recovery_callbacks_ = new ArrayList<>();
@@ -65,7 +67,7 @@ public class JmxClient implements AutoCloseable {
      * This client is effectively connected to the JVM it is part of.
      */
     public JmxClient() {
-        jmx_url_ = Optional.empty();
+        jmxUrl = Optional.empty();
         jmx_factory_ = Optional.empty();
         conn_ = ManagementFactory.getPlatformMBeanServer();
     }
@@ -76,8 +78,8 @@ public class JmxClient implements AutoCloseable {
      * @throws IOException if the connection cannot be established
      */
     public JmxClient(JMXServiceURL connection_url) throws IOException {
-        jmx_url_ = Optional.of(connection_url);
-        jmx_factory_ = Optional.of(JMXConnectorFactory.newJMXConnector(jmx_url_.get(), null));
+        jmxUrl = Optional.of(connection_url);
+        jmx_factory_ = Optional.of(JMXConnectorFactory.newJMXConnector(jmxUrl.get(), null));
         try {
             jmx_factory_.get().connect();
         } catch (IOException ex) {
@@ -122,8 +124,8 @@ public class JmxClient implements AutoCloseable {
         }
 
         /* Re-create factory, because apparently they cannot re-create a broken connection. */
-        if (jmx_url_.isPresent())
-            jmx_factory_ = Optional.of(JMXConnectorFactory.newJMXConnector(jmx_url_.get(), null));  // May throw
+        if (jmxUrl.isPresent())
+            jmx_factory_ = Optional.of(JMXConnectorFactory.newJMXConnector(jmxUrl.get(), null));  // May throw
 
         /* Attempt to recreate the connection and replay the listeners. */
         JMXConnector factory = jmx_factory_.orElseThrow(() -> new IOException("cannot recover from broken connection to local MBean Server"));
@@ -214,14 +216,5 @@ public class JmxClient implements AutoCloseable {
     public synchronized void close() throws IOException {
         if (jmx_factory_.isPresent()) jmx_factory_.get().close();
         conn_ = null;
-    }
-
-    /**
-     * Returns the JMX URL describing the connection.
-     * @return An optional describing the JMX URL.
-     *   The optional is empty, if the connection uses the local PlatformMBeanServer.
-     */
-    public Optional<JMXServiceURL> getJmxUrl() {
-        return jmx_url_;
     }
 }

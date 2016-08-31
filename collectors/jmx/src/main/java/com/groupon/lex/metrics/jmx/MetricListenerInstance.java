@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -44,7 +44,6 @@ import static java.util.Collections.unmodifiableList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -62,6 +61,8 @@ import javax.management.MBeanServerNotification;
 import javax.management.Notification;
 import javax.management.NotificationListener;
 import javax.management.ObjectName;
+import lombok.Getter;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A JMX bean listener, that detects new MBeans with a given name pattern and
@@ -73,18 +74,21 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
     private final Collection<ObjectName> filter_;
     private final Map<ObjectName, MBeanGroupInstance> detected_groups_ = new HashMap<ObjectName, MBeanGroupInstance>();
     private boolean is_enabled_ = false;
-    private final JmxClient conn_;
+    @Getter
+    private final JmxClient connection;
     private final ConnectionDecorator decorator_;
     private final NotificationListener listener_;
-    private final List<String> sub_path_;
-    private final Tags tags_;
+    @Getter
+    private final List<String> subPath;
+    @Getter
+    private final Tags tags;
 
     public MetricListenerInstance(JmxClient conn, Collection<ObjectName> filter, List<String> sub_path, Tags tags) throws IOException, InstanceNotFoundException {
         if (filter.isEmpty()) throw new IllegalArgumentException("empty filter");
         filter_ = filter;
-        conn_ = conn;
-        sub_path_ = unmodifiableList(new ArrayList<>(sub_path));
-        tags_ = requireNonNull(tags);
+        connection = conn;
+        subPath = unmodifiableList(new ArrayList<>(sub_path));
+        this.tags = requireNonNull(tags);
 
         listener_ = (Notification notification, Object handback) -> {
                 MBeanServerNotification mbs = (MBeanServerNotification) notification;
@@ -138,7 +142,7 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
             return;
         }
 
-        MBeanGroupInstance instance = new MBeanGroupInstance(conn_, obj, sub_path_, tags_);
+        MBeanGroupInstance instance = new MBeanGroupInstance(connection, obj, subPath, tags);
         detected_groups_.put(obj, instance);
         Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.INFO, "registered metrics for {0}: {1}", new Object[]{obj, instance});
     }
@@ -162,7 +166,7 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
     public synchronized void enable() throws IOException {
         if (is_enabled_) return;
 
-        conn_.addRecoveryCallback(decorator_);
+        connection.addRecoveryCallback(decorator_);
         is_enabled_ = true;
         Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.INFO, "enabled");
     }
@@ -174,7 +178,7 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
         is_enabled_ = false;
 
         try {
-            Optional<MBeanServerConnection> optionalConnection = conn_.getOptionalConnection();
+            Optional<MBeanServerConnection> optionalConnection = connection.getOptionalConnection();
             try {
                 if (optionalConnection.isPresent())
                     optionalConnection.get().removeNotificationListener(MBeanServerDelegate.DELEGATE_NAME, listener_);
@@ -214,7 +218,7 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
              * If there are no groups registered, the connection opening won't be triggered otherwise.
              * And if that isn't triggered, registering groups won't happen either.
              */
-            conn_.getConnection();
+            connection.getConnection();
         } catch (IOException ex) {
             /*
              * Connection down, can't collect any data.
