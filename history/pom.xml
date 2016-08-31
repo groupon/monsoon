@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>com.groupon.lex</groupId>
+        <groupId>com.github.groupon.monsoon</groupId>
         <artifactId>monsoon-basepom</artifactId>
         <version>1.36-SNAPSHOT</version>
     </parent>
@@ -25,12 +25,12 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.groupon.lex</groupId>
+            <groupId>com.github.groupon.monsoon</groupId>
             <artifactId>monsoon-collector-base</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.groupon.lex</groupId>
+            <groupId>com.github.groupon.monsoon</groupId>
             <artifactId>monsoon-engine</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
