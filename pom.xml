@@ -8,6 +8,32 @@
     <url>https://github.com/groupon/monsoon</url>
     <description>The root of the mon-soon project.</description>
 
+    <licenses>
+        <license>
+            <name>BSD</name>
+            <url>https://raw.githubusercontent.com/groupon/monsoon/master/LICENSE</url>
+            <distribution>repo</distribution>
+            <comments>3-clause BSD</comments>
+        </license>
+    </licenses>
+
+    <developers>
+        <!-- id field: use github username -->
+        <developer>
+            <id>nahratzah</id>
+            <name>Ariane van der Steldt</name>
+            <email>ariane@stack.nl<email>
+            <url>https://github.com/nahratzah/</url>
+            <organization>Groupon</organization>
+            <organizationUrl>http://www.groupon.com</organizationUrl>
+            <roles>
+                <role>architect</role>
+                <role>developer</role>
+            </roles>
+            <timezone>Europe/Dublin</timezone>
+        </developer>
+    </developers>
+
     <scm>
         <connection>scm:git:github.com:groupon/monsoon.git</connection>
         <developerConnection>scm:git:github.com:groupon/monsoon.git</developerConnection>
