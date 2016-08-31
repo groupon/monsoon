@@ -19,7 +19,6 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.javadoc.skip>true</maven.javadoc.skip>
         <project.build.targetJdk>1.8</project.build.targetJdk>
     </properties>
 
