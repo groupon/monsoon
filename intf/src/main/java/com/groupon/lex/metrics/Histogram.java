@@ -68,7 +68,7 @@ public class Histogram implements Serializable, Comparable<Histogram> {
     }
 
     /**
-     * Returns a map of range -> event count.
+     * Returns a map of range -&gt; event count.
      * The elements of the stream are a mutable copy of the internal data.
      */
     public Stream<RangeWithCount> stream() {

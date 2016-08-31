@@ -47,11 +47,11 @@ import lombok.Value;
  * Invoke a name resolver and convert its result to a metric value.
  *
  * If the Name Resolver yields:
- * - [ "true" ] --> yield a boolean true value
- * - [ "false" ] --> yield a boolean false value
- * - [ integral-number] --> yield a metric value representing the number
- * - [ FP-number ] --> yield a metric value representing the number
- * - anything else --> yield a String metric value, separating components by dots ('.').
+ * - [ "true" ] --&gt; yield a boolean true value
+ * - [ "false" ] --&gt; yield a boolean false value
+ * - [ integral-number] --&gt; yield a metric value representing the number
+ * - [ FP-number ] --&gt; yield a metric value representing the number
+ * - anything else --&gt; yield a String metric value, separating components by dots ('.').
  */
 @Value
 public class NameExpression implements TimeSeriesMetricExpression {
