@@ -31,7 +31,7 @@
  */
 package com.groupon.lex.metrics.config;
 
-import com.groupon.lex.metrics.JmxClient;
+import com.groupon.lex.metrics.jmx.JmxClient;
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import static com.groupon.lex.metrics.ConfigSupport.quotedString;
 import com.groupon.lex.metrics.Tags;
@@ -89,19 +89,27 @@ public final class JmxListenerMonitor implements MonitorStatement {
 
     @Override
     public StringBuilder configString() {
-        final StringBuilder buf = new StringBuilder().append("collect jmx_listener ");
+        final StringBuilder buf = new StringBuilder().append("collect jmx_listener");
+
         boolean first = true;
         for (ObjectName obj : includes) {
-            if (first)
+            if (first) {
+                buf.append(' ');
                 first = false;
-            else
+            } else {
                 buf.append(", ");
+            }
             buf.append(quotedString(obj.toString()));
         }
-        if (!tupledElements.isEmpty())
-            buf.append(tupledElements);
-        else
+
+        if (!tupledElements.isEmpty()) {
+            buf
+                    .append(' ')
+                    .append(tupledElements.configString());
+        } else {
             buf.append(';');
+        }
+
         buf.append('\n');
         return buf;
     }

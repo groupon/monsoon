@@ -33,6 +33,7 @@ package com.groupon.lex.metrics.config;
 
 import com.groupon.lex.metrics.ConfigSupport;
 import com.groupon.lex.metrics.config.impl.DerivedMetricTransformerImpl;
+import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import com.groupon.lex.metrics.timeseries.TimeSeriesTransformer;
 import com.groupon.lex.metrics.transformers.NameResolver;
@@ -42,22 +43,22 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
-import lombok.Data;
 import lombok.NonNull;
+import lombok.Value;
 
 /**
  *
  * @author ariane
  */
-@Data
+@Value
 public class DerivedMetricStatement implements RuleStatement {
     private final static String INDENT = "    ";
     @NonNull
-    private NameResolver group;
+    private final NameResolver group;
     @NonNull
-    private Map<String, TimeSeriesMetricExpression> tags;
+    private final Map<String, TimeSeriesMetricExpression> tags;
     @NonNull
-    private Map<NameResolver, TimeSeriesMetricExpression> mapping;
+    private final Map<NameResolver, TimeSeriesMetricExpression> mapping;
 
     @Override
     public TimeSeriesTransformer get() {
@@ -77,9 +78,9 @@ public class DerivedMetricStatement implements RuleStatement {
             final Collector<CharSequence, ?, String> joiner;
 
             if (multiLine)
-                joiner = Collectors.joining(",\n", "tag (\n", ") ");
+                joiner = Collectors.joining(",\n", "tag(\n", ") ");
             else
-                joiner = Collectors.joining(", ", "tag (", ") ");
+                joiner = Collectors.joining(", ", "tag(", ") ");
 
             sb.append(getTags().entrySet().stream()
                     .map(tag_mapping -> {
@@ -101,13 +102,14 @@ public class DerivedMetricStatement implements RuleStatement {
             sb.append("{}\n");
         } else {
             sb.append(getMapping().entrySet().stream()
-                    .sorted(Comparator.comparing(entry -> entry.getKey().configString().toString()))
+                    .map(entry -> SimpleMapEntry.create(entry.getKey().configString().toString(), entry.getValue().configString().toString()))
+                    .sorted(Comparator.comparing(entry -> entry.getKey()))
                     .map(entry -> {
-                        final String metricName = entry.getKey().configString().toString();
-                        final String metricExpr = entry.getValue().configString().toString();
+                        final String metricName = entry.getKey();
+                        final String metricExpr = entry.getValue();
                         return INDENT + metricName + " = " + metricExpr + ";";
                     })
-                    .collect(Collectors.joining("\n", "{\n", "\n}")));
+                    .collect(Collectors.joining("\n", "{\n", "\n}\n")));
         }
         return sb;
     }

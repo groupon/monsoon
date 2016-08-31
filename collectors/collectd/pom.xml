@@ -2,12 +2,12 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.groupon.lex</groupId>
-        <artifactId>monsoon-basepom</artifactId>
+        <artifactId>monsoon-collectors</artifactId>
         <version>1.36-SNAPSHOT</version>
     </parent>
-    <artifactId>monsoon-engine</artifactId>
+    <artifactId>monsoon-collector-collectd</artifactId>
     <packaging>jar</packaging>
-    <name>Mon-soon engine</name>
+    <name>Mon-soon collector: collectd</name>
     <url>https://github.com/groupon/monsoon</url>
 
     <scm>
@@ -25,84 +25,20 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.groupon.lex</groupId>
-            <artifactId>monsoon-collector-base</artifactId>
-            <version>${project.parent.version}</version>
+            <groupId>joda-time</groupId>
+            <artifactId>joda-time</artifactId>
+            <version>2.8</version>
         </dependency>
         <dependency>
-            <groupId>com.groupon.lex</groupId>
-            <artifactId>monsoon-lib</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.groupon.lex</groupId>
-            <artifactId>monsoon-collector-http</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.groupon.lex</groupId>
-            <artifactId>monsoon-collector-collectd</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.groupon.lex</groupId>
-            <artifactId>monsoon-collector-jmx</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.groupon.lex</groupId>
-            <artifactId>monsoon-api</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpcore-nio</artifactId>
-            <version>4.4.4</version>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.4</version>
         </dependency>
         <dependency>
             <groupId>org.antlr</groupId>
             <artifactId>antlr4-runtime</artifactId>
             <version>${antlr.version}</version>
             <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>joda-time</groupId>
-            <artifactId>joda-time</artifactId>
-            <version>2.8</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.visualization</groupId>
-            <artifactId>visualization-datasource</artifactId>
-            <version>1.1.1</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>javax.servlet</groupId>
-                    <artifactId>javax.servlet-api</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>commons-logging</groupId>
-                    <artifactId>commons-logging</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>19.0</version>
-        </dependency>
-        <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-            <version>3.1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>net.sf.trove4j</groupId>
-            <artifactId>trove4j</artifactId>
-            <version>3.0.3</version>
         </dependency>
     </dependencies>
 
@@ -150,7 +86,6 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <treatWarningsAsErrors>true</treatWarningsAsErrors>
                     <sourceDirectory>src/main/antlr4</sourceDirectory>
                 </configuration>
             </plugin>

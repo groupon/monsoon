@@ -216,7 +216,7 @@ ESC_CHAR         : { is_string_state_() && state_ != State.REGEX }? '\\\\'
                          ('0'..'9' | 'a'..'f' | 'A'..'F')
                    {
                      try {
-                         int ch_int = Integer.valueOf(getText().substring(1), 16);
+                         int ch_int = Integer.valueOf(getText().substring(2), 16);
                          if (ch_int > 127) throw new CharEscapeException(this, "Invalid hex escape");
                          setText(String.valueOf((char)ch_int));
                      } catch (NumberFormatException e) {
@@ -229,7 +229,7 @@ ESC_CHAR         : { is_string_state_() && state_ != State.REGEX }? '\\\\'
                          ('0'..'9' | 'a'..'f' | 'A'..'F')
                    {
                      try {
-                         int ch_int = Integer.valueOf(getText().substring(1), 16);
+                         int ch_int = Integer.valueOf(getText().substring(2), 16);
                          if (ch_int > 0x10ffff) throw new CharEscapeException(this, "Invalid hex escape");
                          setText(String.valueOf(Character.toChars(ch_int)));
                      } catch (NumberFormatException e) {
@@ -246,7 +246,7 @@ ESC_CHAR         : { is_string_state_() && state_ != State.REGEX }? '\\\\'
                          ('0'..'9' | 'a'..'f' | 'A'..'F')
                    {
                      try {
-                         int ch_int = Integer.valueOf(getText().substring(1), 16);
+                         int ch_int = Integer.valueOf(getText().substring(2), 16);
                          if (ch_int > 0x10ffff) throw new CharEscapeException(this, "Invalid hex escape");
                          setText(String.valueOf(Character.toChars(ch_int)));
                      } catch (NumberFormatException e) {

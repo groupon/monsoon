@@ -31,10 +31,10 @@
         <module>impl</module>
         <module>api_server</module>
         <module>history</module>
-        <module>http_get_collector</module>
         <module>prometheus</module>
         <module>verify</module>
         <module>file_convert</module>
+        <module>collectors</module>
         <module>processors</module>
         <module>exporter</module>
     </modules>
@@ -143,6 +143,9 @@
 
                         <!-- XDR generated code -->
                         <exclude>com/groupon/lex/metrics/history/v*/xdr/[a-z]*.class</exclude>
+
+                        <!-- Lombok generated code -->
+                        <exclude>com/groupon/lex/metrics/config/MatchStatement$IdentifierPair.class</exclude>
 
                         <!-- Plain enums -->
                         <exclude>com/groupon/lex/metrics/timeseries/AlertState.class</exclude>
