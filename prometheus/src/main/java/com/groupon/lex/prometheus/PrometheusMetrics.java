@@ -52,10 +52,9 @@ public class PrometheusMetrics {
 
      /**
      * @param registry
-     * @return
+     * @return a Stream of PrometheusMetrics
      * @throws java.lang.Exception
-     * @FilteredMetrics()
-     * Returns a Stream of PrometheusMetrics
+     *
      * It will filter out None values and replace all Characters that
      * Does not confirm to Prometheus Metric Format.
      */
