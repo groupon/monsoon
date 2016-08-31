@@ -191,20 +191,6 @@ public class JmxListenerMonitorTest {
         verifyNoMoreInteractions(nbr);
     }
 
-//    @Test
-//    public void apply_noNames_noNBR() throws Exception {
-//        when(nbr.resolve()).then(invocation -> Stream.of(EMPTY_MAP));
-//
-//        mon_noNames.apply(mri);
-//
-//        assertThat(listeners,
-//                contains(listener("localhost", "9999", no_names, EMPTY_LIST, Tags.EMPTY)));
-//
-//        verify(nbr, times(1)).resolve();
-//        verify(mri, times(1)).add(Mockito.any());
-//        verifyNoMoreInteractions(mri, nbr);
-//    }
-
     @Test
     public void apply_oneName_noNBR() throws Exception {
         when(nbr.resolve()).then(invocation -> Stream.of(EMPTY_MAP));
@@ -232,35 +218,6 @@ public class JmxListenerMonitorTest {
         verify(mri, times(1)).add(Mockito.any());
         verifyNoMoreInteractions(mri, nbr);
     }
-
-//    @Test
-//    public void apply_noNames_withNBR() throws Exception {
-//        when(nbr.resolve()).then(invocation -> Stream.of(
-//                new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {{
-//                    put(Any2.right("host"), Any3.create3("other.host"));
-//                    put(Any2.right("port"), Any3.create2(99));
-//                }},
-//                new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {{
-//                    put(Any2.right("host"), Any3.create3("localhost"));
-//                    put(Any2.right("port"), Any3.create3("90"));
-//                }}));
-//
-//        assertThat(listeners,
-//                containsInAnyOrder(
-//                        listener("other.host", "99", no_names, EMPTY_LIST, Tags.valueOf(new HashMap<String, MetricValue>() {{
-//                            put("host", MetricValue.fromStrValue("other.host"));
-//                            put("port", MetricValue.fromIntValue(99));
-//                        }})),
-//                        listener("localhost", "90", no_names, EMPTY_LIST, Tags.valueOf(new HashMap<String, MetricValue>() {{
-//                            put("host", MetricValue.fromStrValue("localhost"));
-//                            put("port", MetricValue.fromStrValue("90"));
-//                        }}))
-//                ));
-//
-//        verify(nbr, times(1)).resolve();
-//        verify(mri, times(2)).add(Mockito.any());
-//        verifyNoMoreInteractions(mri, nbr);
-//    }
 
     @Test
     public void apply_oneName_withNBR() throws Exception {
