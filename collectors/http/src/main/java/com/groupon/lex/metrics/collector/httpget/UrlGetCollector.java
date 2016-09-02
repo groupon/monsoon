@@ -48,7 +48,9 @@ import java.io.InputStream;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
@@ -89,7 +91,7 @@ public class UrlGetCollector implements GroupGenerator {
             .setSocketTimeout(TIMEOUT_SECONDS * 1000)
             .build();
     private static Reference<GCCloseable<CloseableHttpAsyncClient>> http_client_ = new WeakReference<>(null);  // Retrieve it via get_http_client_().
-    private final GCCloseable<CloseableHttpAsyncClient> httpClient = get_http_client_();
+    private GCCloseable<CloseableHttpAsyncClient> httpClient = get_http_client_();
 
     private static final MetricName MN_STATUS_CODE = MetricName.valueOf("status", "code");
     private static final MetricName MN_STATUS_LINE = MetricName.valueOf("status", "line");
@@ -108,6 +110,7 @@ public class UrlGetCollector implements GroupGenerator {
 
     private static synchronized GCCloseable<CloseableHttpAsyncClient> get_http_client_() {
         GCCloseable<CloseableHttpAsyncClient> result = http_client_.get();
+        if (!result.get().isRunning()) result = null;  // Reactor appears to spontaneously shut down.
         if (result == null) {
             result = new GCCloseable<>(HttpAsyncClientBuilder.create()
                     .useSystemProperties()
@@ -115,6 +118,13 @@ public class UrlGetCollector implements GroupGenerator {
             result.get().start();
             http_client_ = new WeakReference<>(result);
         }
+        return result;
+    }
+
+    private synchronized GCCloseable<CloseableHttpAsyncClient> httpClient() {
+        GCCloseable<CloseableHttpAsyncClient> result = httpClient;
+        if (!result.get().isRunning())  // Reactor appears to spontaneously shut down.
+            httpClient = result = get_http_client_();
         return result;
     }
 
@@ -251,8 +261,10 @@ public class UrlGetCollector implements GroupGenerator {
         private final GroupName name_;
         private final GroupName args_;
         private final String url_;
+        /** Objects that need to be kept referenced until the request completes. */
+        private final Collection<Object> keep_live_;
 
-        public HttpResponseConsumer(CompletableFuture<MetricGroup> output, GroupName args, String url) {
+        public HttpResponseConsumer(CompletableFuture<MetricGroup> output, GroupName args, String url, Object... keepLive) {
             output_ = requireNonNull(output);
             args_ = requireNonNull(args);
             url_ = requireNonNull(url);
@@ -262,6 +274,7 @@ public class UrlGetCollector implements GroupGenerator {
                             .flatMap(List::stream)
                             .collect(Collectors.toList())),
                     args.getTags());
+            this.keep_live_ = new ArrayList<>(Arrays.asList(keepLive));
         }
 
         private void fail_() {
@@ -269,6 +282,7 @@ public class UrlGetCollector implements GroupGenerator {
                         new SimpleMetric(MN_UP, MetricValue.FALSE)
                         );
             output_.complete(new SimpleMetricGroup(name_, metrics));
+            keep_live_.clear();  // No need to keep objects alive anymore.
         }
 
         @Override
@@ -285,6 +299,7 @@ public class UrlGetCollector implements GroupGenerator {
 
             final MetricGroup group = new SimpleMetricGroup(name_, metrics);
             output_.complete(group);
+            keep_live_.clear();  // No need to keep objects alive anymore.
         }
 
         @Override
@@ -300,10 +315,21 @@ public class UrlGetCollector implements GroupGenerator {
     };
 
     private Future<MetricGroup> do_request_(GroupName args, String url) {
+        /*
+         * Client seems to spontaneously stop its reactor.
+         * No idea why, so in order to keep the reactor shutdown from disabling
+         * the monitor entirely, we allow for resetting it.
+         *
+         * Since restarted clients drop their reference, keep a reference to the client locally.
+         * The client needs to stay alive until the request completes,
+         * so we attach it to the response consumer as a keep_live object.
+         */
+        final GCCloseable<CloseableHttpAsyncClient> client = httpClient();
+
         final CompletableFuture<MetricGroup> result = new CompletableFuture<>();  // Filled in by HttpResponseConsumer instance.
         final HttpGet request = new HttpGet(url);
         request.setConfig(request_config_);
-        httpClient.get().execute(request, new HttpResponseConsumer(result, args, url));
+        client.get().execute(request, new HttpResponseConsumer(result, args, url, client));
         return result;
     }
 
