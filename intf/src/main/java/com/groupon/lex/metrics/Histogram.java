@@ -115,6 +115,41 @@ public class Histogram implements Serializable, Comparable<Histogram> {
                 .sum();
     }
 
+    /** Return the standard deviation of the histogram. */
+    public Optional<Double> stddev() {
+        return avg()
+                .flatMap((avg) -> {
+                    return buckets_.stream()
+                            .map((Bucket bucket) -> {
+                                final double events = bucket.getEvents();
+                                final double dev = bucket.getRange().getMidPoint() - avg;
+                                final double sqDev = dev * dev;
+                                final double sigma = sqDev * events;
+                                return new SigmaAndEvents(sigma, events);
+                            })
+                            .reduce(SigmaAndEvents::new);
+                })
+                .flatMap(SigmaAndEvents::divide);
+    }
+
+    /** Return the average plus stddevMul standard deviations. */
+    public Optional<Double> avgStddev(double stddevMul) {
+        return avg()
+                .flatMap((avg) -> {
+                    return buckets_.stream()
+                            .map((Bucket bucket) -> {
+                                final double events = bucket.getEvents();
+                                final double dev = bucket.getRange().getMidPoint() - avg;
+                                final double sqDev = dev * dev;
+                                final double sigma = sqDev * events;
+                                return new SigmaAndEvents(sigma, events);
+                            })
+                            .reduce(SigmaAndEvents::new)
+                            .flatMap(SigmaAndEvents::divide)
+                            .map(stddev -> avg + stddevMul * stddev);
+                });
+    }
+
     /** Get the value at a given position. */
     public double get(double index) {
         ListIterator<Bucket> b = buckets_.listIterator(0);
@@ -385,5 +420,25 @@ public class Histogram implements Serializable, Comparable<Histogram> {
         }
 
         return result;
+    }
+
+    /** Helper type for stddev function. */
+    @Value
+    @AllArgsConstructor
+    private static class SigmaAndEvents {
+        private final double sigma, events;
+
+        public SigmaAndEvents(SigmaAndEvents x, SigmaAndEvents y) {
+            this(x.getSigma() + y.getSigma(), x.getEvents() + y.getEvents());
+        }
+
+        public Optional<Double> divide() {
+            if (events == 0d) return Optional.empty();
+            try {
+                return Optional.of(sigma / events);
+            } catch (ArithmeticException ex) {
+                return Optional.empty();
+            }
+        }
     }
 }
