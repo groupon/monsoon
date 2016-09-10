@@ -134,17 +134,33 @@ public class PipelineBuilder {
 
             registry = cfg_.create(PushMetricRegistryInstance::new, epr);
             for (PushProcessorSupplier pps : processor_suppliers)
-                processors.add(pps.build(api));
+                processors.add(pps.build(epr));
 
             if (history_ != null)
                 registry.setHistory(history_);
             if (api != null) api.start();
             return new PushProcessorPipeline(registry, collect_interval_seconds_, processors);
         } catch (Exception ex) {
-            if (api != null) api.close();
-            if (registry != null) registry.close();
-            for (PushProcessor pp : processors)
-                pp.close();
+            try {
+                if (api != null) api.close();
+            } catch (Exception ex1) {
+                ex.addSuppressed(ex1);
+            }
+
+            try {
+                if (registry != null) registry.close();
+            } catch (Exception ex1) {
+                ex.addSuppressed(ex1);
+            }
+
+            for (PushProcessor pp : processors) {
+                try {
+                    pp.close();
+                } catch (Exception ex1) {
+                    ex.addSuppressed(ex1);
+                }
+            }
+
             throw ex;
         }
     }
@@ -183,13 +199,25 @@ public class PipelineBuilder {
             else
                 epr = epr_;
 
-            registry = cfg_.create(PullMetricRegistryInstance::new, api);
+            registry = cfg_.create(PullMetricRegistryInstance::new, epr);
 
-            api.start();
+            if (api != null) api.start();
             return new PullProcessorPipeline(registry);
         } catch (Exception ex) {
-            if (api != null) api.close();
-            if (registry != null) registry.close();
+            // Close API server.
+            try {
+                if (api != null) api.close();
+            } catch (Exception ex1) {
+                ex.addSuppressed(ex1);
+            }
+
+            // Close registry.
+            try {
+                if (registry != null) registry.close();
+            } catch (Exception ex1) {
+                ex.addSuppressed(ex1);
+            }
+
             throw ex;
         }
     }
