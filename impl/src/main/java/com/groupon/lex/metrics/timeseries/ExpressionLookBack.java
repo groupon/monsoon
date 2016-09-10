@@ -6,6 +6,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.Value;
 import org.joda.time.DateTime;
@@ -117,7 +119,8 @@ public interface ExpressionLookBack {
     public static class Interval implements ChainableExpressionLookBack {
         private final Duration duration;
 
-        @Value
+        @AllArgsConstructor
+        @Getter
         private static class FilterResult<TSC extends TimeSeriesCollection> {
             private final Stream<TSC> used;
             private final ForwardIterator<TSC> unused;

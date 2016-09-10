@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -44,30 +44,28 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.Getter;
 
-/**
- *
- * @author ariane
- */
+@Getter
 public class WithoutTagAggregationClause implements TagAggregationClause {
-    private final Set<String> tags_;
+    private final Set<String> tags;
 
     public WithoutTagAggregationClause(Collection<String> tags) {
-        tags_ = unmodifiableSet(new HashSet<>(tags));
+        this.tags = unmodifiableSet(new HashSet<>(tags));
     }
 
     @Override
     public boolean isScalar() { return false; }
 
     private Tags key_(Tags in) {
-        return mismatchingKeys(in, tags_);
+        return mismatchingKeys(in, tags);
     }
 
     @Override
     public <X, R> Map<Tags, Collection<R>> apply(Stream<X> x_stream, Function<? super X, Tags> x_tag_fn, Function<? super X, R> x_map_fn) {
         return x_stream
                 .map(x -> SimpleMapEntry.create(x_tag_fn.apply(x), x_map_fn.apply(x)))
-                .filter(entry -> tags_.stream().allMatch(entry.getKey()::contains))
+                .filter(entry -> tags.stream().allMatch(entry.getKey()::contains))
                 .collect(Collectors.groupingBy(
                         entry -> key_(entry.getKey()),
                         Collectors.mapping(Map.Entry::getValue, Collectors.toCollection(() -> (Collection<R>)new ArrayList()))));
@@ -80,7 +78,7 @@ public class WithoutTagAggregationClause implements TagAggregationClause {
         return Stream.concat(
                 x_stream.map(x -> SimpleMapEntry.create(x_tag_fn.apply(x), x_map_fn.apply(x))),
                 y_stream.map(y -> SimpleMapEntry.create(y_tag_fn.apply(y), y_map_fn.apply(y))))
-                .filter(entry -> tags_.stream().allMatch(entry.getKey()::contains))
+                .filter(entry -> tags.stream().allMatch(entry.getKey()::contains))
                 .collect(Collectors.groupingBy(
                         entry -> key_(entry.getKey()),
                         Collectors.mapping(entry -> entry.getValue(), Collectors.toCollection(() -> (Collection<R>)new ArrayList()))));
@@ -89,7 +87,7 @@ public class WithoutTagAggregationClause implements TagAggregationClause {
     @Override
     public StringBuilder configString() {
         StringBuilder result = new StringBuilder("without (");
-        tags_.stream().sorted().forEachOrdered(tag -> result.append(maybeQuoteIdentifier(tag)).append(", "));
+        tags.stream().sorted().forEachOrdered(tag -> result.append(maybeQuoteIdentifier(tag)).append(", "));
         result.replace(result.length() - 2, result.length(), ")");
         return result;
     }
