@@ -196,9 +196,12 @@ public class JmxListenerMonitorTest {
         when(nbr.resolve()).then(invocation -> Stream.of(EMPTY_MAP));
 
         mon_oneName.apply(mri);
+        listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
 
         assertThat(listeners,
-                contains(listener("localhost", "9999", one_name, EMPTY_LIST, Tags.EMPTY)));
+                contains(
+                        Matchers.hasProperty("currentGenerators", contains(
+                                listener("localhost", "9999", one_name, EMPTY_LIST, Tags.EMPTY)))));
 
         verify(nbr, times(1)).resolve();
         verify(mri, times(1)).add(Mockito.any());
@@ -210,9 +213,12 @@ public class JmxListenerMonitorTest {
         when(nbr.resolve()).then(invocation -> Stream.of(EMPTY_MAP));
 
         mon_twoNames.apply(mri);
+        listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
 
         assertThat(listeners,
-                contains(listener("localhost", "9999", two_names, EMPTY_LIST, Tags.EMPTY)));
+                contains(
+                        Matchers.hasProperty("currentGenerators", contains(
+                                listener("localhost", "9999", two_names, EMPTY_LIST, Tags.EMPTY)))));
 
         verify(nbr, times(1)).resolve();
         verify(mri, times(1)).add(Mockito.any());
@@ -234,23 +240,26 @@ public class JmxListenerMonitorTest {
                 }}));
 
         mon_oneName.apply(mri);
+        listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
 
         assertThat(listeners,
-                containsInAnyOrder(
-                        listener("other.host", "99", one_name, EMPTY_LIST, Tags.valueOf(new HashMap<String, MetricValue>() {{
-                            put("host", MetricValue.fromStrValue("other.host"));
-                            put("port", MetricValue.fromIntValue(99));
-                            put("extra_tag", MetricValue.fromStrValue("foobar"));
-                        }})),
-                        listener("localhost", "90", one_name, EMPTY_LIST, Tags.valueOf(new HashMap<String, MetricValue>() {{
-                            put("host", MetricValue.fromStrValue("localhost"));
-                            put("port", MetricValue.fromStrValue("90"));
-                            put("extra_tag", MetricValue.TRUE);
-                        }}))
+                contains(
+                        Matchers.hasProperty("currentGenerators", containsInAnyOrder(
+                                listener("other.host", "99", one_name, EMPTY_LIST, Tags.valueOf(new HashMap<String, MetricValue>() {{
+                                    put("host", MetricValue.fromStrValue("other.host"));
+                                    put("port", MetricValue.fromIntValue(99));
+                                    put("extra_tag", MetricValue.fromStrValue("foobar"));
+                                }})),
+                                listener("localhost", "90", one_name, EMPTY_LIST, Tags.valueOf(new HashMap<String, MetricValue>() {{
+                                    put("host", MetricValue.fromStrValue("localhost"));
+                                    put("port", MetricValue.fromStrValue("90"));
+                                    put("extra_tag", MetricValue.TRUE);
+                                }}))
+                        ))
                 ));
 
         verify(nbr, times(1)).resolve();
-        verify(mri, times(2)).add(Mockito.any());
+        verify(mri, times(1)).add(Mockito.any());
         verifyNoMoreInteractions(mri, nbr);
     }
 
@@ -269,21 +278,24 @@ public class JmxListenerMonitorTest {
                 }}));
 
         mon_twoNames.apply(mri);
+        listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
 
         assertThat(listeners,
-                containsInAnyOrder(
-                        listener("other.host", "99", two_names, singletonList("foobar"), Tags.valueOf(new HashMap<String, MetricValue>() {{
-                            put("host", MetricValue.fromStrValue("other.host"));
-                            put("port", MetricValue.fromIntValue(99));
-                        }})),
-                        listener("localhost", "90", two_names, singletonList("foobar"), Tags.valueOf(new HashMap<String, MetricValue>() {{
-                            put("host", MetricValue.fromStrValue("localhost"));
-                            put("port", MetricValue.fromStrValue("90"));
-                        }}))
+                contains(
+                        Matchers.hasProperty("currentGenerators", containsInAnyOrder(
+                                listener("other.host", "99", two_names, singletonList("foobar"), Tags.valueOf(new HashMap<String, MetricValue>() {{
+                                    put("host", MetricValue.fromStrValue("other.host"));
+                                    put("port", MetricValue.fromIntValue(99));
+                                }})),
+                                listener("localhost", "90", two_names, singletonList("foobar"), Tags.valueOf(new HashMap<String, MetricValue>() {{
+                                    put("host", MetricValue.fromStrValue("localhost"));
+                                    put("port", MetricValue.fromStrValue("90"));
+                                }}))
+                        ))
                 ));
 
         verify(nbr, times(1)).resolve();
-        verify(mri, times(2)).add(Mockito.any());
+        verify(mri, times(1)).add(Mockito.any());
         verifyNoMoreInteractions(mri, nbr);
     }
 

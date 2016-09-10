@@ -7,11 +7,13 @@ import java.util.Collection;
  *
  * Resolvers return tuples of a fixed length.
  */
-public interface Resolver {
+public interface Resolver extends AutoCloseable {
     /** Returns the number of elements per tuple. */
     public int getTupleWidth();
     /** Resolves tuples. */
     public Collection<ResolverTuple> getTuples() throws Exception;
 
     public String configString();
+    @Override
+    public default void close() throws Exception {}
 }

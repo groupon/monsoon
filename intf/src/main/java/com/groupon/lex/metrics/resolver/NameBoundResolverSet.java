@@ -15,14 +15,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.Value;
 import static java.util.Objects.requireNonNull;
+import lombok.NonNull;
 
 @Value
 public class NameBoundResolverSet implements NameBoundResolver {
     private final List<NameBoundResolver> nameResolvers;
 
-    public NameBoundResolverSet(Collection<NameBoundResolver> nameResolvers) {
-        for (NameBoundResolver nr : nameResolvers)
-            requireNonNull(nr, "null name resolver");
+    public NameBoundResolverSet(@NonNull Collection<NameBoundResolver> nameResolvers) {
+        nameResolvers.stream().forEach((nr) -> requireNonNull(nr, "null name resolver"));
         this.nameResolvers = unmodifiableList(new ArrayList<>(nameResolvers));
     }
 
@@ -36,7 +36,7 @@ public class NameBoundResolverSet implements NameBoundResolver {
         for (NameBoundResolver nr : nameResolvers)
             sets.add(nr.resolve().collect(Collectors.toList()));
 
-        return cartesianProduct(Stream.of(EMPTY_MAP), sets);
+        return cartesianProduct(sets);
     }
 
     @Override
@@ -78,5 +78,25 @@ public class NameBoundResolverSet implements NameBoundResolver {
                     });
         }
         return in;
+    }
+
+    private static <K, V> Stream<Map<K, V>> cartesianProduct(Iterable<? extends Collection<Map<K, V>>> sets) {
+        return cartesianProduct(Stream.of(EMPTY_MAP), sets);
+    }
+
+    @Override
+    public void close() throws Exception {
+        Exception thrown = null;
+        for (NameBoundResolver resolver : nameResolvers) {
+            try {
+                resolver.close();
+            } catch (Exception ex) {
+                if (thrown == null)
+                    thrown = ex;
+                else
+                    thrown.addSuppressed(ex);
+            }
+        }
+        if (thrown != null) throw thrown;
     }
 }
