@@ -9,4 +9,7 @@ dependency-reduced-pom.xml
 **/*.idea
 **/*.iml
 
+# Netbeans project settings
+**/nb-configuration.xml
+
 .sonar
