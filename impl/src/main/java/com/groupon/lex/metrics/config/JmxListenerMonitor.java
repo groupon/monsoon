@@ -34,21 +34,19 @@ package com.groupon.lex.metrics.config;
 import com.groupon.lex.metrics.jmx.JmxClient;
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import static com.groupon.lex.metrics.ConfigSupport.quotedString;
+import com.groupon.lex.metrics.ResolverGroupGenerator;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.jmx.MetricListenerInstance;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.Any3;
-import java.io.IOException;
 import static java.util.Collections.unmodifiableSortedSet;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
-import javax.management.InstanceNotFoundException;
 import javax.management.ObjectName;
 import lombok.NonNull;
 import lombok.Value;
@@ -67,24 +65,23 @@ public final class JmxListenerMonitor implements MonitorStatement {
     }
 
     @Override
-    public void apply(MetricRegistryInstance registry) throws Exception, IOException, InstanceNotFoundException {
-        final Iterator<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> argIter = tupledElements.resolve().iterator();
-        while (argIter.hasNext()) {
-            final Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> arg = argIter.next();
+    public void apply(MetricRegistryInstance registry) {
+        registry.add(new ResolverGroupGenerator(
+                tupledElements,
+                (Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> arg) -> {
+                    final String host = arg.getOrDefault(Any2.<Integer, String>right("host"), Any3.create3("localhost")).mapCombine(String::valueOf, String::valueOf, String::valueOf);
+                    final String port = arg.getOrDefault(Any2.<Integer, String>right("port"), Any3.create2(9999)).mapCombine(String::valueOf, String::valueOf, String::valueOf);
 
-            final String host = arg.getOrDefault(Any2.<Integer, String>right("host"), Any3.create3("localhost")).mapCombine(String::valueOf, String::valueOf, String::valueOf);
-            final String port = arg.getOrDefault(Any2.<Integer, String>right("port"), Any3.create2(9999)).mapCombine(String::valueOf, String::valueOf, String::valueOf);
+                    final List<String> sublist = NameBoundResolver.indexToStringMap(arg).entrySet().stream()
+                            .sorted(Comparator.comparing(Map.Entry::getKey))
+                            .map(Map.Entry::getValue)
+                            .collect(Collectors.toList());
+                    final Tags tags = Tags.valueOf(NameBoundResolver.tagMap(arg));
 
-            final List<String> sublist = NameBoundResolver.indexToStringMap(arg).entrySet().stream()
-                    .sorted(Comparator.comparing(Map.Entry::getKey))
-                    .map(Map.Entry::getValue)
-                    .collect(Collectors.toList());
-            final Tags tags = Tags.valueOf(NameBoundResolver.tagMap(arg));
-
-            MetricListenerInstance listener = new MetricListenerInstance(new JmxClient("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi"), getIncludes(), sublist, tags);
-            registry.add(listener);
-            listener.enable();
-        }
+                    MetricListenerInstance listener = new MetricListenerInstance(new JmxClient("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi"), getIncludes(), sublist, tags);
+                    listener.enable();
+                    return listener;
+                }));
     }
 
     @Override

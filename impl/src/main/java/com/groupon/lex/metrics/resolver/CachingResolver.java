@@ -55,7 +55,7 @@ public class CachingResolver implements Resolver {
     private static final Logger LOG = Logger.getLogger(CachingResolver.class.getName());
     /** Scheduler used for async resolution. */
     private static final ScheduledExecutorService SCHEDULER;
-    /** Time until next attempt to reload tuples, after a failed reload attempt. */
+    /** Time (msec) until next attempt to reload tuples, after a failed reload attempt. */
     private static final int FAILURE_RESCHEDULE_DELAY = 5000;
     private final AsyncResolver underlying;
     private final Duration minAge, maxAge;
@@ -75,11 +75,16 @@ public class CachingResolver implements Resolver {
                     thr.setDaemon(true);
                     return thr;
                 });
-        scheduler.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
-        scheduler.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
-        scheduler.setKeepAliveTime(5, TimeUnit.MINUTES);
-        scheduler.setMaximumPoolSize(4);
-        SCHEDULER = scheduler;
+        try {
+            scheduler.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+            scheduler.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+            scheduler.setKeepAliveTime(5, TimeUnit.MINUTES);
+            scheduler.setMaximumPoolSize(4);
+            SCHEDULER = scheduler;
+        } catch (RuntimeException ex) {
+            scheduler.shutdown();
+            throw ex;
+        }
     }
 
     public CachingResolver(@NonNull AsyncResolver underlying, @NonNull Duration minAge, @NonNull Duration maxAge) {
@@ -135,6 +140,8 @@ public class CachingResolver implements Resolver {
             currentFut.cancel(false);
             currentFut = null;
         }
+
+        // Closing underlying is done by reschedule loop.
     }
 
     private synchronized Refresh getRefresh() {
@@ -160,14 +167,13 @@ public class CachingResolver implements Resolver {
 
             // Publish future, needs synchronization, so close() method can cancel properly.
             synchronized(this) {
-                if (closed) {  // Close may have set close bit while we were creating future.
+                // We create the whenCompleteAsync continuation with synchronization locked,
+                // because the update code will want to clear the currentFut member-variable.
+                // We must ensure it is set before.
+                currentFut = fut.whenCompleteAsync(this::update, SCHEDULER);
+
+                if (closed)  // Close may have set close bit while we were creating future.
                     fut.cancel(false);
-                } else {
-                    // We create the whenCompleteAsync continuation with synchronization locked,
-                    // because the update code will want to clear the currentFut member-variable.
-                    // We must ensure it is set before.
-                    currentFut = fut.whenCompleteAsync(this::update, SCHEDULER);
-                }
             }
         } catch (Exception ex) {
             synchronized(this) {

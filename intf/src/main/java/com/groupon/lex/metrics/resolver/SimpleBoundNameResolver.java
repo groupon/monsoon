@@ -95,4 +95,9 @@ public class SimpleBoundNameResolver implements NameBoundResolver {
                     .collect(nameJoiner);
         }
     }
+
+    @Override
+    public void close() throws Exception {
+        resolver.close();
+    }
 }

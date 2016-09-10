@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public interface NameBoundResolver {
+public interface NameBoundResolver extends AutoCloseable {
     public static final NameBoundResolver EMPTY = new NameBoundResolver() {
         @Override
         public Stream<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolve() { return Stream.of(EMPTY_MAP); }
@@ -19,6 +19,8 @@ public interface NameBoundResolver {
         public boolean isEmpty() { return true; }
         @Override
         public String configString() { return ""; }
+        @Override
+        public void close() {}
     };
 
     public Stream<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolve() throws Exception;
