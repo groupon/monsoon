@@ -472,10 +472,28 @@ collect_url_line returns [ NameBoundResolver s ]
                  }
                  : ( s_tk=tuple_key { keys = Collections.singletonList($s_tk.s); }
                      EQ_KW
-                     SQBRACE_OPEN_LIT
-                     s0=tuple_value{ tuples.add(new ResolverTuple($s0.s)); }
-                     (COMMA_LIT sN=tuple_value{ tuples.add(new ResolverTuple($sN.s)); })*
-                     SQBRACE_CLOSE_LIT
+                     (
+                       SQBRACE_OPEN_LIT
+                       s0=tuple_value{ tuples.add(new ResolverTuple($s0.s)); }
+                       (COMMA_LIT sN=tuple_value{ tuples.add(new ResolverTuple($sN.s)); })*
+                       SQBRACE_CLOSE_LIT
+                       {
+                         $s = new SimpleBoundNameResolver(
+                                new SimpleBoundNameResolver.Names(keys),
+                                new ConstResolver(tuples));
+                       }
+                     | range_begin=int_val DOT_DOT_LIT range_end=int_val
+                       {
+                         if ($range_begin.s < Integer.MIN_VALUE ||
+                             $range_end.s   < Integer.MIN_VALUE ||
+                             $range_begin.s > Integer.MAX_VALUE ||
+                             $range_end.s   > Integer.MAX_VALUE)
+                             throw new IllegalArgumentException("integer out of range");
+                         $s = new SimpleBoundNameResolver(
+                                new SimpleBoundNameResolver.Names(keys),
+                                new RangeResolver((int)$range_begin.s, (int)$range_end.s));
+                       }
+                     )
                    | keys=collect_url_line_key_tuple
                      { keys = $keys.s; }
                      EQ_KW
@@ -486,12 +504,12 @@ collect_url_line returns [ NameBoundResolver s ]
                        { tuples.add(new ResolverTuple($values.s)); }
                      )*
                      SQBRACE_CLOSE_LIT
+                     {
+                       $s = new SimpleBoundNameResolver(
+                              new SimpleBoundNameResolver.Names(keys),
+                              new ConstResolver(tuples));
+                     }
                    )
-                   {
-                     $s = new SimpleBoundNameResolver(
-                            new SimpleBoundNameResolver.Names(keys),
-                            new ConstResolver(tuples));
-                   }
                  ;
 collect_url_line_key_tuple returns [ List<Any2<Integer, String>> s = new ArrayList<>() ]
                  : BRACE_OPEN_LIT
