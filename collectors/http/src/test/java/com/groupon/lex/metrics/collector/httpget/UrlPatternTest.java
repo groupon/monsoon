@@ -39,7 +39,6 @@ import com.groupon.lex.metrics.resolver.SimpleBoundNameResolver;
 import com.groupon.lex.metrics.resolver.ConstResolver;
 import com.groupon.lex.metrics.resolver.NameBoundResolverSet;
 import com.groupon.lex.metrics.resolver.ResolverTuple;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 import static java.util.Collections.EMPTY_LIST;
 import java.util.HashMap;
 import java.util.Map;
@@ -51,12 +50,6 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 
 /**
