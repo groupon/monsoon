@@ -38,6 +38,7 @@ import com.groupon.lex.metrics.lib.Any3;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
 import java.util.ArrayList;
 import java.util.Collection;
+import static java.util.Collections.unmodifiableCollection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -47,6 +48,7 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
@@ -63,9 +65,15 @@ public class ResolverGroupGenerator implements GroupGenerator {
     private static final Logger LOG = Logger.getLogger(ResolverGroupGenerator.class.getName());
     private final Map<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>, GroupGenerator> generators = new HashMap<>();
     @NonNull
+    @Getter
     private final NameBoundResolver resolver;
     @NonNull
+    @Getter
     private final GroupGeneratorFactory createGenerator;
+
+    public Collection<GroupGenerator> getCurrentGenerators() {
+        return unmodifiableCollection(generators.values());
+    }
 
     @Override
     public GroupCollection getGroups() {
