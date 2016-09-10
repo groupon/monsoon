@@ -31,7 +31,6 @@
  */
 package com.groupon.lex.metrics;
 
-import com.groupon.lex.metrics.api.ApiServer;
 import com.groupon.lex.metrics.config.Configuration;
 import com.groupon.lex.metrics.config.ConfigurationException;
 import com.groupon.lex.metrics.history.CollectHistory;
@@ -39,10 +38,15 @@ import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import static java.util.Collections.singletonList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import lombok.Getter;
 import lombok.NonNull;
 
 public class PipelineBuilder {
@@ -122,15 +126,17 @@ public class PipelineBuilder {
      *     Push Processors that were created before the exception was thrown, will be closed.
      */
     public PushProcessorPipeline build(List<PushProcessorSupplier> processor_suppliers) throws Exception {
-        ApiServer api = null;
+        ApiServerCreation api = null;
         PushMetricRegistryInstance registry = null;
         final List<PushProcessor> processors = new ArrayList<>(processor_suppliers.size());
         try {
             final EndpointRegistration epr;
-            if (epr_ == null)
-                epr = api = new ApiServer(api_sockaddr_);
-            else
+            if (epr_ == null) {
+                api = new ApiServerCreation(api_sockaddr_);
+                epr = api.getApiServer();
+            } else {
                 epr = epr_;
+            }
 
             registry = cfg_.create(PushMetricRegistryInstance::new, epr);
             for (PushProcessorSupplier pps : processor_suppliers)
@@ -190,14 +196,16 @@ public class PipelineBuilder {
      * @throws Exception indicating construction failed.
      */
     public PullProcessorPipeline build() throws Exception {
-        ApiServer api = null;
+        ApiServerCreation api = null;
         PullMetricRegistryInstance registry = null;
         try {
             final EndpointRegistration epr;
-            if (epr_ == null)
-                epr = api = new ApiServer(api_sockaddr_);
-            else
+            if (epr_ == null) {
+                api = new ApiServerCreation(api_sockaddr_);
+                epr = api.getApiServer();
+            } else {
                 epr = epr_;
+            }
 
             registry = cfg_.create(PullMetricRegistryInstance::new, epr);
 
@@ -219,6 +227,57 @@ public class PipelineBuilder {
             }
 
             throw ex;
+        }
+    }
+
+    /**
+     * Create default ApiServer instance using reflection.
+     *
+     * This means that binaries not depending on the built-in API server can
+     * supply their own and not accumulate the cost of the built-in API server.
+     */
+    private static class ApiServerCreation implements AutoCloseable {
+        private final static String API_SERVER_CLASS = "com.groupon.lex.metrics.api.ApiServer";
+        private static final Logger LOG = Logger.getLogger(ApiServerCreation.class.getName());
+
+        @Getter
+        private final EndpointRegistration apiServer;
+
+        public ApiServerCreation(@NonNull InetSocketAddress addr) {
+            try {
+                final Class<?> apiServerClass = ClassLoader.getSystemClassLoader().loadClass(API_SERVER_CLASS);
+                if (!EndpointRegistration.class.isAssignableFrom(apiServerClass)) {
+                    LOG.log(Level.WARNING, "Found API server implementation is not an API server");
+                    throw new IllegalStateException("API server absent");
+                }
+
+                final Constructor<?> constructor = apiServerClass.getConstructor(InetSocketAddress.class);
+                apiServer = (EndpointRegistration)constructor.newInstance(addr);
+            } catch (ClassNotFoundException ex) {
+                LOG.log(Level.SEVERE, "default API server not present; either load monsoon-api module or supply your own", ex);
+                throw new IllegalStateException(ex);
+            } catch (NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+                LOG.log(Level.SEVERE, "unable to instantiate API server", ex);
+                throw new IllegalStateException(ex);
+            }
+        }
+
+        /** Start the API server. */
+        public void start() {
+            try {
+                apiServer.getClass().getMethod("start").invoke(apiServer);
+            } catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+                LOG.log(Level.SEVERE, "unable to start API server", ex);
+                throw new RuntimeException(ex);
+            }
+        }
+
+        /** Close the API server. */
+        @Override
+        public void close() throws Exception {
+            if (apiServer instanceof AutoCloseable) {
+                ((AutoCloseable)apiServer).close();
+            }
         }
     }
 }
