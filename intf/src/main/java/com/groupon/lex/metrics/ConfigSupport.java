@@ -265,7 +265,9 @@ public class ConfigSupport {
         if (builder instanceof MainStringList) {
             buf
                     .append(' ')
-                    .append(((MainStringList)builder).getMain().stream().map(ConfigSupport::quotedString).collect(Collectors.joining(", ")));
+                    .append(((MainStringList)builder).getMain().stream()
+                            .map(ConfigSupport::quotedString)
+                            .collect(Collectors.joining(", ")));
         }
 
         /*
