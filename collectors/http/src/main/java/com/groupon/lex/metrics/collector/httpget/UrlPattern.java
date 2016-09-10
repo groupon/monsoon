@@ -44,14 +44,14 @@ import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.NonNull;
-import lombok.Value;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import lombok.Getter;
 
 /**
  *
  * @author ariane
  */
-@Value
+@Getter
 public class UrlPattern {
     private final StringTemplate urlTemplate;
     private final NameBoundResolver templateArgs;

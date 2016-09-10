@@ -35,11 +35,11 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.lib.Any2;
+import com.groupon.lex.metrics.lib.StringTemplate;
 import com.groupon.lex.metrics.resolver.SimpleBoundNameResolver;
 import com.groupon.lex.metrics.resolver.ConstResolver;
 import com.groupon.lex.metrics.resolver.NameBoundResolverSet;
 import com.groupon.lex.metrics.resolver.ResolverTuple;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 import static java.util.Collections.EMPTY_LIST;
 import java.util.HashMap;
 import java.util.Map;
@@ -51,12 +51,6 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 
 /**
@@ -197,5 +191,15 @@ public class UrlPatternTest {
                 hasEntry(H.group_("www.groupon.com", "8080"), "http://www.groupon.com:8080/"),
                 hasEntry(H.group_("www.groupon.com", "80"), "http://www.groupon.com:80/")
         ));
+    }
+
+    @Test(expected=NullPointerException.class)
+    public void noNullPtr_urlTemplate() {
+        new UrlPattern((StringTemplate)null, PARAMS);
+    }
+
+    @Test(expected=NullPointerException.class)
+    public void noNullPtr_params() {
+        new UrlPattern("foobar", null);
     }
 }

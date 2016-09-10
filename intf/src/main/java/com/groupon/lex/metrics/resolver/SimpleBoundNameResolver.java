@@ -16,8 +16,11 @@ import java.util.stream.Stream;
 import lombok.NonNull;
 import lombok.Value;
 import static java.util.Objects.requireNonNull;
+import lombok.Getter;
+import lombok.ToString;
 
-@Value
+@Getter
+@ToString
 public class SimpleBoundNameResolver implements NameBoundResolver {
     private final Names names;
     private final Resolver resolver;
