@@ -48,22 +48,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import static org.hamcrest.Matchers.arrayContainingInAnyOrder;
 import static org.hamcrest.Matchers.contains;
-import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import org.junit.Before;
-import org.junit.Test;
 
 /**
  *
  * @author ariane
  */
 public class MetricListenerInstanceTest {
-    private static final AtomicInteger sequence = new AtomicInteger();  // To help us create unique names for each test.
+    private static final AtomicInteger SEQUENCE = new AtomicInteger();  // To help us create unique names for each test.
     private int seqno;
     /** Group name prefix used during test. */
     private String PREFIX;
@@ -77,7 +77,7 @@ public class MetricListenerInstanceTest {
 
     @Before
     public void setup() throws Exception {
-        seqno = sequence.getAndIncrement();
+        seqno = SEQUENCE.getAndIncrement();
         PREFIX = "com.groupon.lex.metrics.jmx:type=MetricListenerInstanceTest,seq=" + seqno + ",";
         NOT_PREFIX = "com.groupon.lex.metrics.jmx:type=NotThisMetricListenerInstanceTest,seq=" + seqno + ",";
         GROUP_PATH = new Function<Map<String, MetricValue>, GroupName>() {

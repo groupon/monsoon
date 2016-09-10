@@ -50,33 +50,21 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
-import lombok.Data;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
-@Data
+@Getter
+@Setter
+@ToString
 public class JmxBuilder implements CollectorBuilder, MainStringList, AcceptTagSet {
     private List<String> main;
     private NameBoundResolver tagSet;
 
     @Override
     public GroupGenerator build(EndpointRegistration er) throws Exception {
-        final SortedSet<ObjectName> includes = getIncludes();
-
-        return new ResolverGroupGenerator(
-                tagSet,
-                (Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> arg) -> {
-                    final String host = arg.getOrDefault(Any2.<Integer, String>right("host"), Any3.create3("localhost")).mapCombine(String::valueOf, String::valueOf, String::valueOf);
-                    final String port = arg.getOrDefault(Any2.<Integer, String>right("port"), Any3.create2(9999)).mapCombine(String::valueOf, String::valueOf, String::valueOf);
-
-                    final List<String> sublist = NameBoundResolver.indexToStringMap(arg).entrySet().stream()
-                            .sorted(Comparator.comparing(Map.Entry::getKey))
-                            .map(Map.Entry::getValue)
-                            .collect(Collectors.toList());
-                    final Tags tags = Tags.valueOf(NameBoundResolver.tagMap(arg));
-
-                    MetricListenerInstance listener = new MetricListenerInstance(new JmxClient("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi"), includes, sublist, tags);
-                    listener.enable();
-                    return listener;
-                });
+        return new ResolverGroupGenerator(tagSet, new Constructor(getIncludes()));
     }
 
     private SortedSet<ObjectName> getIncludes() throws MalformedObjectNameException {
@@ -84,5 +72,26 @@ public class JmxBuilder implements CollectorBuilder, MainStringList, AcceptTagSe
         for (String name : main)
             includes.add(new ObjectName(name));
         return unmodifiableSortedSet(includes);
+    }
+
+    @RequiredArgsConstructor
+    private static class Constructor implements ResolverGroupGenerator.GroupGeneratorFactory {
+        private final SortedSet<ObjectName> includes;
+
+        @Override
+        public GroupGenerator create(Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> arg) throws Exception {
+            final String host = arg.getOrDefault(Any2.<Integer, String>right("host"), Any3.create3("localhost")).mapCombine(String::valueOf, String::valueOf, String::valueOf);
+            final String port = arg.getOrDefault(Any2.<Integer, String>right("port"), Any3.create2(9999)).mapCombine(String::valueOf, String::valueOf, String::valueOf);
+
+            final List<String> sublist = NameBoundResolver.indexToStringMap(arg).entrySet().stream()
+                    .sorted(Comparator.comparing(Map.Entry::getKey))
+                    .map(Map.Entry::getValue)
+                    .collect(Collectors.toList());
+            final Tags tags = Tags.valueOf(NameBoundResolver.tagMap(arg));
+
+            MetricListenerInstance listener = new MetricListenerInstance(new JmxClient("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi"), includes, sublist, tags);
+            listener.enable();
+            return listener;
+        }
     }
 }
