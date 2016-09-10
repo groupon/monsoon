@@ -110,7 +110,8 @@ public class UrlGetCollector implements GroupGenerator {
 
     private static synchronized GCCloseable<CloseableHttpAsyncClient> get_http_client_() {
         GCCloseable<CloseableHttpAsyncClient> result = http_client_.get();
-        if (!result.get().isRunning()) result = null;  // Reactor appears to spontaneously shut down.
+        if (result != null && !result.get().isRunning())
+            result = null;  // Reactor appears to spontaneously shut down.
         if (result == null) {
             result = new GCCloseable<>(HttpAsyncClientBuilder.create()
                     .useSystemProperties()
