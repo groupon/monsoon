@@ -38,9 +38,13 @@ import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
 import com.groupon.lex.metrics.builders.collector.MainString;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
-@Data
+@Getter
+@Setter
+@ToString
 public class UrlJsonBuilder implements CollectorBuilder, MainString, AcceptAsPath, AcceptTagSet {
     private SimpleGroupPath asPath;
     private NameBoundResolver tagSet;

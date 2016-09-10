@@ -32,26 +32,30 @@
 package com.groupon.lex.metrics.collector.httpget;
 
 import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.builders.collector.AcceptAsPath;
-import com.groupon.lex.metrics.builders.collector.AcceptTagSet;
-import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
-import com.groupon.lex.metrics.builders.collector.MainString;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.runners.MockitoJUnitRunner;
 
-@Getter
-@Setter
-@ToString
-public class UrlGetBuilder implements CollectorBuilder, MainString, AcceptAsPath, AcceptTagSet {
-    private SimpleGroupPath asPath;
-    private NameBoundResolver tagSet;
-    private String main;
+@RunWith(MockitoJUnitRunner.class)
+public class UrlJsonBuilderTest {
+    @Mock
+    EndpointRegistration er;
 
-    @Override
-    public UrlGetCollector build(EndpointRegistration er) throws Exception {
-        return new UrlGetCollector(asPath, new UrlPattern(main, tagSet));
+    @Test
+    public void constructor() throws Exception {
+        final UrlJsonBuilder builder = new UrlJsonBuilder();
+        builder.setMain("test");
+        builder.setAsPath(SimpleGroupPath.valueOf("some", "path"));
+        builder.setTagSet(NameBoundResolver.EMPTY);
+        final UrlJsonCollector urlGet = builder.build(er);
+
+        assertEquals(SimpleGroupPath.valueOf("some", "path"), urlGet.getBaseGroupName());
+        assertEquals("test", urlGet.getPatterns().getUrlTemplate().toString());
+        assertSame(NameBoundResolver.EMPTY, urlGet.getPatterns().getTemplateArgs());
     }
 }
