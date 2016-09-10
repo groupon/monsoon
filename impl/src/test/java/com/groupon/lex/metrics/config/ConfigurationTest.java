@@ -155,7 +155,7 @@ public class ConfigurationTest {
     public void defaultConfigSerialization() throws Exception {
         Configuration cfg = Configuration.readFromFile(null, new StringReader(Configuration.DEFAULT.configString().toString()));
 
-        assertEquals("Configuration can parse itself", Configuration.DEFAULT, cfg);
+        assertEquals("Configuration can parse itself", Configuration.DEFAULT.toString(), cfg.toString());
     }
 
     @Test(expected = ConfigurationException.class)
