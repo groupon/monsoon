@@ -53,6 +53,7 @@ parser grammar ConfigBnf;
  *     import com.groupon.lex.metrics.transformers.LiteralNameResolver;
  *     import com.groupon.lex.metrics.transformers.IdentifierNameResolver;
  *     import com.groupon.lex.metrics.resolver.*;
+ *     import com.groupon.lex.metrics.builders.collector.*;
  *     import java.util.Objects;
  *     import java.util.SortedSet;
  *     import java.util.TreeSet;
@@ -134,15 +135,65 @@ collect_statements returns [ Collection<MonitorStatement> s = new ArrayList<Moni
                  : (s1=collect_statement{ $s.add($s1.s); })*
                  ;
 collect_statement returns [ MonitorStatement s ]
+                 @init{
+                   String builderName = null;
+                   CollectorBuilder builderInst = null;
+                 }
                  : COLLECT_KW id=ID
-                   ( { $id.getText().equals("jmx_listener") }?  s_jmx=collect_jmx_listener
-                     { $s = $s_jmx.s; }
-                   | { $id.getText().equals("url") }?           s_url=collect_url
-                     { $s = $s_url.s; }
-                   | { $id.getText().equals("json_url") }?      s_json_url=collect_json_url
-                     { $s = $s_json_url.s; }
-                   | { $id.getText().equals("collectd_push") }? s_name=quoted_string AS_KW s_grp=lit_group_name ENDSTATEMENT_KW
-                     { $s = new CollectdPushMonitor($s_name.s, $s_grp.s); }
+                   {
+                     builderName = $id.getText();
+                     try {
+                       builderInst = Configuration.COLLECTORS.get(builderName).newInstance();
+                     } catch (InstantiationException | IllegalAccessException ex) {
+                       throw new FailedPredicateException(this, "collector " + builderName + " is not instantiable", ex.getMessage());
+                     }
+                   }
+                   collect_stmt_parse[ builderInst ]
+                   { $s = new CollectorBuilderWrapper(builderName, builderInst); }
+                 ;
+collect_stmt_parse [ CollectorBuilder builder ]
+                 : collect_stmt_parse_main[ $builder ]
+                   collect_stmt_parse_asPath[ $builder ]
+                   collect_stmt_parse_tagSet[ $builder ]
+                 ;
+collect_stmt_parse_main [ CollectorBuilder builder ]
+                 @init{
+                   List<String> strings;
+                 }
+                 : ( { $builder instanceof MainNone }?
+                     /* SKIP */
+                   | { $builder instanceof MainString }?
+                     main_name=quoted_string
+                     { ((MainString)$builder).setMain($main_name.s); }
+                   | { $builder instanceof MainStringList }?
+                     main_name0=quoted_string
+                     { strings = new ArrayList<>();
+                       strings.add($main_name0.s);
+                     }
+                     ( COMMA_LIT main_nameN=quoted_string
+                       { strings.add($main_nameN.s); }
+                     )*
+                     { ((MainStringList)$builder).setMain(strings); }
+                   )
+                 ;
+collect_stmt_parse_asPath [ CollectorBuilder builder ]
+                 : ( { $builder instanceof AcceptAsPath }?
+                     AS_KW grp=lit_group_name
+                     { ((AcceptAsPath)$builder).setAsPath($grp.s); }
+                   | { $builder instanceof AcceptOptAsPath }?
+                     ( AS_KW grp=lit_group_name
+                       { ((AcceptOptAsPath)$builder).setAsPath(Optional.of($grp.s)); }
+                     | { ((AcceptOptAsPath)$builder).setAsPath(Optional.empty()); }
+                     )
+                   | /* SKIP */
+                   )
+                 ;
+collect_stmt_parse_tagSet [ CollectorBuilder builder ]
+                 : ( { $builder instanceof AcceptTagSet }?
+                     tuples=opt_tuple_body
+                     { ((AcceptTagSet)$builder).setTagSet($tuples.s); }
+                   | ENDSTATEMENT_KW
+                     /* SKIP */
                    )
                  ;
 
@@ -420,32 +471,6 @@ alert_statement_attributes_line_arg returns [ Any2<TimeSeriesMetricExpression, L
                    { $s = Any2.right(exprs); }
                  ;
 
-collect_jmx_listener returns [ MonitorStatement s ]
-                 : s1=object_names s2=opt_tuple_body
-                   { $s = new JmxListenerMonitor($s1.s, $s2.s); }
-                 ;
-object_names     returns [ SortedSet<ObjectName> s = new TreeSet<ObjectName>() ]
-                 : (s1=object_name{ $s.add($s1.s); } (COMMA_LIT s3=object_name{ $s.add($s3.s); })*)
-                 ;
-object_name      returns [ ObjectName s ]
-                 : s1=quoted_string
-                   {
-                     try {
-                         $s = new ObjectName($s1.s);
-                     } catch (MalformedObjectNameException ex) {
-                         throw new FailedPredicateException(this, $s1.s + " is not a valid object name", ex.getMessage());
-                     }
-                   }
-                 ;
-
-collect_url      returns [ MonitorStatement s ]
-                 : s1=quoted_string AS_KW s3=lit_group_name s4=opt_tuple_body
-                   { $s = new UrlGetCollectorMonitor($s3.s, $s1.s, $s4.s); }
-                 ;
-collect_json_url returns [ MonitorStatement s ]
-                 : s1=quoted_string AS_KW s3=lit_group_name s4=opt_tuple_body
-                   { $s = new JsonUrlMonitor($s3.s, $s1.s, $s4.s); }
-                 ;
 opt_tuple_body   returns [ NameBoundResolver s ]
                  @init{
                    final List<NameBoundResolver> resolvers = new ArrayList<>();
@@ -453,9 +478,9 @@ opt_tuple_body   returns [ NameBoundResolver s ]
                  : ENDSTATEMENT_KW
                    { $s = NameBoundResolver.EMPTY; }
                  | CURLYBRACKET_OPEN
-                   m0=collect_url_line{ resolvers.add($m0.s); }
+                   m0=tuple_line{ resolvers.add($m0.s); }
                    (
-                     COMMA_LIT mN=collect_url_line{ resolvers.add($mN.s); }
+                     COMMA_LIT mN=tuple_line{ resolvers.add($mN.s); }
                    )*
                    CURLYBRACKET_CLOSE
                    {
@@ -465,7 +490,7 @@ opt_tuple_body   returns [ NameBoundResolver s ]
                          $s = new NameBoundResolverSet(resolvers);
                    }
                  ;
-collect_url_line returns [ NameBoundResolver s ]
+tuple_line returns [ NameBoundResolver s ]
                  @init{
                    List<Any2<Integer, String>> keys = new ArrayList<>();
                    List<ResolverTuple> tuples = new ArrayList<>();
@@ -476,13 +501,13 @@ collect_url_line returns [ NameBoundResolver s ]
                      s0=tuple_value{ tuples.add(new ResolverTuple($s0.s)); }
                      (COMMA_LIT sN=tuple_value{ tuples.add(new ResolverTuple($sN.s)); })*
                      SQBRACE_CLOSE_LIT
-                   | keys=collect_url_line_key_tuple
+                   | keys=tuple_line_key_tuple
                      { keys = $keys.s; }
                      EQ_KW
                      SQBRACE_OPEN_LIT
-                     values=collect_url_line_value_tuple
+                     values=tuple_line_value_tuple
                      { tuples.add(new ResolverTuple($values.s)); }
-                     ( COMMA_LIT values=collect_url_line_value_tuple
+                     ( COMMA_LIT values=tuple_line_value_tuple
                        { tuples.add(new ResolverTuple($values.s)); }
                      )*
                      SQBRACE_CLOSE_LIT
@@ -493,7 +518,7 @@ collect_url_line returns [ NameBoundResolver s ]
                             new ConstResolver(tuples));
                    }
                  ;
-collect_url_line_key_tuple returns [ List<Any2<Integer, String>> s = new ArrayList<>() ]
+tuple_line_key_tuple returns [ List<Any2<Integer, String>> s = new ArrayList<>() ]
                  : BRACE_OPEN_LIT
                    s1=tuple_key { $s.add($s1.s); }
                    ( COMMA_LIT
@@ -501,7 +526,7 @@ collect_url_line_key_tuple returns [ List<Any2<Integer, String>> s = new ArrayLi
                    )*
                    BRACE_CLOSE_LIT
                  ;
-collect_url_line_value_tuple returns [ List<Any3<Boolean, Integer, String>> s = new ArrayList<>() ]
+tuple_line_value_tuple returns [ List<Any3<Boolean, Integer, String>> s = new ArrayList<>() ]
                  : BRACE_OPEN_LIT
                    s0=tuple_value{ $s.add($s0.s); }
                    ( COMMA_LIT

@@ -31,37 +31,29 @@
  */
 package com.groupon.lex.metrics.config;
 
-import static com.groupon.lex.metrics.ConfigSupport.quotedString;
+import static com.groupon.lex.metrics.ConfigSupport.collectorConfigString;
 import com.groupon.lex.metrics.MetricRegistryInstance;
-import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.collector.collectd.CollectdPushCollector;
+import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
+import lombok.Value;
 
 /**
- *
- * @author ariane
+ * CollectorBuilderWrapper wraps a builder.
  */
-@Deprecated
-public class CollectdPushMonitor implements MonitorStatement {
-    private final String api_name_;
-    private final SimpleGroupPath base_name_;
-
-    public CollectdPushMonitor(String api_name, SimpleGroupPath base_name) {
-        api_name_ = api_name;
-        base_name_ = base_name;
-    }
+@Value
+public class CollectorBuilderWrapper implements MonitorStatement {
+    /** Collector name. */
+    private final String name;
+    /** Builder implementation. */
+    private final CollectorBuilder builder;
 
     @Override
     public void apply(MetricRegistryInstance registry) throws Exception {
-        registry.add(new CollectdPushCollector(registry.getApi(), base_name_, api_name_));
+        registry.add(builder.build(registry.getApi()));
     }
 
     @Override
     public StringBuilder configString() {
-        return new StringBuilder()
-                .append("collect collectd_push ")
-                .append(quotedString(api_name_))
-                .append(" as ")
-                .append(base_name_.configString())
-                .append(';');
+        return collectorConfigString(name, builder)
+                .append('\n');
     }
 }

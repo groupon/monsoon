@@ -32,7 +32,12 @@
 package com.groupon.lex.metrics.config;
 
 import com.groupon.lex.metrics.MetricRegistryInstance;
+import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
+import com.groupon.lex.metrics.collector.collectd.CollectdPushBuilder;
+import com.groupon.lex.metrics.collector.httpget.UrlGetBuilder;
+import com.groupon.lex.metrics.collector.httpget.UrlJsonBuilder;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
+import com.groupon.lex.metrics.jmx.JmxBuilder;
 import java.util.Collection;
 import java.util.Objects;
 import java.io.File;
@@ -45,38 +50,52 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import java.util.List;
 import java.util.Optional;
-import java.util.TreeSet;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.management.MalformedObjectNameException;
-import javax.management.ObjectName;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *
  * @author ariane
  */
 public class Configuration {
+    /**
+     * A mapping from collector name to collector builder.
+     *
+     * Contains all known collectors and is used by the parser to configure
+     * collectors.
+     * This Map is thread safe, it is fine to add new collectors at runtime.
+     *
+     * (You can also remove or replace collectors, but I'm not sure why you
+     * would want to do that.)
+     */
+    public static final Map<String, Class<? extends CollectorBuilder>> COLLECTORS;
+
+    static {
+        COLLECTORS = new ConcurrentHashMap<>();
+        COLLECTORS.put("url", UrlGetBuilder.class);
+        COLLECTORS.put("json_url", UrlJsonBuilder.class);
+        COLLECTORS.put("jmx_listener", JmxBuilder.class);
+        COLLECTORS.put("collectd_push", CollectdPushBuilder.class);
+    }
+
     private static Configuration defaultConfiguration_() {
-        try {
-            Configuration cfg = new Configuration(emptyList(),
-                    singleton(new JmxListenerMonitor(
-                            new TreeSet(Arrays.asList(new ObjectName("metrics:name=*"),
-                                    new ObjectName("java.lang:*"),
-                                    new ObjectName("java.lang.*:*"))),
-                            NameBoundResolver.EMPTY)),
-                    emptyList());
-            cfg.has_config_ = false;
-            return cfg;
-        } catch (MalformedObjectNameException ex) {
-            Logger.getLogger(Configuration.class.getName()).log(Level.SEVERE, "programmer fail", ex);
-            throw new RuntimeException("programmer fail", ex);
-        }
+        final JmxBuilder jmx_builder = new JmxBuilder();
+        jmx_builder.setMain(Arrays.asList("metrics:name=*", "java.lang:*", "java.lang.*:*"));
+        jmx_builder.setTagSet(NameBoundResolver.EMPTY);
+
+        Configuration cfg = new Configuration(emptyList(),
+                singleton(new CollectorBuilderWrapper("jmx_listener", jmx_builder)),
+                emptyList());
+        cfg.has_config_ = false;
+        return cfg;
     }
 
     public static Configuration DEFAULT = defaultConfiguration_();

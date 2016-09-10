@@ -53,6 +53,7 @@ import lombok.Value;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
 
 @Value
+@Deprecated
 public final class JmxListenerMonitor implements MonitorStatement {
     @NonNull
     private final SortedSet<ObjectName> includes;

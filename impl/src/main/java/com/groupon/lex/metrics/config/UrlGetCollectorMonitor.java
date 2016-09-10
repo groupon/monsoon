@@ -42,6 +42,7 @@ import com.groupon.lex.metrics.resolver.NameBoundResolver;
  *
  * @author ariane
  */
+@Deprecated
 public class UrlGetCollectorMonitor implements MonitorStatement {
     private final UrlPattern pattern_;
     private final SimpleGroupPath base_name_;
