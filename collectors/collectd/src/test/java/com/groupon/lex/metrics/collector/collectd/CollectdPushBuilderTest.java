@@ -32,23 +32,31 @@
 package com.groupon.lex.metrics.collector.collectd;
 
 import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.builders.collector.AcceptAsPath;
-import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
-import com.groupon.lex.metrics.builders.collector.MainString;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
+import static org.junit.Assert.assertEquals;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import org.mockito.runners.MockitoJUnitRunner;
 
-@Getter
-@Setter
-@ToString
-public class CollectdPushBuilder implements CollectorBuilder, MainString, AcceptAsPath {
-    private String main;
-    private SimpleGroupPath asPath;
+@RunWith(MockitoJUnitRunner.class)
+public class CollectdPushBuilderTest {
+    @Mock
+    private EndpointRegistration er;
 
-    @Override
-    public CollectdPushCollector build(EndpointRegistration er) throws Exception {
-        return new CollectdPushCollector(er, asPath, main);
+    @Test
+    public void constructor() throws Exception {
+        final CollectdPushBuilder builder = new CollectdPushBuilder();
+        builder.setAsPath(SimpleGroupPath.valueOf("foo", "bar"));
+        builder.setMain("bla");
+        final CollectdPushCollector collectd = builder.build(er);
+
+        assertEquals(SimpleGroupPath.valueOf("foo", "bar"), collectd.getBasePath());
+        verify(er, times(1)).addEndpoint(Mockito.eq(CollectdPushCollector.API_ENDPOINT_BASE + "bla"), Mockito.anyObject());
+        verifyNoMoreInteractions(er);
     }
 }
