@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.lib.Any2;
+import com.groupon.lex.metrics.lib.StringTemplate;
 import com.groupon.lex.metrics.resolver.SimpleBoundNameResolver;
 import com.groupon.lex.metrics.resolver.ConstResolver;
 import com.groupon.lex.metrics.resolver.NameBoundResolverSet;
@@ -190,5 +191,15 @@ public class UrlPatternTest {
                 hasEntry(H.group_("www.groupon.com", "8080"), "http://www.groupon.com:8080/"),
                 hasEntry(H.group_("www.groupon.com", "80"), "http://www.groupon.com:80/")
         ));
+    }
+
+    @Test(expected=NullPointerException.class)
+    public void noNullPtr_urlTemplate() {
+        new UrlPattern((StringTemplate)null, PARAMS);
+    }
+
+    @Test(expected=NullPointerException.class)
+    public void noNullPtr_params() {
+        new UrlPattern("foobar", null);
     }
 }

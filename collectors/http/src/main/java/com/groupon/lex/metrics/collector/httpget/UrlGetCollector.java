@@ -52,7 +52,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -74,6 +73,8 @@ import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.joda.time.Instant;
 import org.joda.time.Interval;
+import static java.util.Objects.requireNonNull;
+import lombok.Getter;
 
 /**
  *
@@ -83,8 +84,10 @@ public class UrlGetCollector implements GroupGenerator {
     private static final Logger LOG = Logger.getLogger(UrlGetCollector.class.getName());
     public static final int TIMEOUT_SECONDS = 10;
     public static final int OVERALL_TIMEOUT_SECONDS = 30;
-    private final SimpleGroupPath base_group_name_;
-    private final UrlPattern patterns_;
+    @Getter
+    private final SimpleGroupPath baseGroupName;
+    @Getter
+    private final UrlPattern patterns;
     private final RequestConfig request_config_ = RequestConfig.custom()
             .setConnectionRequestTimeout(TIMEOUT_SECONDS * 1000)
             .setConnectTimeout(TIMEOUT_SECONDS * 1000)
@@ -130,8 +133,8 @@ public class UrlGetCollector implements GroupGenerator {
     }
 
     public UrlGetCollector(SimpleGroupPath base_group_name, UrlPattern patterns) {
-        base_group_name_ = requireNonNull(base_group_name);
-        patterns_ = requireNonNull(patterns);
+        baseGroupName = requireNonNull(base_group_name);
+        this.patterns = requireNonNull(patterns);
     }
 
     private long get_len_from_stream_(ByteCountingInputStream in) throws IOException {
@@ -269,8 +272,7 @@ public class UrlGetCollector implements GroupGenerator {
             output_ = requireNonNull(output);
             args_ = requireNonNull(args);
             url_ = requireNonNull(url);
-            name_ = GroupName.valueOf(
-                    SimpleGroupPath.valueOf(Stream.of(base_group_name_, args.getPath())
+            name_ = GroupName.valueOf(SimpleGroupPath.valueOf(Stream.of(baseGroupName, args.getPath())
                             .map(SimpleGroupPath::getPath)
                             .flatMap(List::stream)
                             .collect(Collectors.toList())),
@@ -339,7 +341,7 @@ public class UrlGetCollector implements GroupGenerator {
         /* Collect all URLs. */
         final List<Future<MetricGroup>> urls;
         try {
-            urls = patterns_.getUrls()
+            urls = patterns.getUrls()
                     .map(x -> do_request_(x.getKey(), x.getValue()))
                     .collect(Collectors.toList());
         } catch (Exception ex) {

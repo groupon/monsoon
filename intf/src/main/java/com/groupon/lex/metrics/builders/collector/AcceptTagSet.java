@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -29,38 +29,20 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.config;
+package com.groupon.lex.metrics.builders.collector;
 
-import static com.groupon.lex.metrics.ConfigSupport.quotedString;
-import com.groupon.lex.metrics.MetricRegistryInstance;
-import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.collector.collectd.CollectdPushCollector;
+import com.groupon.lex.metrics.resolver.NameBoundResolver;
 
-/**
- *
- * @author ariane
- */
-public class CollectdPushMonitor implements MonitorStatement {
-    private final String api_name_;
-    private final SimpleGroupPath base_name_;
-
-    public CollectdPushMonitor(String api_name, SimpleGroupPath base_name) {
-        api_name_ = api_name;
-        base_name_ = base_name;
-    }
-
-    @Override
-    public void apply(MetricRegistryInstance registry) throws Exception {
-        registry.add(new CollectdPushCollector(registry.getApi(), base_name_, api_name_));
-    }
-
-    @Override
-    public StringBuilder configString() {
-        return new StringBuilder()
-                .append("collect collectd_push ")
-                .append(quotedString(api_name_))
-                .append(" as ")
-                .append(base_name_.configString())
-                .append(';');
-    }
+/** The collector accepts a tag set. */
+public interface AcceptTagSet {
+    /**
+     * Set the tag set used by the collector.
+     * @param args A resolver that emits the tags to be used by the collector.
+     */
+    public void setTagSet(NameBoundResolver args);
+    /**
+     * Get the tag set used by the collector.
+     * @return The resolver that was set by setTagSet() method.
+     */
+    public NameBoundResolver getTagSet();
 }

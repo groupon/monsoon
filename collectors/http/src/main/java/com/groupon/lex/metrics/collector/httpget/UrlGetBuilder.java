@@ -29,46 +29,29 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.config;
+package com.groupon.lex.metrics.collector.httpget;
 
-import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.collector.httpget.UrlGetCollector;
-import com.groupon.lex.metrics.collector.httpget.UrlPattern;
-import lombok.NonNull;
+import com.groupon.lex.metrics.builders.collector.AcceptAsPath;
+import com.groupon.lex.metrics.builders.collector.AcceptTagSet;
+import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
+import com.groupon.lex.metrics.builders.collector.MainString;
+import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
-/**
- *
- * @author ariane
- */
-public class UrlGetCollectorMonitor implements MonitorStatement {
-    private final UrlPattern pattern_;
-    private final SimpleGroupPath base_name_;
-
-    public UrlGetCollectorMonitor(@NonNull SimpleGroupPath base_name, @NonNull String pattern, @NonNull NameBoundResolver args) {
-        pattern_ = new UrlPattern(pattern, args);
-        base_name_ = base_name;
-    }
+@Getter
+@Setter
+@ToString
+public class UrlGetBuilder implements CollectorBuilder, MainString, AcceptAsPath, AcceptTagSet {
+    private SimpleGroupPath asPath;
+    private NameBoundResolver tagSet;
+    private String main;
 
     @Override
-    public void apply(MetricRegistryInstance registry) throws Exception {
-        registry.add(new UrlGetCollector(base_name_, pattern_));
-    }
-
-    @Override
-    public StringBuilder configString() {
-        final StringBuilder buf = new StringBuilder()
-                .append("collect url ")
-                .append(pattern_.getUrlTemplate().configString())
-                .append(" as ")
-                .append(base_name_.configString());
-
-        if (!pattern_.getTemplateArgs().isEmpty())
-            buf.append(pattern_.getTemplateArgs().configString());
-        else
-            buf.append(';');
-
-        return buf.append('\n');
+    public UrlGetCollector build(EndpointRegistration er) throws Exception {
+        return new UrlGetCollector(asPath, new UrlPattern(main, tagSet));
     }
 }

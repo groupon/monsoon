@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.GroupGenerator;
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.jmx.JmxBuilder;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.Any3;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
@@ -42,7 +43,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.EMPTY_MAP;
-import static java.util.Collections.EMPTY_SET;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import java.util.HashMap;
@@ -68,6 +68,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -82,23 +83,28 @@ public class JmxListenerMonitorTest {
     @Mock
     private MetricRegistryInstance mri;
 
-    private Set<ObjectName> no_names, one_name, two_names;
-    private JmxListenerMonitor mon_noNames, mon_oneName, mon_twoNames;
+    private Set<ObjectName> one_name, two_names;
+    private CollectorBuilderWrapper mon_oneName, mon_twoNames;
     /** mri.add(GroupGenerator) adds to this collection. */
     private List<GroupGenerator> listeners;
 
+    private static JmxBuilder newJmxBuilder(Set<ObjectName> names, NameBoundResolver resolver) {
+        JmxBuilder builder = new JmxBuilder();
+        builder.setMain(names.stream().map(ObjectName::toString).collect(Collectors.toList()));
+        builder.setTagSet(resolver);
+        return builder;
+    }
+
     @Before
     public void setup() throws Exception {
-        no_names = EMPTY_SET;
         one_name = singleton(new ObjectName("java.lang.*:*"));
         two_names = new HashSet<ObjectName>() {{
             add(new ObjectName("java.lang.*:*"));
             add(new ObjectName("com.groupon.*:*"));
         }};
 
-        mon_noNames = new JmxListenerMonitor(no_names, nbr);
-        mon_oneName = new JmxListenerMonitor(one_name, nbr);
-        mon_twoNames = new JmxListenerMonitor(two_names, nbr);
+        mon_oneName = new CollectorBuilderWrapper("jmx_listener", newJmxBuilder(one_name, nbr));
+        mon_twoNames = new CollectorBuilderWrapper("jmx_listener", newJmxBuilder(two_names, nbr));
 
         listeners = new ArrayList<>();
         when(mri.add(Mockito.isA(GroupGenerator.class))).then(invocation -> {
@@ -120,17 +126,6 @@ public class JmxListenerMonitorTest {
     }
 
     @Test
-    public void configStrings_noNames_noNBR() {
-        when(nbr.isEmpty()).thenReturn(true);
-
-        assertEquals("collect jmx_listener;\n",
-                mon_noNames.configString().toString());
-
-        verify(nbr, times(1)).isEmpty();
-        verifyNoMoreInteractions(nbr);
-    }
-
-    @Test
     public void configStrings_oneName_noNBR() {
         when(nbr.isEmpty()).thenReturn(true);
 
@@ -149,19 +144,6 @@ public class JmxListenerMonitorTest {
                 mon_twoNames.configString().toString());
 
         verify(nbr, times(1)).isEmpty();
-        verifyNoMoreInteractions(nbr);
-    }
-
-    @Test
-    public void configStrings_noNames_withNBR() {
-        when(nbr.isEmpty()).thenReturn(false);
-        when(nbr.configString()).thenReturn("{FOOBAR}");
-
-        assertEquals("collect jmx_listener {FOOBAR}\n",
-                mon_noNames.configString().toString());
-
-        verify(nbr, times(1)).isEmpty();
-        verify(nbr, times(1)).configString();
         verifyNoMoreInteractions(nbr);
     }
 
@@ -205,6 +187,7 @@ public class JmxListenerMonitorTest {
 
         verify(nbr, times(1)).resolve();
         verify(mri, times(1)).add(Mockito.any());
+        verify(mri, atLeast(0)).getApi();
         verifyNoMoreInteractions(mri, nbr);
     }
 
@@ -222,6 +205,7 @@ public class JmxListenerMonitorTest {
 
         verify(nbr, times(1)).resolve();
         verify(mri, times(1)).add(Mockito.any());
+        verify(mri, atLeast(0)).getApi();
         verifyNoMoreInteractions(mri, nbr);
     }
 
@@ -260,6 +244,7 @@ public class JmxListenerMonitorTest {
 
         verify(nbr, times(1)).resolve();
         verify(mri, times(1)).add(Mockito.any());
+        verify(mri, atLeast(0)).getApi();
         verifyNoMoreInteractions(mri, nbr);
     }
 
@@ -296,6 +281,7 @@ public class JmxListenerMonitorTest {
 
         verify(nbr, times(1)).resolve();
         verify(mri, times(1)).add(Mockito.any());
+        verify(mri, atLeast(0)).getApi();
         verifyNoMoreInteractions(mri, nbr);
     }
 

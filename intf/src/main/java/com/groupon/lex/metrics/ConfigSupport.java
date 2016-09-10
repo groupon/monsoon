@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -31,6 +31,14 @@
  */
 package com.groupon.lex.metrics;
 
+import com.groupon.lex.metrics.builders.collector.AcceptAsPath;
+import com.groupon.lex.metrics.builders.collector.AcceptOptAsPath;
+import com.groupon.lex.metrics.builders.collector.AcceptTagSet;
+import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
+import com.groupon.lex.metrics.builders.collector.MainNone;
+import com.groupon.lex.metrics.builders.collector.MainString;
+import com.groupon.lex.metrics.builders.collector.MainStringList;
+import com.groupon.lex.metrics.resolver.NameBoundResolver;
 import static java.util.Collections.unmodifiableSet;
 import java.util.HashSet;
 import java.util.Set;
@@ -39,6 +47,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import static java.util.regex.Pattern.CANON_EQ;
+import java.util.stream.Collectors;
+import lombok.NonNull;
 import org.joda.time.Duration;
 
 /**
@@ -224,5 +234,76 @@ public class ConfigSupport {
         }
 
         return result;
+    }
+
+    /**
+     * Create a config string for a builder.
+     *
+     * The function may fail if the builder has not been fully initialized.
+     * @param name The name of the collector.
+     * @param builder The builder implementation used to create collectors.
+     * @return A string with the collect statement.
+     *     The statement will be closed (either with a tag set or a semi-colon).
+     *     The string will not have a trailing new-line.
+     */
+    public static StringBuilder collectorConfigString(@NonNull String name, @NonNull CollectorBuilder builder) {
+        StringBuilder buf = new StringBuilder()
+                .append("collect ")
+                .append(name);
+
+        /*
+         * Handle main argument.
+         */
+        if (builder instanceof MainNone) {
+            /* SKIP */
+        }
+        if (builder instanceof MainString) {
+            buf
+                    .append(' ')
+                    .append(quotedString(((MainString)builder).getMain()).toString());
+        }
+        if (builder instanceof MainStringList) {
+            buf
+                    .append(' ')
+                    .append(((MainStringList)builder).getMain().stream()
+                            .map(ConfigSupport::quotedString)
+                            .collect(Collectors.joining(", ")));
+        }
+
+        /*
+         * Hande asPath argument.
+         */
+        if (builder instanceof AcceptAsPath) {
+            buf
+                    .append(" as ")
+                    .append(((AcceptAsPath)builder).getAsPath().configString());
+        }
+        if (builder instanceof AcceptOptAsPath) {
+            ((AcceptOptAsPath)builder).getAsPath()
+                    .ifPresent(path -> {
+                        buf
+                                .append(" as ")
+                                .append(path.configString());
+                    });
+        }
+
+        /*
+         * Handle tag set.
+         * If the collector has no tag set, the collector is closed using a semi-colon.
+         */
+        if (builder instanceof AcceptTagSet) {
+            final NameBoundResolver tagSet = ((AcceptTagSet)builder).getTagSet();
+            if (tagSet.isEmpty()) {
+                buf.append(';');  // Empty tag set has no meaningful config string.
+            } else {
+                buf
+                        .append(' ')
+                        .append(tagSet.configString());
+            }
+        } else {
+            buf.append(';');
+        }
+
+        return buf;
     }
 }

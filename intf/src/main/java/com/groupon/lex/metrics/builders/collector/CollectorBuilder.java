@@ -29,47 +29,39 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.config;
+package com.groupon.lex.metrics.builders.collector;
 
-import com.groupon.lex.metrics.MetricRegistryInstance;
-import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.collector.httpget.UrlJsonCollector;
-import com.groupon.lex.metrics.collector.httpget.UrlPattern;
-import static java.util.Objects.requireNonNull;
-import com.groupon.lex.metrics.resolver.NameBoundResolver;
-import static java.util.Objects.requireNonNull;
+import com.groupon.lex.metrics.GroupGenerator;
+import com.groupon.lex.metrics.httpd.EndpointRegistration;
 
 /**
+ * Builder interface for a collector.
  *
+ * An implementation of this class must:
+ * <ol>
+ *   <li>implement at least one of the Main* classes: MainNone, MainString or MainStringList</li>
+ * </ol>
+ *
+ * An implementation of this class may:
+ * <ol>
+ *   <li>implement one of AcceptAsPath, AcceptOptAsPath</li>
+ *   <li>implement AcceptTagSet</li>
+ * </ol>
+ *
+ * These extra interfaces are used to instruct the parser to handle the collector
+ * statements appropriately.
  * @author ariane
  */
-public class JsonUrlMonitor implements MonitorStatement {
-    private final UrlPattern pattern_;
-    private final SimpleGroupPath base_name_;
-
-    public JsonUrlMonitor(SimpleGroupPath base_name, String pattern, NameBoundResolver args) {
-        pattern_ = new UrlPattern(pattern, args);
-        base_name_ = requireNonNull(base_name);
-    }
-
-    @Override
-    public void apply(MetricRegistryInstance registry) throws Exception {
-        registry.add(new UrlJsonCollector(base_name_, pattern_));
-    }
-
-    @Override
-    public StringBuilder configString() {
-        final StringBuilder buf = new StringBuilder()
-                .append("collect json_url ")
-                .append(pattern_.getUrlTemplate().configString())
-                .append(" as ")
-                .append(base_name_.configString());
-
-        if (!pattern_.getTemplateArgs().isEmpty())
-            buf.append(pattern_.getTemplateArgs().configString());
-        else
-            buf.append(';');
-
-        return buf.append('\n');
-    }
+public interface CollectorBuilder {
+    /**
+     * Create the actual collector.
+     *
+     * The parser will call each of the setters from the Main* and Accept*
+     * base classes of the implementation exactly once, before calling this function.
+     * The function must be able to return multiple instances of the collector.
+     * @param er Endpoint registration API. Used for registering HTTP endpoints.
+     * @return A GroupGenerator implementation that performs the desired collection.
+     * @throws Exception If the implementation fails to create the collector.
+     */
+    public GroupGenerator build(EndpointRegistration er) throws Exception;
 }
