@@ -12,6 +12,7 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import org.junit.Before;
@@ -206,5 +207,125 @@ public class ExpressionLookBackTest {
                         )
                         .map(Matchers::sameInstance).collect(Collectors.toList())));
         verifyNoMoreInteractions(mockLookBack1, mockLookBack2, tsc0, tsc1);
+    }
+
+    @Test
+    public void interval_equality() {
+        ChainableExpressionLookBack a = ExpressionLookBack.fromInterval(Duration.ZERO),
+                b = ExpressionLookBack.fromInterval(Duration.ZERO);
+
+        assertEquals(a.hashCode(), b.hashCode());
+        assertEquals(a, b);
+    }
+
+    @Test
+    public void interval_inequality() {
+        ChainableExpressionLookBack a = ExpressionLookBack.fromInterval(Duration.standardMinutes(5)),
+                b = ExpressionLookBack.fromInterval(Duration.standardMinutes(4)),
+                c = ExpressionLookBack.fromScrapeCount(1);
+
+        assertNotEquals(a, b);
+        assertNotEquals(a, c);
+    }
+
+    @Test
+    public void interval_durationHint() {
+        ChainableExpressionLookBack a = ExpressionLookBack.fromInterval(Duration.standardMinutes(5));
+
+        assertEquals(Duration.standardMinutes(5), a.hintDuration());
+    }
+
+    @Test
+    public void interval_durationHint_chained() {
+        ExpressionLookBack a = ExpressionLookBack.fromInterval(Duration.standardMinutes(2))
+                .andThen(ExpressionLookBack.fromInterval(Duration.standardMinutes(3)));
+
+        assertEquals(Duration.standardMinutes(5), a.hintDuration());
+    }
+
+    @Test
+    public void interval_durationHint_chainedStream() {
+        ExpressionLookBack a = ExpressionLookBack.fromInterval(Duration.standardMinutes(2))
+                .andThen(Stream.of(Duration.standardMinutes(3), Duration.standardMinutes(2)).map(ExpressionLookBack::fromInterval));
+
+        assertEquals(Duration.standardMinutes(5), a.hintDuration());
+    }
+
+    @Test
+    public void scrapeCount_equality() {
+        ChainableExpressionLookBack a = ExpressionLookBack.fromScrapeCount(5),
+                b = ExpressionLookBack.fromScrapeCount(5);
+
+        assertEquals(a.hashCode(), b.hashCode());
+        assertEquals(a, b);
+    }
+
+    @Test
+    public void scrapeCount_inequality() {
+        ChainableExpressionLookBack a = ExpressionLookBack.fromScrapeCount(5),
+                b = ExpressionLookBack.fromScrapeCount(4),
+                c = ExpressionLookBack.fromInterval(Duration.standardMinutes(5));
+
+        assertNotEquals(a, b);
+        assertNotEquals(a, c);
+    }
+
+    @Test
+    public void scrapeCount_durationHint() {
+        ChainableExpressionLookBack a = ExpressionLookBack.fromScrapeCount(5);
+
+        assertEquals(Duration.ZERO, a.hintDuration());
+    }
+
+    @Test
+    public void scrapeCount_durationHint_chained() {
+        ExpressionLookBack a = ExpressionLookBack.fromScrapeCount(2)
+                .andThen(ExpressionLookBack.fromInterval(Duration.standardMinutes(5)));
+
+        assertEquals(Duration.standardMinutes(5), a.hintDuration());
+    }
+
+    @Test
+    public void scrapeCount_durationHint_chainedStream() {
+        ExpressionLookBack a = ExpressionLookBack.fromScrapeCount(2)
+                .andThen(Stream.of(Duration.standardMinutes(5), Duration.standardMinutes(4)).map(ExpressionLookBack::fromInterval));
+
+        assertEquals(Duration.standardMinutes(5), a.hintDuration());
+    }
+
+    @Test
+    public void empty_equality() {
+        assertTrue(ExpressionLookBack.EMPTY.equals(ExpressionLookBack.EMPTY));
+    }
+
+    @Test
+    public void empty_durationHint() {
+        assertEquals(Duration.ZERO, ExpressionLookBack.EMPTY.hintDuration());
+    }
+
+    @Test
+    public void empty_durationHint_chained() {
+        ExpressionLookBack a = ExpressionLookBack.EMPTY
+                .andThen(ExpressionLookBack.fromInterval(Duration.standardMinutes(5)));
+
+        assertEquals(Duration.standardMinutes(5), a.hintDuration());
+    }
+
+    @Test
+    public void empty_durationHint_chainedStream() {
+        ExpressionLookBack a = ExpressionLookBack.EMPTY
+                .andThen(Stream.of(Duration.standardMinutes(5), Duration.standardMinutes(4)).map(ExpressionLookBack::fromInterval));
+
+        assertEquals(Duration.standardMinutes(5), a.hintDuration());
+    }
+
+    @Test(expected=IllegalArgumentException.class)
+    public void interval_noNegativeDuration() {
+        ExpressionLookBack.fromInterval(Duration.millis(-1));
+    }
+
+    @Test(expected=NullPointerException.class)
+    public void interval_noNullDuration() {
+        ExpressionLookBack.fromInterval(null);
     }
 }
