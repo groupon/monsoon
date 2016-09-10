@@ -36,16 +36,22 @@ import static com.groupon.lex.metrics.ConfigSupport.quotedString;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.PushMetricRegistryInstance;
 import com.groupon.lex.metrics.expression.LiteralGroupExpression;
+import com.groupon.lex.metrics.jmx.JmxBuilder;
 import com.groupon.lex.metrics.transformers.LiteralNameResolver;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.StringReader;
 import java.util.Arrays;
-import static java.util.Collections.singleton;
-import java.util.Set;
+import java.util.Collection;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import javax.management.ObjectName;
+import org.hamcrest.Matchers;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasProperty;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -116,14 +122,19 @@ public class ConfigurationTest {
         assertFalse(cfg.needsResolve());
 
         MonitorStatement mon = cfg.getMonitors().iterator().next();
-        assertTrue("monitor is a jmx listener", mon instanceof JmxListenerMonitor);
-        JmxListenerMonitor mon_impl = (JmxListenerMonitor)mon;
-        assertEquals("monitor listens for \"java.lang:*\"", singleton(new ObjectName("java.lang:*")), mon_impl.getIncludes());
+        assertThat("monitor is a CollectorBuilderWrapper", mon, instanceOf(CollectorBuilderWrapper.class));
+        assertThat("monitor builder is a jmx builder", mon,
+                hasProperty("builder", instanceOf(JmxBuilder.class)));
+        assertThat("monitor listens for \"java.lang:*\"", mon,
+                hasProperty("builder", hasProperty("main", contains("java.lang:*"))));
     }
 
     @Test
     public void multilineListenerStatement() throws Exception {
-        final Set<ObjectName> expected = new TreeSet<ObjectName>(Arrays.asList(new ObjectName("java.lang:*"), new ObjectName("metrics:*")));
+        final Collection expected = new TreeSet<ObjectName>(Arrays.asList(new ObjectName("java.lang:*"), new ObjectName("metrics:*"))).stream()
+                .map(ObjectName::toString)
+                .map(Matchers::equalTo)
+                .collect(Collectors.toList());
         Configuration cfg = Configuration.readFromFile(null, new StringReader("collect jmx_listener \"java.lang:*\", \"metrics:*\";"));
 
         assertTrue("no imports", cfg.getImports().isEmpty());
@@ -133,9 +144,11 @@ public class ConfigurationTest {
         assertFalse(cfg.needsResolve());
 
         MonitorStatement mon = cfg.getMonitors().iterator().next();
-        assertTrue("monitor is a jmx listener", mon instanceof JmxListenerMonitor);
-        JmxListenerMonitor mon_impl = (JmxListenerMonitor)mon;
-        assertEquals("monitor listens for \"java.lang:*\"", expected, mon_impl.getIncludes());
+        assertThat("monitor is a CollectorBuilderWrapper", mon, instanceOf(CollectorBuilderWrapper.class));
+        assertThat("monitor builder is a jmx builder", mon,
+                hasProperty("builder", instanceOf(JmxBuilder.class)));
+        assertThat("monitor listens for \"java.lang:*\"", mon,
+                hasProperty("builder", hasProperty("main", containsInAnyOrder(expected))));
     }
 
     @Test
