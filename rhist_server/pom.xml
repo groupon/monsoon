@@ -1,0 +1,88 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.github.groupon.monsoon</groupId>
+        <artifactId>monsoon-basepom</artifactId>
+        <version>2.1-SNAPSHOT</version>
+    </parent>
+    <artifactId>monsoon-rhist-server</artifactId>
+    <packaging>jar</packaging>
+    <name>Mon-soon remote history server</name>
+    <url>https://github.com/groupon/monsoon</url>
+
+    <scm>
+        <connection>scm:git:github.com:groupon/monsoon.git</connection>
+        <developerConnection>scm:git:github.com:groupon/monsoon.git</developerConnection>
+        <url>https://github.com/groupon/monsoon</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.build.targetJdk>1.8</project.build.targetJdk>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.github.groupon.monsoon</groupId>
+            <artifactId>monsoon-history</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.groupon.monsoon</groupId>
+            <artifactId>monsoon-remote-history</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>args4j</groupId>
+            <artifactId>args4j</artifactId>
+            <version>2.33</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.2</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <compilerReuseStrategy>alwaysNew</compilerReuseStrategy>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>2.10.3</version>
+                <configuration>
+                    <source>1.8</source>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>2.4.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <manifestEntries>
+					    <Main-Class>com.groupon.monsoon.remote.history.server.RhistMain</Main-Class>
+                                    </manifestEntries>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

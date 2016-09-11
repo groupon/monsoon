@@ -1,6 +1,5 @@
 package com.groupon.lex.metrics.history;
 
-import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.lib.SkippingIterator;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -9,10 +8,11 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Collection;
 import java.util.Map;
-import java.util.concurrent.ForkJoinPool;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -62,58 +62,53 @@ public interface CollectHistory {
 
     /** Return a History Context for evaluating expressions. */
     public default Stream<Context> getContext(Duration stepsize, ExpressionLookBack lookback) {
-        return BufferedIterator.stream(ForkJoinPool.commonPool(), HistoryContext.stream(stream(stepsize), lookback));
+        return HistoryContext.stream(stream(stepsize), lookback);
     }
 
     /** Return a History Context for evaluating expressions, starting at the 'begin' timestamp (inclusive). */
     public default Stream<Context> getContext(DateTime begin, Duration stepsize, ExpressionLookBack lookback) {
-        return BufferedIterator.stream(ForkJoinPool.commonPool(), HistoryContext.stream(stream(begin.minus(lookback.hintDuration()), stepsize), lookback)
-                .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin)));
+        return HistoryContext.stream(stream(begin.minus(lookback.hintDuration()), stepsize), lookback)
+                .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin));
     }
 
     /** Return a History Context for evaluating expressions, between the 'begin' timestamp (inclusive) and the 'end' timestamp (inclusive). */
     public default Stream<Context> getContext(DateTime begin, DateTime end, Duration stepsize, ExpressionLookBack lookback) {
-        return BufferedIterator.stream(ForkJoinPool.commonPool(), HistoryContext.stream(stream(begin.minus(lookback.hintDuration()), end, stepsize), lookback)
-                .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin)));
+        return HistoryContext.stream(stream(begin.minus(lookback.hintDuration()), end, stepsize), lookback)
+                .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin));
     }
 
     /** Evaluate expression over time. */
     public default Stream<Collection<NamedEvaluation>> evaluate(Map<String, ? extends TimeSeriesMetricExpression> expression, Duration stepsize) {
         final ExpressionLookBack lookback = ExpressionLookBack.EMPTY.andThen(expression.values().stream().map(TimeSeriesMetricExpression::getLookBack));
-        return getContext(stepsize, lookback)
-                .map(ctx -> {
-                    return expression.entrySet().stream()
-                            .map(eval -> {
-                                return new NamedEvaluation(eval.getKey(), ctx.getTSData().getCurrentCollection().getTimestamp(), eval.getValue().apply(ctx));
-                            })
-                            .collect(Collectors.toList());
-                });
+        return new ApplyExpressions(expression).apply(getContext(stepsize, lookback));
     }
 
     /** Evaluate expression over time, starting at the 'begin' timestamp (inclusive). */
     public default Stream<Collection<NamedEvaluation>> evaluate(Map<String, ? extends TimeSeriesMetricExpression> expression, DateTime begin, Duration stepsize) {
         final ExpressionLookBack lookback = ExpressionLookBack.EMPTY.andThen(expression.values().stream().map(TimeSeriesMetricExpression::getLookBack));
-        return getContext(begin, stepsize, lookback)
-                .map(ctx -> {
-                    return expression.entrySet().stream()
-                            .map(eval -> {
-                                return new NamedEvaluation(eval.getKey(), ctx.getTSData().getCurrentCollection().getTimestamp(), eval.getValue().apply(ctx));
-                            })
-                            .collect(Collectors.toList());
-                });
+        return new ApplyExpressions(expression).apply(getContext(begin, stepsize, lookback));
     }
 
     /** Evaluate expression over time, between the 'begin' timestamp (inclusive) and the 'end' timestamp (inclusive). */
     public default Stream<Collection<NamedEvaluation>> evaluate(Map<String, ? extends TimeSeriesMetricExpression> expression, DateTime begin, DateTime end, Duration stepsize) {
         final ExpressionLookBack lookback = ExpressionLookBack.EMPTY.andThen(expression.values().stream().map(TimeSeriesMetricExpression::getLookBack));
-        return getContext(begin, end, stepsize, lookback)
-                .map(ctx -> {
-                    return expression.entrySet().stream()
-                            .map(eval -> {
-                                return new NamedEvaluation(eval.getKey(), ctx.getTSData().getCurrentCollection().getTimestamp(), eval.getValue().apply(ctx));
-                            })
-                            .collect(Collectors.toList());
-                });
+        return new ApplyExpressions(expression).apply(getContext(begin, end, stepsize, lookback));
+    }
+
+    @RequiredArgsConstructor
+    public static class ApplyExpressions implements Function<Stream<Context>, Stream<Collection<NamedEvaluation>>> {
+        private final Map<String, ? extends TimeSeriesMetricExpression> expression;
+
+        @Override
+        public Stream<Collection<NamedEvaluation>> apply(Stream<Context> ctxStream) {
+            return ctxStream.map(ctx -> {
+                return expression.entrySet().stream()
+                        .map(eval -> {
+                            return new NamedEvaluation(eval.getKey(), ctx.getTSData().getCurrentCollection().getTimestamp(), eval.getValue().apply(ctx));
+                        })
+                        .collect(Collectors.toList());
+            });
+        }
     }
 
     @Value
