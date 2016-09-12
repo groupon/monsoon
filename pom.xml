@@ -56,6 +56,8 @@
         <module>impl</module>
         <module>api_server</module>
         <module>history</module>
+        <module>remote_history</module>
+        <module>rhist_server</module>
         <module>prometheus</module>
         <module>verify</module>
         <module>file_convert</module>
@@ -173,9 +175,14 @@
 
                         <!-- XDR generated code -->
                         <exclude>com/groupon/lex/metrics/history/v*/xdr/[a-z]*.class</exclude>
+                        <exclude>com/groupon/monsoon/remote/history/xdr/*.class</exclude>
 
                         <!-- Lombok generated code -->
                         <exclude>com/groupon/lex/metrics/config/MatchStatement$IdentifierPair.class</exclude>
+
+                        <exclude>com/groupon/monsoon/remote/history/EncDec$NewIterResponse.class</exclude>
+                        <exclude>com/groupon/monsoon/remote/history/EncDec$IterSuccessResponseImpl.class</exclude>
+                        <exclude>com/groupon/monsoon/remote/history/EncDec$IterErrorResponse.class</exclude>
 
                         <!-- Plain enums -->
                         <exclude>com/groupon/lex/metrics/timeseries/AlertState.class</exclude>

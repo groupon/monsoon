@@ -1,7 +1,6 @@
 package com.groupon.lex.metrics.timeseries;
 
 import com.groupon.lex.metrics.history.CollectHistory;
-import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.lib.ForwardIterator;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -11,7 +10,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Optional;
-import java.util.concurrent.ForkJoinPool;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -41,7 +39,7 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
 
         Stream<TimeSeriesCollection> filtered;
         try {
-            filtered = lookback.filter(new ForwardIterator<>(BufferedIterator.stream(ForkJoinPool.commonPool(), history.streamReversed()).iterator()));
+            filtered = lookback.filter(new ForwardIterator<>(history.streamReversed().iterator()));
         } catch (UnsupportedOperationException ex) {
             LOG.log(Level.WARNING, "history reverse streaming not supported, fallback to duration hint");
             final DateTime end = history.getEnd();
