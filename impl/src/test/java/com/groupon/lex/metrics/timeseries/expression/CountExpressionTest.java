@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -35,6 +35,8 @@ import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.timeseries.TagAggregationClause;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Optional;
+import org.joda.time.Duration;
 import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 
@@ -45,22 +47,29 @@ import org.junit.Test;
 public class CountExpressionTest {
     @Test
     public void no_arg_constructor() {
-        final CountExpression expr = new CountExpression(Collections.EMPTY_LIST, TagAggregationClause.DEFAULT);
+        final CountExpression expr = new CountExpression(Collections.EMPTY_LIST, TagAggregationClause.DEFAULT, Optional.empty());
 
         assertEquals("count()", expr.configString().toString());
     }
 
     @Test
     public void arg1_constructor() {
-        final CountExpression expr = new CountExpression(Arrays.asList(Any2.right(Util.constantExpression("foobar"))), TagAggregationClause.DEFAULT);
+        final CountExpression expr = new CountExpression(Arrays.asList(Any2.right(Util.constantExpression("foobar"))), TagAggregationClause.DEFAULT, Optional.empty());
 
         assertEquals("count(\"foobar\")", expr.configString().toString());
     }
 
     @Test
     public void arg2_constructor() {
-        final CountExpression expr = new CountExpression(Arrays.asList(Any2.right(Util.constantExpression("foobar")), Any2.right(Util.constantExpression(17))), TagAggregationClause.DEFAULT);
+        final CountExpression expr = new CountExpression(Arrays.asList(Any2.right(Util.constantExpression("foobar")), Any2.right(Util.constantExpression(17))), TagAggregationClause.DEFAULT, Optional.empty());
 
         assertEquals("count(\"foobar\", 17)", expr.configString().toString());
+    }
+
+    @Test
+    public void duration_constructor() {
+        final CountExpression expr = new CountExpression(Arrays.asList(Any2.right(Util.constantExpression("foobar"))), TagAggregationClause.DEFAULT, Optional.of(Duration.standardMinutes(5)));
+
+        assertEquals("count[5m](\"foobar\")", expr.configString().toString());
     }
 }

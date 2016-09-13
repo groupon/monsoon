@@ -13,6 +13,7 @@ import org.joda.time.Duration;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public class AbstractTSCPairTest {
@@ -137,6 +138,82 @@ public class AbstractTSCPairTest {
         assertEquals(input.get(4).getTimestamp(), impl.getPreviousCollectionPair(delta2).getPreviousCollection(2).get().getTimestamp());
         assertEquals(input.get(5).getTimestamp(), impl.getPreviousCollectionPair(delta2).getPreviousCollection(3).get().getTimestamp());
         assertEquals(Optional.empty(), impl.getPreviousCollectionPair(delta2).getPreviousCollection(4));
+    }
+
+    @Test
+    public void previousPairsSince_exact() {
+        final Duration delta2 = Duration.standardMinutes(2);
+        setup(ExpressionLookBack.fromScrapeCount(5));
+
+        assertEquals("this test checks that the oldest collection has the same timestamp as was requested and is included",
+                input.get(2).getTimestamp(), input.get(0).getTimestamp().minus(delta2));
+
+        List<TimeSeriesCollectionPair> pairs = impl.getCollectionPairsSince(delta2);
+
+        // 2 minutes in the past
+        assertEquals(input.get(2).getTimestamp(), pairs.get(0).getPreviousCollection(0).get().getTimestamp());
+        assertEquals(input.get(3).getTimestamp(), pairs.get(0).getPreviousCollection(1).get().getTimestamp());
+        assertEquals(input.get(4).getTimestamp(), pairs.get(0).getPreviousCollection(2).get().getTimestamp());
+        assertEquals(input.get(5).getTimestamp(), pairs.get(0).getPreviousCollection(3).get().getTimestamp());
+        assertEquals(Optional.empty(), pairs.get(0).getPreviousCollection(4));
+
+        // 1 minute in the past
+        assertEquals(input.get(1).getTimestamp(), pairs.get(1).getPreviousCollection(0).get().getTimestamp());
+        assertEquals(input.get(2).getTimestamp(), pairs.get(1).getPreviousCollection(1).get().getTimestamp());
+        assertEquals(input.get(3).getTimestamp(), pairs.get(1).getPreviousCollection(2).get().getTimestamp());
+        assertEquals(input.get(4).getTimestamp(), pairs.get(1).getPreviousCollection(3).get().getTimestamp());
+        assertEquals(input.get(5).getTimestamp(), pairs.get(1).getPreviousCollection(4).get().getTimestamp());
+        assertEquals(Optional.empty(), pairs.get(1).getPreviousCollection(5));
+
+        // current collection
+        assertEquals(input.get(0).getTimestamp(), pairs.get(2).getPreviousCollection(0).get().getTimestamp());
+        assertEquals(input.get(1).getTimestamp(), pairs.get(2).getPreviousCollection(1).get().getTimestamp());
+        assertEquals(input.get(2).getTimestamp(), pairs.get(2).getPreviousCollection(2).get().getTimestamp());
+        assertEquals(input.get(3).getTimestamp(), pairs.get(2).getPreviousCollection(3).get().getTimestamp());
+        assertEquals(input.get(4).getTimestamp(), pairs.get(2).getPreviousCollection(4).get().getTimestamp());
+        assertEquals(input.get(5).getTimestamp(), pairs.get(2).getPreviousCollection(5).get().getTimestamp());
+        assertEquals(Optional.empty(), pairs.get(2).getPreviousCollection(6));
+
+        assertEquals(3, pairs.size());
+    }
+
+    @Test
+    public void previousPairsSince_inexact() {
+        final Duration delta2 = Duration.standardMinutes(2).plus(Duration.standardSeconds(17));
+        setup(ExpressionLookBack.fromScrapeCount(5));
+
+        assertTrue("this test checks that the oldest collection has the first timestamp after what was requested",
+                input.get(2).getTimestamp().isAfter(input.get(0).getTimestamp().minus(delta2)));
+        assertTrue("this test checks that the oldest collection has the first timestamp after what was requested",
+                input.get(3).getTimestamp().isBefore(input.get(0).getTimestamp().minus(delta2)));
+
+        List<TimeSeriesCollectionPair> pairs = impl.getCollectionPairsSince(delta2);
+
+        // 2 minutes in the past
+        assertEquals(input.get(2).getTimestamp(), pairs.get(0).getPreviousCollection(0).get().getTimestamp());
+        assertEquals(input.get(3).getTimestamp(), pairs.get(0).getPreviousCollection(1).get().getTimestamp());
+        assertEquals(input.get(4).getTimestamp(), pairs.get(0).getPreviousCollection(2).get().getTimestamp());
+        assertEquals(input.get(5).getTimestamp(), pairs.get(0).getPreviousCollection(3).get().getTimestamp());
+        assertEquals(Optional.empty(), pairs.get(0).getPreviousCollection(4));
+
+        // 1 minute in the past
+        assertEquals(input.get(1).getTimestamp(), pairs.get(1).getPreviousCollection(0).get().getTimestamp());
+        assertEquals(input.get(2).getTimestamp(), pairs.get(1).getPreviousCollection(1).get().getTimestamp());
+        assertEquals(input.get(3).getTimestamp(), pairs.get(1).getPreviousCollection(2).get().getTimestamp());
+        assertEquals(input.get(4).getTimestamp(), pairs.get(1).getPreviousCollection(3).get().getTimestamp());
+        assertEquals(input.get(5).getTimestamp(), pairs.get(1).getPreviousCollection(4).get().getTimestamp());
+        assertEquals(Optional.empty(), pairs.get(1).getPreviousCollection(5));
+
+        // current collection
+        assertEquals(input.get(0).getTimestamp(), pairs.get(2).getPreviousCollection(0).get().getTimestamp());
+        assertEquals(input.get(1).getTimestamp(), pairs.get(2).getPreviousCollection(1).get().getTimestamp());
+        assertEquals(input.get(2).getTimestamp(), pairs.get(2).getPreviousCollection(2).get().getTimestamp());
+        assertEquals(input.get(3).getTimestamp(), pairs.get(2).getPreviousCollection(3).get().getTimestamp());
+        assertEquals(input.get(4).getTimestamp(), pairs.get(2).getPreviousCollection(4).get().getTimestamp());
+        assertEquals(input.get(5).getTimestamp(), pairs.get(2).getPreviousCollection(5).get().getTimestamp());
+        assertEquals(Optional.empty(), pairs.get(2).getPreviousCollection(6));
+
+        assertEquals(3, pairs.size());
     }
 
     @Test

@@ -84,6 +84,35 @@ public class FunctionTest extends AbstractAlertTest {
     }
 
     @Test
+    public void rate_duration() throws Exception {
+        /*
+         * We're comparing for rate between upper and lower bounds, since doubles are really hard to compare for equality.
+         */
+        try (AbstractAlertTest.AlertValidator impl = replay("alert test if "
+                + "rate[2m](" + TESTGROUP.configString() + " a) < 0.99*1/60 ||"
+                + "rate[2m](" + TESTGROUP.configString() + " a) > 1.01*1/60;", 60,
+                newDatapoint(TESTGROUP, "a",            0, 1, 2, null, 4, 5, 6))) {
+            impl.validate(newDatapoint(GroupName.valueOf("test"),
+                    UNKNOWN, UNKNOWN, OK, UNKNOWN, OK, UNKNOWN, OK));
+        }
+    }
+
+    /** Test the deprecated notation of the rate function. */
+    @Test
+    public void rate_duration_deprecated_notation() throws Exception {
+        /*
+         * We're comparing for rate between upper and lower bounds, since doubles are really hard to compare for equality.
+         */
+        try (AbstractAlertTest.AlertValidator impl = replay("alert test if "
+                + "rate(" + TESTGROUP.configString() + " a, 2m) < 0.99*1/60 ||"
+                + "rate(" + TESTGROUP.configString() + " a, 2m) > 1.01*1/60;", 60,
+                newDatapoint(TESTGROUP, "a",            0, 1, 2, null, 4, 5, 6))) {
+            impl.validate(newDatapoint(GroupName.valueOf("test"),
+                    UNKNOWN, UNKNOWN, OK, UNKNOWN, OK, UNKNOWN, OK));
+        }
+    }
+
+    @Test
     public void sum_direct() throws Exception {
         final String QUERY = "alert test if "
                 + "sum("
@@ -245,6 +274,32 @@ public class FunctionTest extends AbstractAlertTest {
                 newDatapoint(TESTGROUP, "expected",  3, 3,  3, 3,    2,    0))) {
             impl.validate(newDatapoint(GroupName.valueOf("test"),
                     OK, OK, OK, OK, OK, OK));
+        }
+    }
+
+    @Test
+    public void count_exact_duration() throws Exception {
+        final String QUERY = "alert test if "
+                + "count[3m]("
+                + testgroup_idx_(0).configString() + " a) != " + TESTGROUP.configString() + " expected;";
+        try (AbstractAlertTest.AlertValidator impl = replay(QUERY, 60,
+                newDatapoint(testgroup_idx_(0), "a", 0, 0, 12, 1, 4, null, null, 6),
+                newDatapoint(TESTGROUP, "expected",  1, 2,  3, 4, 4,    3,    2, 2))) {
+            impl.validate(newDatapoint(GroupName.valueOf("test"),
+                    OK, OK, OK, OK, OK, OK, OK, OK));
+        }
+    }
+
+    @Test
+    public void count_inexact_duration() throws Exception {
+        final String QUERY = "alert test if "
+                + "count[3m 15s]("
+                + testgroup_idx_(0).configString() + " a) != " + TESTGROUP.configString() + " expected;";
+        try (AbstractAlertTest.AlertValidator impl = replay(QUERY, 60,
+                newDatapoint(testgroup_idx_(0), "a", 0, 0, 12, 1, 4, null, null, 6),
+                newDatapoint(TESTGROUP, "expected",  1, 2,  3, 4, 4,    3,    2, 2))) {
+            impl.validate(newDatapoint(GroupName.valueOf("test"),
+                    OK, OK, OK, OK, OK, OK, OK, OK));
         }
     }
 

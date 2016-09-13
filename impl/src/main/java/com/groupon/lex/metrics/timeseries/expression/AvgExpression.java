@@ -10,6 +10,7 @@ import static com.groupon.lex.metrics.timeseries.expression.Priorities.BRACKETS;
 import java.util.Collection;
 import java.util.Optional;
 import lombok.Value;
+import org.joda.time.Duration;
 
 /**
  *
@@ -22,8 +23,8 @@ public class AvgExpression extends TimeSeriesMetricAggregate<AvgExpression.AvgAg
         private final double count;
     }
 
-    public AvgExpression(Collection<Any2<MetricMatcher, TimeSeriesMetricExpression>> matchers, TagAggregationClause aggregation) {
-        super("avg", matchers, aggregation);
+    public AvgExpression(Collection<Any2<MetricMatcher, TimeSeriesMetricExpression>> matchers, TagAggregationClause aggregation, Optional<Duration> tDelta) {
+        super("avg", matchers, aggregation, tDelta);
     }
 
     @Override
