@@ -848,51 +848,58 @@ duration_unit    returns [ Function<Long, Duration> fn ]
 function_invocation returns [ TimeSeriesMetricExpression s ]
                  @init{ TimeSeriesMetricExpression expr = null; }
                  @after{ $s = Objects.requireNonNull(expr); }
-                 : fn=ID BRACE_OPEN_LIT
-                   ( { $fn.getText().equals("rate")           }? s_fn__rate=fn__rate       { expr = $s_fn__rate.s;    }
-                   | { $fn.getText().equals("sum")            }? s_fn__sum=fn__sum         { expr = $s_fn__sum.s;     }
-                   | { $fn.getText().equals("avg")            }? s_fn__avg=fn__avg         { expr = $s_fn__avg.s;     }
-                   | { $fn.getText().equals("min")            }? s_fn__min=fn__min         { expr = $s_fn__min.s;     }
-                   | { $fn.getText().equals("max")            }? s_fn__max=fn__max         { expr = $s_fn__max.s;     }
-                   | { $fn.getText().equals("count")          }? s_fn__count=fn__count     { expr = $s_fn__count.s;   }
-                   | { $fn.getText().equals("str")            }? s_fn__str=fn__str         { expr = $s_fn__str.s;     }
-                   | { $fn.getText().equals("regexp")         }? s_fn__regexp=fn__regexp   { expr = $s_fn__regexp.s;  }
-                   | { $fn.getText().equals("percentile_agg") }? s_fn__pct_agg=fn__pct_agg { expr = $s_fn__pct_agg.s; }
-                   | { $fn.getText().equals("name")           }? s_fn__name=fn__name       { expr = $s_fn__name.s;    }
+                 : fn=ID
+                   ( { $fn.getText().equals("rate")           }? tdelta=function_opt_duration BRACE_OPEN_LIT s_fn__rate=fn__rate[ $tdelta.s ]       { expr = $s_fn__rate.s;    }
+                   | { $fn.getText().equals("sum")            }? tdelta=function_opt_duration BRACE_OPEN_LIT s_fn__sum=fn__sum[ $tdelta.s ]         { expr = $s_fn__sum.s;     }
+                   | { $fn.getText().equals("avg")            }? tdelta=function_opt_duration BRACE_OPEN_LIT s_fn__avg=fn__avg[ $tdelta.s ]         { expr = $s_fn__avg.s;     }
+                   | { $fn.getText().equals("min")            }? tdelta=function_opt_duration BRACE_OPEN_LIT s_fn__min=fn__min[ $tdelta.s ]         { expr = $s_fn__min.s;     }
+                   | { $fn.getText().equals("max")            }? tdelta=function_opt_duration BRACE_OPEN_LIT s_fn__max=fn__max[ $tdelta.s ]         { expr = $s_fn__max.s;     }
+                   | { $fn.getText().equals("count")          }? tdelta=function_opt_duration BRACE_OPEN_LIT s_fn__count=fn__count[ $tdelta.s ]     { expr = $s_fn__count.s;   }
+                   | { $fn.getText().equals("str")            }?                              BRACE_OPEN_LIT s_fn__str=fn__str                      { expr = $s_fn__str.s;     }
+                   | { $fn.getText().equals("regexp")         }?                              BRACE_OPEN_LIT s_fn__regexp=fn__regexp                { expr = $s_fn__regexp.s;  }
+                   | { $fn.getText().equals("percentile_agg") }? tdelta=function_opt_duration BRACE_OPEN_LIT s_fn__pct_agg=fn__pct_agg[ $tdelta.s ] { expr = $s_fn__pct_agg.s; }
+                   | { $fn.getText().equals("name")           }?                              BRACE_OPEN_LIT s_fn__name=fn__name                    { expr = $s_fn__name.s;    }
                    )
-                   | TAG_KW BRACE_OPEN_LIT                       s_fn__tag=fn__tag         { expr = $s_fn__tag.s;     }
+                   | TAG_KW                                                                   BRACE_OPEN_LIT s_fn__tag=fn__tag                      { expr = $s_fn__tag.s;     }
+                 ;
+function_opt_duration returns [ Optional<Duration> s = Optional.empty() ]
+                 : ( SQBRACE_OPEN_LIT d=duration SQBRACE_CLOSE_LIT
+                     { $s = Optional.of($d.s); }
+                   )?
                  ;
 
-fn__rate         returns [ TimeSeriesMetricExpression s ]
-                 @init{ Optional<Duration> interval = Optional.empty(); }
-                 @after{ $s = new RateExpression($rate_arg.s, interval); }
+fn__rate         [ Optional<Duration> interval ] returns [ TimeSeriesMetricExpression s ]
+                 @after{ $s = new RateExpression($rate_arg.s, $interval); }
                  : rate_arg=expression
-                   (COMMA_LIT s_dur=duration { interval = Optional.of($s_dur.s); })?
+                   ( { !$interval.isPresent() }?
+                     COMMA_LIT s_dur=duration
+                     { $interval = Optional.of($s_dur.s); }
+                   )?
                    BRACE_CLOSE_LIT
                  ;
-fn__sum          returns [ TimeSeriesMetricExpression s ]
-                 @after{ $s = new SumExpression(Objects.requireNonNull($sel.s), Objects.requireNonNull($tag_agg.s)); }
+fn__sum          [ Optional<Duration> interval ] returns [ TimeSeriesMetricExpression s ]
+                 @after{ $s = new SumExpression(Objects.requireNonNull($sel.s), Objects.requireNonNull($tag_agg.s), $interval); }
                  : sel=function_aggregate_arguments BRACE_CLOSE_LIT tag_agg=tag_aggregation_clause
                  ;
-fn__avg          returns [ TimeSeriesMetricExpression s ]
-                 @after{ $s = new AvgExpression(Objects.requireNonNull($sel.s), Objects.requireNonNull($tag_agg.s)); }
+fn__avg          [ Optional<Duration> interval ] returns [ TimeSeriesMetricExpression s ]
+                 @after{ $s = new AvgExpression(Objects.requireNonNull($sel.s), Objects.requireNonNull($tag_agg.s), $interval); }
                  : sel=function_aggregate_arguments BRACE_CLOSE_LIT tag_agg=tag_aggregation_clause
                  ;
-fn__min          returns [ TimeSeriesMetricExpression s ]
-                 @after{ $s = new MinExpression(Objects.requireNonNull($sel.s), Objects.requireNonNull($tag_agg.s)); }
+fn__min          [ Optional<Duration> interval ] returns [ TimeSeriesMetricExpression s ]
+                 @after{ $s = new MinExpression(Objects.requireNonNull($sel.s), Objects.requireNonNull($tag_agg.s), $interval); }
                  : sel=function_aggregate_arguments BRACE_CLOSE_LIT tag_agg=tag_aggregation_clause
                  ;
-fn__max          returns [ TimeSeriesMetricExpression s ]
-                 @after{ $s = new MaxExpression(Objects.requireNonNull($sel.s), Objects.requireNonNull($tag_agg.s)); }
+fn__max          [ Optional<Duration> interval ] returns [ TimeSeriesMetricExpression s ]
+                 @after{ $s = new MaxExpression(Objects.requireNonNull($sel.s), Objects.requireNonNull($tag_agg.s), $interval); }
                  : sel=function_aggregate_arguments BRACE_CLOSE_LIT tag_agg=tag_aggregation_clause
                  ;
-fn__pct_agg      returns [ TimeSeriesMetricExpression s ]
-                 @after{ $s = new PercentileAggregateExpression($pct.s.doubleValue(), $sel.s, Objects.requireNonNull($tag_agg.s)); }
+fn__pct_agg      [ Optional<Duration> interval ] returns [ TimeSeriesMetricExpression s ]
+                 @after{ $s = new PercentileAggregateExpression($pct.s.doubleValue(), $sel.s, Objects.requireNonNull($tag_agg.s), $interval); }
                  : pct=number
                    COMMA_LIT sel=function_aggregate_arguments BRACE_CLOSE_LIT tag_agg=tag_aggregation_clause
                  ;
-fn__count        returns [ TimeSeriesMetricExpression s ]
-                 @after{ $s = new CountExpression($sel.s, $tag_agg.s); }
+fn__count        [ Optional<Duration> interval ] returns [ TimeSeriesMetricExpression s ]
+                 @after{ $s = new CountExpression($sel.s, $tag_agg.s, $interval); }
                  : sel=function_aggregate_arguments BRACE_CLOSE_LIT tag_agg=tag_aggregation_clause
                  ;
 fn__tag          returns [ TimeSeriesMetricExpression s ]

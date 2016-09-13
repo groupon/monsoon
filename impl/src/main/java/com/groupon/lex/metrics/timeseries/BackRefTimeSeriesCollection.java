@@ -36,15 +36,15 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import gnu.trove.map.hash.THashMap;
+import gnu.trove.set.hash.THashSet;
 import java.util.Collection;
 import static java.util.Collections.unmodifiableCollection;
 import static java.util.Collections.unmodifiableSet;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
@@ -70,18 +70,8 @@ public class BackRefTimeSeriesCollection implements TimeSeriesCollection {
             final boolean is_removed = data_by_path_.get(path).remove(r);
             assert(is_removed);
         });
-        data_by_path_.computeIfAbsent(path, (p) -> new HashSet<>())
+        data_by_path_.computeIfAbsent(path, (p) -> new THashSet<>())
                 .add(tsv);
-    }
-
-    private void remove_by_path_only_(TimeSeriesValue tsv) {
-        final SimpleGroupPath path = tsv.getGroup().getPath();
-
-        Set<TimeSeriesValue> set = data_by_path_.get(path);
-        final boolean is_removed = set.remove(tsv);
-        assert(is_removed);
-        if (set.isEmpty())
-            data_by_path_.remove(path);
     }
 
     public BackRefTimeSeriesCollection() {
@@ -90,6 +80,20 @@ public class BackRefTimeSeriesCollection implements TimeSeriesCollection {
 
     public BackRefTimeSeriesCollection(DateTime initial) {
         timestamp_ = requireNonNull(initial);
+    }
+
+    public BackRefTimeSeriesCollection(DateTime initial, Collection<TimeSeriesValue> values) {
+        this(initial);
+        values.forEach(this::add_);
+    }
+
+    public BackRefTimeSeriesCollection(DateTime initial, Stream<TimeSeriesValue> values) {
+        this(initial);
+        values.forEach(this::add_);
+    }
+
+    public BackRefTimeSeriesCollection(TimeSeriesCollection tsdata) {
+        this(tsdata.getTimestamp(), tsdata.getTSValues());
     }
 
     private BackRefTimeSeriesCollection(BackRefTimeSeriesCollection o) {
@@ -125,12 +129,12 @@ public class BackRefTimeSeriesCollection implements TimeSeriesCollection {
 
     @Override
     public Set<GroupName> getGroups() {
-        return unmodifiableSet(new HashSet<>(data_.keySet()));  // Copy of the keyset, since Map.keySet is a view.
+        return unmodifiableSet(data_.keySet());  // Copy of the keyset, since Map.keySet is a view.
     }
 
     @Override
     public Set<SimpleGroupPath> getGroupPaths() {
-        return unmodifiableSet(new HashSet<>(data_by_path_.keySet()));
+        return unmodifiableSet(data_by_path_.keySet());
     }
 
     @Override
@@ -155,30 +159,6 @@ public class BackRefTimeSeriesCollection implements TimeSeriesCollection {
     @Override
     public Optional<TimeSeriesValue> get(GroupName name) {
         return Optional.ofNullable(data_.get(name));
-    }
-
-    public BackRefTimeSeriesCollection merge(DateTime timestamp, Collection<TimeSeriesValue> values) {
-        requireNonNull(values);
-        timestamp_ = requireNonNull(timestamp);
-
-        // Remove entries that are now considered expired.
-        final DateTime expire = timestamp_.minus(MAX_AGE);
-        Iterator<TimeSeriesValue> iter = data_.values().iterator();
-        while (iter.hasNext()) {
-            TimeSeriesValue tsv = iter.next();
-            if (tsv.getTimestamp().isBefore(expire)) {
-                iter.remove();
-                remove_by_path_only_(tsv);
-            }
-        }
-
-        // Add new entries.
-        values.forEach(this::add_);
-        return this;
-    }
-
-    public BackRefTimeSeriesCollection merge(MutableTimeSeriesCollection c) {
-        return merge(c.getTimestamp(), c.getData().values());
     }
 
     @Override

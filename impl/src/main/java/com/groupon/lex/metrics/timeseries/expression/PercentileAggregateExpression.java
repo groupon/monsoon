@@ -12,10 +12,12 @@ import java.util.Collection;
 import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.singletonList;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.joda.time.Duration;
 
 /**
  *
@@ -25,8 +27,8 @@ public class PercentileAggregateExpression extends TimeSeriesMetricAggregate<Lis
     private static final Logger LOG = Logger.getLogger(PercentileAggregateExpression.class.getName());
     private final double percentile_;
 
-    public PercentileAggregateExpression(double percentile, Collection<Any2<MetricMatcher, TimeSeriesMetricExpression>> matchers, TagAggregationClause aggregation) {
-        super("percentile_agg", matchers, aggregation);
+    public PercentileAggregateExpression(double percentile, Collection<Any2<MetricMatcher, TimeSeriesMetricExpression>> matchers, TagAggregationClause aggregation, Optional<Duration> tDelta) {
+        super("percentile_agg", matchers, aggregation, tDelta);
         percentile_ = percentile;
         if (percentile < 0.0 || percentile > 100.0)
             throw new IllegalArgumentException("invalid percentile range");

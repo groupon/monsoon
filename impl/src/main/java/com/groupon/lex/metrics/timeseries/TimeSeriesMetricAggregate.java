@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.timeseries;
 
+import com.groupon.lex.metrics.ConfigSupport;
 import com.groupon.lex.metrics.MetricMatcher;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.Tags;
@@ -38,9 +39,11 @@ import com.groupon.lex.metrics.config.ConfigStatement;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.expression.Context;
+import com.groupon.lex.metrics.timeseries.expression.PreviousContextWrapper;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import static java.util.Collections.singletonList;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +53,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.joda.time.Duration;
 
 /**
  *
@@ -61,8 +65,9 @@ public abstract class TimeSeriesMetricAggregate<T> implements TimeSeriesMetricEx
     private final Collection<MetricMatcher> matchers_;
     private final Collection<TimeSeriesMetricExpression> exprs_;
     private final TagAggregationClause aggregation_;
+    private final Optional<Duration> tDelta;
 
-    public TimeSeriesMetricAggregate(String fn_name, Collection<Any2<MetricMatcher, TimeSeriesMetricExpression>> matchers, TagAggregationClause aggregation) {
+    public TimeSeriesMetricAggregate(String fn_name, Collection<Any2<MetricMatcher, TimeSeriesMetricExpression>> matchers, TagAggregationClause aggregation, Optional<Duration> tDelta) {
         fn_name_ = requireNonNull(fn_name);
         matchers_ = new ArrayList<>(matchers.stream()
                 .map((elem) -> elem.getLeft())
@@ -73,10 +78,19 @@ public abstract class TimeSeriesMetricAggregate<T> implements TimeSeriesMetricEx
                 .flatMap((x) -> x.map(Stream::of).orElseGet(Stream::empty))
                 .collect(Collectors.toList())));
         aggregation_ = requireNonNull(aggregation);
+        this.tDelta = requireNonNull(tDelta);
     }
 
     @Override
     public Collection<TimeSeriesMetricExpression> getChildren() { return exprs_; }
+
+    @Override
+    public final ExpressionLookBack getLookBack() {
+        final ChainableExpressionLookBack base = tDelta
+                .map(ExpressionLookBack::fromInterval)
+                .orElse(ExpressionLookBack.EMPTY);
+        return base.andThen(getChildren().stream().map(TimeSeriesMetricExpression::getLookBack));
+    }
 
     protected abstract T initial_();
     protected MetricValue scalar_fallback_() { return MetricValue.EMPTY; }
@@ -85,15 +99,24 @@ public abstract class TimeSeriesMetricAggregate<T> implements TimeSeriesMetricEx
     protected abstract MetricValue unmap_(T v);
 
     @Override
-    public TimeSeriesMetricDeltaSet apply(Context t) {
+    public final TimeSeriesMetricDeltaSet apply(Context ctx) {
+        /* If a time delta is specified, create a context for each of the time deltas. */
+        List<Context> contextList = tDelta
+                .map(tdelta_val -> {
+                    return ctx.getTSData().getCollectionPairsSince(tdelta_val).stream()
+                            .map(tsdata -> new PreviousContextWrapper(ctx, tsdata))
+                            .collect(Collectors.<Context>toList());
+                })
+                .orElse(singletonList(ctx));
+
         /* Fetch each metric wildcard and add it to the to-be-processed list. */
         final List<Map.Entry<Tags, MetricValue>> matcher_tsvs = matchers_.stream()
-                .flatMap(m -> m.filter(t))
+                .flatMap(m -> contextList.stream().flatMap(t -> m.filter(t)))
                 .map(named_entry -> SimpleMapEntry.create(named_entry.getKey().getTags(), named_entry.getValue()))
                 .collect(Collectors.toList());
         /* Resolve each expression and resolve it. */
         final Map<Boolean, List<TimeSeriesMetricDeltaSet>> expr_tsvs_map = exprs_.stream()
-                .map((expr) -> expr.apply(t))
+                .flatMap((expr) -> contextList.stream().map(t -> expr.apply(t)))
                 .collect(Collectors.partitioningBy(TimeSeriesMetricDeltaSet::isVector));
         final List<TimeSeriesMetricDeltaSet> expr_tsvs = Optional.ofNullable(expr_tsvs_map.get(true)).orElse(Collections.emptyList());
         final T scalar = Optional.ofNullable(expr_tsvs_map.get(false))
@@ -135,6 +158,7 @@ public abstract class TimeSeriesMetricAggregate<T> implements TimeSeriesMetricEx
     public StringBuilder configString() {
         final StringBuilder rv = new StringBuilder()
                 .append(fn_name_)
+                .append(tDelta.map(ConfigSupport::durationConfigString).map(s -> "[" + s + "]").orElse(""))
                 .append('(')
                 .append(configStringArgs())
                 .append(')');

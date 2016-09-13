@@ -3,7 +3,6 @@ package com.groupon.lex.metrics.timeseries;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.lib.ForwardIterator;
 import java.util.ArrayList;
-import java.util.Collection;
 import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.unmodifiableList;
 import java.util.Comparator;
@@ -15,7 +14,6 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 
 /**
@@ -47,13 +45,11 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
             filtered = history.stream(begin, end);
         }
 
-        BackRefTimeSeriesCollection prev = new BackRefTimeSeriesCollection(new DateTime(0, DateTimeZone.UTC));
         for (TimeSeriesCollection tsc : filtered
                 .sorted(Comparator.comparing(TimeSeriesCollection::getTimestamp))
                 .distinct()
                 .collect(Collectors.toList())) {
-            prev.merge(tsc.getTimestamp(), tsc.getTSValues());
-            previous_.add(0, prev.clone());
+            previous_.add(0, new BackRefTimeSeriesCollection(tsc.getTimestamp(), tsc.getTSValues()));
         }
         LOG.log(Level.INFO, "recovered {0} scrapes from history", previous_.size());
     }
@@ -107,26 +103,29 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
         return new ImmutableTimeSeriesCollectionPair(EMPTY_LIST);
     }
 
-    protected void update(MutableTimeSeriesCollection mtsc, ExpressionLookBack lookback) {
-        if (!previous_.isEmpty()) {
-            previous_.add(0, previous_.get(0).clone().merge(mtsc));  // Clone into position 0, so scrapes shared among classes remain unaffected.
-        } else {
-            previous_.add(new BackRefTimeSeriesCollection(mtsc.getTimestamp()).merge(mtsc));
-        }
-        apply_lookback_(lookback);
-    }
+    @Override
+    public List<TimeSeriesCollectionPair> getCollectionPairsSince(Duration duration) {
+        final DateTime ts = getCurrentCollection().getTimestamp().minus(duration);
 
-    protected void update(DateTime ts, Collection<TimeSeriesValue> values, ExpressionLookBack lookback) {
-        if (!previous_.isEmpty()) {
-            previous_.add(0, previous_.get(0).clone().merge(ts, values));  // Clone into position 0, so scrapes shared among classes remain unaffected.
-        } else {
-            previous_.add(new BackRefTimeSeriesCollection(ts).merge(ts, values));
+        int lastIdx;
+        for (final ListIterator<BackRefTimeSeriesCollection> p = previous_.listIterator(0); /* SKIP */; /* SKIP */) {
+            lastIdx = p.nextIndex();
+            if (!p.hasNext() || p.next().getTimestamp().isBefore(ts))
+                break;
         }
-        apply_lookback_(lookback);
+
+        final List<TimeSeriesCollectionPair> pairs = new ArrayList<>(lastIdx + 1);
+        for (int idx = lastIdx - 1; idx >= 0; --idx)
+            pairs.add(ImmutableTimeSeriesCollectionPair.copyList(previous_.subList(idx, previous_.size())));
+        if (!getCurrentCollection().getTimestamp().isBefore(ts))
+            pairs.add(this);
+
+        return pairs;
     }
 
     protected void update(TimeSeriesCollection tsc, ExpressionLookBack lookback) {
-        update(tsc.getTimestamp(), tsc.getTSValues(), lookback);
+        previous_.add(0, new BackRefTimeSeriesCollection(tsc));
+        apply_lookback_(lookback);
     }
 
     private void apply_lookback_(ExpressionLookBack lookback) {

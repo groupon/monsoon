@@ -73,4 +73,22 @@ public class ImmutableTimeSeriesCollectionPair implements TimeSeriesCollectionPa
         }
         return new ImmutableTimeSeriesCollectionPair(EMPTY_LIST);
     }
+
+    @Override
+    public List<TimeSeriesCollectionPair> getCollectionPairsSince(Duration duration) {
+        final DateTime ts = getCurrentCollection().getTimestamp().minus(duration);
+
+        int lastIdx;
+        for (final ListIterator<TimeSeriesCollection> p = history_.listIterator(0); /* SKIP */; /* SKIP */) {
+            lastIdx = p.nextIndex();
+            if (!p.hasNext() || p.next().getTimestamp().isBefore(ts))
+                break;
+        }
+
+        final List<TimeSeriesCollectionPair> pairs = new ArrayList<>(lastIdx + 1);
+        for (int idx = lastIdx - 1; idx >= 0; --idx)
+            pairs.add(ImmutableTimeSeriesCollectionPair.copyList(history_.subList(idx, history_.size())));
+
+        return pairs;
+    }
 }

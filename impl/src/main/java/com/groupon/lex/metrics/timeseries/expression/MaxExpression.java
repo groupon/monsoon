@@ -10,14 +10,15 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import static com.groupon.lex.metrics.timeseries.expression.Priorities.BRACKETS;
 import java.util.Collection;
 import java.util.Optional;
+import org.joda.time.Duration;
 
 /**
  *
  * @author ariane
  */
 public class MaxExpression extends TimeSeriesMetricAggregate<Optional<Number>> {
-    public MaxExpression(Collection<Any2<MetricMatcher, TimeSeriesMetricExpression>> matchers, TagAggregationClause aggregation) {
-        super("max", matchers, aggregation);
+    public MaxExpression(Collection<Any2<MetricMatcher, TimeSeriesMetricExpression>> matchers, TagAggregationClause aggregation, Optional<Duration> tDelta) {
+        super("max", matchers, aggregation, tDelta);
     }
 
     /* Calculate the sum of two numbers, preserving integral type if possible. */
