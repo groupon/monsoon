@@ -116,7 +116,11 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
             @Override
             public void commit() {
                 alerts_ = unmodifiableMap(alerts);
-                getHistory().ifPresent(history -> history.add(getCollectionData()));
+                try {
+                    getHistory().ifPresent(history -> history.add(getCollectionData()));
+                } catch (Exception ex) {
+                    logger.log(Level.WARNING, "unable to add collection data to history (dropped)", ex);
+                }
             }
         };
     }
