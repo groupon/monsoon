@@ -51,7 +51,11 @@ import lombok.ToString;
  * A map that lazily computes its mapped values.
  */
 public class LazyMap<K, V> implements Map<K, V> {
-    private static final Object SENTINEL = new Object();
+    private static final Object SENTINEL = new Object() {
+        @Override
+        public String toString() { return "SENTINEL"; }
+    };
+
     private final Function<? super K, ? extends V> compute;
     private final Map<K, V> internalMap;
 
@@ -167,6 +171,11 @@ public class LazyMap<K, V> implements Map<K, V> {
         return entrySet().equals(m.entrySet());
     }
 
+    @Override
+    public String toString() {
+        return internalMap.toString();
+    }
+
     @SuppressWarnings("unchecked")
     private static <T> T getSentinel() {
         return (T)SENTINEL;
@@ -198,7 +207,7 @@ public class LazyMap<K, V> implements Map<K, V> {
         @Override
         public int hashCode() {
             return (getKey() == null   ? 0 : getKey().hashCode()) ^
-                    (getValue() == null ? 0 : getValue().hashCode());
+                   (getValue() == null ? 0 : getValue().hashCode());
         }
 
         @Override
@@ -208,6 +217,11 @@ public class LazyMap<K, V> implements Map<K, V> {
 
             final Map.Entry<?, ?> other = (Map.Entry<?, ?>)o;
             return Objects.equals(getKey(), other.getKey()) && Objects.equals(getValue(), other.getValue());
+        }
+
+        @Override
+        public String toString() {
+            return getKey() + "=" + internalMap.get(getKey());
         }
     }
 
@@ -273,11 +287,13 @@ public class LazyMap<K, V> implements Map<K, V> {
         @Override
         public boolean retainAll(Collection<?> c) {
             boolean changed = false;
+            final List<Object> retainKeys = new ArrayList<>(c.size());
 
             for (Object eObj : c) {
                 if (eObj == null || !(eObj instanceof Map.Entry)) continue;
                 Map.Entry e = (Map.Entry)eObj;
                 Object k = e.getKey();
+                retainKeys.add(k);
 
                 V v = LazyMap.this.get(k);
                 if (!Objects.equals(e.getValue(), v)) {
@@ -285,6 +301,9 @@ public class LazyMap<K, V> implements Map<K, V> {
                         changed = true;
                 }
             }
+
+            if (internalMap.keySet().retainAll(retainKeys))
+                changed = true;
             return changed;
         }
 
