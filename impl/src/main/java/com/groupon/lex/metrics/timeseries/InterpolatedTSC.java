@@ -273,6 +273,7 @@ public class InterpolatedTSC implements TimeSeriesCollection {
             this.metrics = unmodifiableMap(new LazyMap<>(key -> interpolate(backward.get(key), forward.get(key)), names));
         }
 
+        @Override
         public InterpolatedTSV clone() {
             return this;  // Immutable.
         }
