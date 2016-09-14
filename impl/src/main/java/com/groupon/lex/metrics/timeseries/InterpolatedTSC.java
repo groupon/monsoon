@@ -74,6 +74,27 @@ public class InterpolatedTSC implements TimeSeriesCollection {
         this.backward = unmodifiableList(new ArrayList<>(backward));
         this.forward = unmodifiableList(new ArrayList<>(forward));
         this.interpolatedTsvMap = new LazyMap<>(this::interpolateTSV, calculateNames(this.current, this.backward, this.forward));
+
+        validate();
+    }
+
+    /** Check the forward and backward invariants. */
+    private void validate() {
+        DateTime ts;
+
+        ts = current.getTimestamp();
+        for (TimeSeriesCollection b : backward) {
+            if (b.getTimestamp().isAfter(ts))
+                throw new IllegalArgumentException("backwards collection must be before current and be ordered in reverse chronological order");
+            ts = b.getTimestamp();
+        }
+
+        ts = current.getTimestamp();
+        for (TimeSeriesCollection f : forward) {
+            if (f.getTimestamp().isBefore(ts))
+                throw new IllegalArgumentException("forwards collection must be after current and be ordered in chronological order");
+            ts = f.getTimestamp();
+        }
     }
 
     @Override
