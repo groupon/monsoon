@@ -278,34 +278,20 @@ public class InterpolatedTSC implements TimeSeriesCollection {
         }
 
         private MetricValue interpolate(MetricValue a, MetricValue b) {
-            {
-                final Optional<Boolean> a_bool = a.asBool();
-                final Optional<Boolean> b_bool = b.asBool();
-                if (a_bool.isPresent() && b_bool.isPresent())
-                    return a;
-            }
+            if (a.getBoolValue() != null && b.getBoolValue() != null)
+                return a;
 
-            {
-                final Optional<Number> a_num = a.value();
-                final Optional<Number> b_num = b.value();
-                if (a_num.isPresent() && b_num.isPresent())
-                    return MetricValue.fromDblValue(backWeight * a_num.get().doubleValue() + forwWeight * b_num.get().doubleValue());
-            }
+            if ((a.getIntValue() != null || a.getFltValue() != null) &&
+                    (b.getIntValue() != null || b.getFltValue() != null))
+                return MetricValue.fromDblValue(backWeight * a.value().get().doubleValue() + forwWeight * b.value().get().doubleValue());
 
-            {
-                Optional<String> a_str = a.asString();
-                Optional<String> b_str = b.asString();
-                if (a_str.isPresent() && b_str.isPresent())
-                    return a;
-            }
+            if (a.getStrValue() != null && b.getStrValue() != null)
+                return a;
 
-            {
-                Optional<Histogram> a_hist = a.histogram();
-                Optional<Histogram> b_hist = b.histogram();
-                if (a_hist.isPresent() && b_hist.isPresent())
-                    return MetricValue.fromHistValue(Histogram.add(
-                            Histogram.multiply(a_hist.get(), backWeight),
-                            Histogram.multiply(b_hist.get(), forwWeight)));
+            if (a.getHistValue() != null && b.getHistValue() != null) {
+                return MetricValue.fromHistValue(Histogram.add(
+                        Histogram.multiply(a.getHistValue(), backWeight),
+                        Histogram.multiply(b.getHistValue(), forwWeight)));
             }
 
             // Mismatched types, return empty metric value.

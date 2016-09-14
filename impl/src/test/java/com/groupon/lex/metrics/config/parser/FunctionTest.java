@@ -93,7 +93,21 @@ public class FunctionTest extends AbstractAlertTest {
                 + "rate[2m](" + TESTGROUP.configString() + " a) > 1.01*1/60;", 60,
                 newDatapoint(TESTGROUP, "a",            0, 1, 2, null, 4, 5, 6))) {
             impl.validate(newDatapoint(GroupName.valueOf("test"),
-                    UNKNOWN, UNKNOWN, OK, UNKNOWN, OK, UNKNOWN, OK));
+                    UNKNOWN, UNKNOWN, OK, UNKNOWN, OK, OK, OK));
+        }
+    }
+
+    @Test
+    public void rate_duration_inexact() throws Exception {
+        /*
+         * We're comparing for rate between upper and lower bounds, since doubles are really hard to compare for equality.
+         */
+        try (AbstractAlertTest.AlertValidator impl = replay("alert test if "
+                + "rate[1m 30s](" + TESTGROUP.configString() + " a) < 0.99*1/60 ||"
+                + "rate[1m 30s](" + TESTGROUP.configString() + " a) > 1.01*1/60;", 60,
+                newDatapoint(TESTGROUP, "a",            0, 1, 2, null, 4, 5, 6))) {
+            impl.validate(newDatapoint(GroupName.valueOf("test"),
+                    UNKNOWN, UNKNOWN, OK, UNKNOWN, OK, OK, OK));
         }
     }
 
@@ -108,7 +122,7 @@ public class FunctionTest extends AbstractAlertTest {
                 + "rate(" + TESTGROUP.configString() + " a, 2m) > 1.01*1/60;", 60,
                 newDatapoint(TESTGROUP, "a",            0, 1, 2, null, 4, 5, 6))) {
             impl.validate(newDatapoint(GroupName.valueOf("test"),
-                    UNKNOWN, UNKNOWN, OK, UNKNOWN, OK, UNKNOWN, OK));
+                    UNKNOWN, UNKNOWN, OK, UNKNOWN, OK, OK, OK));
         }
     }
 

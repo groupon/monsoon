@@ -77,7 +77,7 @@ public interface TimeSeriesCollectionPair {
         List<TimeSeriesCollection> tail = new ArrayList<>(size() - n);
         for (int i = n; i < size(); ++i)
             tail.add(getPreviousCollection(i).orElseThrow(() -> new IllegalStateException("Collections within range 0..size() must exist")));
-        return ImmutableTimeSeriesCollectionPair.copyList(tail);
+        return new ImmutableTimeSeriesCollectionPair(tail, this);
     }
 
     public default TimeSeriesCollectionPair getPreviousCollectionPair(Duration duration) {
@@ -97,7 +97,7 @@ public interface TimeSeriesCollectionPair {
 
         for (int k = i; k < size(); ++k)
             tail.add(getPreviousCollection(k).orElseThrow(() -> new IllegalStateException("Collections within range 0..size() must exist")));
-        return new ImmutableTimeSeriesCollectionPair(tail);
+        return new ImmutableTimeSeriesCollectionPair(tail, this);
     }
 
     public default List<TimeSeriesCollectionPair> getCollectionPairsSince(Duration duration) {
@@ -136,6 +136,33 @@ public interface TimeSeriesCollectionPair {
         return new MutableTimeSeriesCollection(ts);
     }
 
+    public static TimeSeriesCollectionPair getPreviousCollectionPairAt(List<TimeSeriesCollection> list, DateTime ts, TimeSeriesCollectionPair parent) {
+        TimeSeriesCollection interpolated = null;
+        List<TimeSeriesCollection> backward = null;
+        for (int i = 0; i < list.size(); ++i) {
+            final TimeSeriesCollection collection = list.get(i);
+
+            if (collection.getTimestamp().equals(ts)) {
+                List<TimeSeriesCollection> forward = new ArrayList<>(list.subList(0, i));
+                reverse(forward);
+                backward = new ArrayList<>(list.subList(i + 1, list.size()));
+                interpolated = new InterpolatedTSC(collection, backward, forward);
+                break;
+            } else if (collection.getTimestamp().isBefore(ts)) {
+                List<TimeSeriesCollection> forward = new ArrayList<>(list.subList(0, i));
+                reverse(forward);
+                backward = new ArrayList<>(list.subList(i, list.size()));
+                interpolated = new InterpolatedTSC(new MutableTimeSeriesCollection(ts), backward, forward);
+                break;
+            }
+        }
+        if (interpolated == null) interpolated = new InterpolatedTSC(new MutableTimeSeriesCollection(ts), EMPTY_LIST, EMPTY_LIST);
+        if (backward == null) backward = new ArrayList<>(1);
+        backward.add(0, interpolated);
+
+        return new ImmutableTimeSeriesCollectionPair(backward, parent);
+    }
+
     public default TimeSeriesCollection getPreviousCollectionAt(DateTime ts) {
         List<TimeSeriesCollection> list = new ArrayList<>();
         for (int i = 0; i < size(); ++i)
@@ -145,6 +172,17 @@ public interface TimeSeriesCollectionPair {
 
     public default TimeSeriesCollection getPreviousCollectionAt(Duration duration) {
         return getPreviousCollectionAt(getCurrentCollection().getTimestamp().minus(duration));
+    }
+
+    public default TimeSeriesCollectionPair getPreviousCollectionPairAt(DateTime ts) {
+        List<TimeSeriesCollection> list = new ArrayList<>();
+        for (int i = 0; i < size(); ++i)
+            list.add(getPreviousCollection(i).orElseThrow(() -> new IllegalStateException("Collections within range 0..size() must exist")));
+        return getPreviousCollectionPairAt(list, ts, this);
+    }
+
+    public default TimeSeriesCollectionPair getPreviousCollectionPairAt(Duration duration) {
+        return getPreviousCollectionPairAt(getCurrentCollection().getTimestamp().minus(duration));
     }
 
     public default Duration getCollectionInterval() {

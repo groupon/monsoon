@@ -1,6 +1,5 @@
 package com.groupon.lex.metrics.timeseries;
 
-import java.util.ArrayList;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
 import java.util.Optional;
@@ -25,10 +24,6 @@ public class ImmutableTimeSeriesCollectionPair implements TimeSeriesCollectionPa
 
     public ImmutableTimeSeriesCollectionPair(List<? extends TimeSeriesCollection> tsc, TimeSeriesCollectionPair parent) {
         this(tsc, Optional.of(parent));
-    }
-
-    public static TimeSeriesCollectionPair copyList(List<? extends TimeSeriesCollection> tsc) {
-        return new ImmutableTimeSeriesCollectionPair(new ArrayList<>(tsc));
     }
 
     @Override
