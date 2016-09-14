@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import java.util.ArrayList;
 import static java.util.Collections.EMPTY_LIST;
+import static java.util.Collections.reverse;
 import java.util.List;
 import java.util.Optional;
 import org.joda.time.DateTime;
@@ -113,6 +114,37 @@ public interface TimeSeriesCollectionPair {
         for (int idx = lastIdx - 1; idx >= 0; --idx)
             pairs.add(getPreviousCollectionPair(idx));
         return pairs;
+    }
+
+    public static TimeSeriesCollection getPreviousCollectionAt(List<TimeSeriesCollection> list, DateTime ts) {
+        for (int i = 0; i < list.size(); ++i) {
+            final TimeSeriesCollection collection = list.get(i);
+
+            if (collection.getTimestamp().equals(ts)) {
+                List<TimeSeriesCollection> forward = list.subList(0, i);
+                reverse(forward);
+                List<TimeSeriesCollection> backward = list.subList(i + 1, list.size());
+                return new InterpolatedTSC(collection, backward, forward);
+            } else if (collection.getTimestamp().isBefore(ts)) {
+                List<TimeSeriesCollection> forward = list.subList(0, i);
+                reverse(forward);
+                List<TimeSeriesCollection> backward = list.subList(i, list.size());
+                return new InterpolatedTSC(new MutableTimeSeriesCollection(ts), backward, forward);
+            }
+        }
+
+        return new MutableTimeSeriesCollection(ts);
+    }
+
+    public default TimeSeriesCollection getPreviousCollectionAt(DateTime ts) {
+        List<TimeSeriesCollection> list = new ArrayList<>();
+        for (int i = 0; i < size(); ++i)
+            list.add(getPreviousCollection(i).orElseThrow(() -> new IllegalStateException("Collections within range 0..size() must exist")));
+        return getPreviousCollectionAt(list, ts);
+    }
+
+    public default TimeSeriesCollection getPreviousCollectionAt(Duration duration) {
+        return getPreviousCollectionAt(getCurrentCollection().getTimestamp().minus(duration));
     }
 
     public default Duration getCollectionInterval() {

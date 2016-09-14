@@ -223,4 +223,20 @@ public class AbstractTSCPairTest {
         assertNotNull(impl.getPreviousCollectionPair(Duration.standardDays(1)));
         assertEquals(Optional.empty(), impl.getPreviousCollection(Duration.standardDays(1)));
     }
+
+    @Test
+    public void previousAt_exact() {
+        final Duration delta2 = Duration.standardMinutes(2);
+        setup(ExpressionLookBack.fromScrapeCount(10));
+
+        assertEquals(input.get(2).getTimestamp(), impl.getPreviousCollectionAt(delta2).getTimestamp());
+    }
+
+    @Test
+    public void previousAt_inexact() {
+        final Duration delta2 = Duration.standardMinutes(2).plus(Duration.standardSeconds(30));
+        setup(ExpressionLookBack.fromScrapeCount(10));
+
+        assertEquals(input.get(0).getTimestamp().minus(delta2), impl.getPreviousCollectionAt(delta2).getTimestamp());
+    }
 }

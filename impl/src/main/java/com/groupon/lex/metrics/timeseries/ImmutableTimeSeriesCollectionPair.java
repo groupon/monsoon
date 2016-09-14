@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
 import java.util.Optional;
+import org.joda.time.DateTime;
 
 /**
  *
@@ -11,9 +12,19 @@ import java.util.Optional;
  */
 public class ImmutableTimeSeriesCollectionPair implements TimeSeriesCollectionPair {
     private final List<TimeSeriesCollection> history_;
+    private final TimeSeriesCollectionPair parent_;  // May be null.
+
+    public ImmutableTimeSeriesCollectionPair(List<? extends TimeSeriesCollection> tsc, Optional<TimeSeriesCollectionPair> parent) {
+        history_ = unmodifiableList(tsc);
+        parent_ = parent.orElse(null);
+    }
 
     public ImmutableTimeSeriesCollectionPair(List<? extends TimeSeriesCollection> tsc) {
-        history_ = unmodifiableList(tsc);
+        this(tsc, Optional.empty());
+    }
+
+    public ImmutableTimeSeriesCollectionPair(List<? extends TimeSeriesCollection> tsc, TimeSeriesCollectionPair parent) {
+        this(tsc, Optional.of(parent));
     }
 
     public static TimeSeriesCollectionPair copyList(List<? extends TimeSeriesCollection> tsc) {
@@ -32,6 +43,12 @@ public class ImmutableTimeSeriesCollectionPair implements TimeSeriesCollectionPa
         if (n < 0) throw new IllegalArgumentException("cannot look into the future");
         if (n >= history_.size()) return Optional.empty();
         return Optional.of(history_.get(n));
+    }
+
+    @Override
+    public TimeSeriesCollection getPreviousCollectionAt(DateTime ts) {
+        if (parent_ != null) return parent_.getPreviousCollectionAt(ts);
+        return TimeSeriesCollectionPair.getPreviousCollectionAt(history_, ts);
     }
 
     @Override
