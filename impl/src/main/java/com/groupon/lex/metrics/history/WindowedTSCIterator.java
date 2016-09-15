@@ -31,9 +31,11 @@
  */
 package com.groupon.lex.metrics.history;
 
+import com.groupon.lex.metrics.timeseries.InterpolatedTSC;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import static java.util.Collections.reverse;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
@@ -152,6 +154,16 @@ public class WindowedTSCIterator implements Iterator<WindowedTSCIterator.Window>
         @Override
         public int compareTo(Window o) {
             return getPresent().compareTo(o.getPresent());
+        }
+
+        public TimeSeriesCollection getInterpolated() {
+            if (future.isEmpty() || past.isEmpty())
+                return present;  // Can't interpolate anything without them.
+
+            final List<TimeSeriesCollection> forward = new ArrayList<>(future);
+            final List<TimeSeriesCollection> backward = new ArrayList<>(past);
+            reverse(backward);
+            return new InterpolatedTSC(present, backward, forward);
         }
     }
 }
