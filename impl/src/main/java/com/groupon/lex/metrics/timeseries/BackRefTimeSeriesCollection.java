@@ -55,7 +55,7 @@ import org.joda.time.Duration;
  * It remembers older values that are not present after merging in a new set,
  * so that rate queries and back-referencing queries can still get data.
  */
-public class BackRefTimeSeriesCollection implements TimeSeriesCollection {
+public class BackRefTimeSeriesCollection extends AbstractTimeSeriesCollection implements TimeSeriesCollection {
     public static final Duration MAX_AGE = Duration.standardMinutes(30);
     private DateTime timestamp_;
     private final Map<GroupName, TimeSeriesValue> data_ = new THashMap<>();

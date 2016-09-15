@@ -48,7 +48,7 @@ import org.joda.time.DateTimeZone;
  *
  * @author ariane
  */
-public interface TimeSeriesCollection extends Cloneable {
+public interface TimeSeriesCollection extends Cloneable, Comparable<TimeSeriesCollection> {
     public static DateTime now() {
         return DateTime.now(DateTimeZone.UTC);
     }
@@ -76,4 +76,9 @@ public interface TimeSeriesCollection extends Cloneable {
     }
 
     public TimeSeriesCollection clone();
+
+    @Override
+    public default int compareTo(TimeSeriesCollection o) {
+        return getTimestamp().compareTo(o.getTimestamp());
+    }
 }

@@ -17,9 +17,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Spliterator;
+import static java.util.Spliterator.DISTINCT;
 import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
+import static java.util.Spliterator.SORTED;
 import java.util.Spliterators;
 import java.util.function.Predicate;
 import java.util.logging.Level;
@@ -49,21 +51,39 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
     public short getMinor();
     /** Returns true if the file is compressed. */
     public boolean isGzipped();
-    /** Returns a closeable iterator for this TSData. */
+    /** Returns true if the file has ordered records. */
+    public boolean isOrdered();
+    /** Returns true if the file records are unique. */
+    public boolean isUnique();
+    /**
+     * Returns an iterator for this TSData.
+     * Iterator is always ordered, without duplicate timestamps.
+     */
     @Override
     public Iterator<TimeSeriesCollection> iterator();
 
+    /**
+     * Returns an iterator for this TSData.
+     * Iterator is always ordered, without duplicate timestamps.
+     */
     @Override
     public default Spliterator<TimeSeriesCollection> spliterator() {
-        return Spliterators.spliteratorUnknownSize(iterator(), NONNULL | IMMUTABLE | ORDERED);
+        return Spliterators.spliteratorUnknownSize(iterator(), NONNULL | IMMUTABLE | ORDERED | DISTINCT | SORTED);
     }
 
-    /** Stream the TSData contents. */
+    /**
+     * Stream the TSData contents.
+     * The stream iterates collection in chronological order, without duplicate timestamps.
+     */
     @Override
     public default Stream<TimeSeriesCollection> stream() {
         return StreamSupport.stream(spliterator(), false);
     }
 
+    /**
+     * Stream the TSData contents in reverse chronological order.
+     * The stream iterates collection in reverse chronological order, without duplicate timestamps.
+     */
     @Override
     public default Stream<TimeSeriesCollection> streamReversed() {
         final List<TimeSeriesCollection> copy = stream().collect(Collectors.toList());

@@ -359,6 +359,18 @@ public class TSDataTest {
         }
 
         @Override
+        public boolean isUnique() {
+            fail("unimplemented mock function");
+            return true;
+        }
+
+        @Override
+        public boolean isOrdered() {
+            fail("unimplemented mock function");
+            return true;
+        }
+
+        @Override
         public Iterator<TimeSeriesCollection> iterator() {
             fail("unimplemented mock function");
             return null;

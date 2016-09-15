@@ -3,8 +3,8 @@ package com.groupon.lex.metrics.history.xdr;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.xdr.TSDataScanDir.MetaData;
+import com.groupon.lex.metrics.history.xdr.support.MultiFileIterator;
 import com.groupon.lex.metrics.history.xdr.support.TSDataMap;
-import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.lang.ref.SoftReference;
@@ -20,25 +20,27 @@ import java.security.SecureRandom;
 import java.util.Collection;
 import java.util.Collections;
 import static java.util.Collections.emptyList;
-import static java.util.Collections.reverse;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.Set;
-import java.util.Spliterator;
+import static java.util.Spliterator.DISTINCT;
 import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import java.util.Spliterators;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import java.util.zip.GZIPOutputStream;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -198,72 +200,90 @@ public class TSDataFileChain implements TSData {
         }
     }
 
-    private Stream<Map.Entry<Key, TSData>> stream_datafiles_() {
-        Stream<Map.Entry<Key, TSData>> read = read_stores_.entrySet().stream()
-                .sorted(Comparator.comparing(entry -> entry.getKey().getBegin()));
+    @AllArgsConstructor
+    @Getter
+    private static abstract class TSDataSupplier implements MultiFileIterator.TSDataSupplier {
+        private final DateTime begin;
+        private final DateTime end;
+    }
 
-        Optional<WriteableTSDataFile> opt_ws;
+    private Stream<TSData> stream_datafiles_() {
+        Stream<TSData> wfileStream;
         try {
-            opt_ws = get_write_store_();
+            wfileStream = get_write_store_().map(Stream::<TSData>of).orElseGet(Stream::empty);
         } catch (IOException ex) {
-            opt_ws = Optional.empty();
+            wfileStream = Stream.empty();
         }
-        Stream<Map.Entry<Key, TSData>> write = opt_ws
-                .flatMap(ws -> write_filename_.map(name -> SimpleMapEntry.create(name, ws)))
-                .map(named_ws -> {
-                    final Path name = named_ws.getKey();
-                    final WriteableTSDataFile ws = named_ws.getValue();
-                    final Key key = new Key(name, ws.getBegin(), ws.getEnd());
-                    return SimpleMapEntry.<Key, TSData>create(key, ws);
-                })
-                .map(Stream::of)
-                .orElseGet(Stream::empty);
 
-        return Stream.concat(read, write);
+        final Stream<TSData> rfileStream = read_stores_.entrySet().stream()
+                .map(rfile -> rfile.getValue());
+
+        return Stream.concat(wfileStream, rfileStream);
+    }
+
+    private Stream<TSDataSupplier> stream_tsdata_suppliers_(Function<TSData, Iterator<TimeSeriesCollection>> iteratorFn) {
+        Stream<TSDataSupplier> wfileStream;
+        try {
+            wfileStream = get_write_store_().map(Stream::of).orElseGet(Stream::empty)
+                    .map(wfile -> new TSDataSupplier(wfile.getBegin(), wfile.getEnd()) {
+                        @Override
+                        public Iterator<TimeSeriesCollection> getIterator() {
+                            return iteratorFn.apply(wfile);
+                        }
+                    });
+        } catch (IOException ex) {
+            wfileStream = Stream.empty();
+        }
+
+        final Stream<TSDataSupplier> rfileStream = read_stores_.entrySet().stream()
+                .map(rfile -> new TSDataSupplier(rfile.getKey().getBegin(), rfile.getKey().getEnd()) {
+                    @Override
+                    public Iterator<TimeSeriesCollection> getIterator() {
+                        return iteratorFn.apply(rfile.getValue());
+                    }
+                });
+
+        return Stream.concat(wfileStream, rfileStream);
     }
 
     @Override
     public Iterator<TimeSeriesCollection> iterator() {
-        return stream().iterator();
-    }
-
-    @Override
-    public Spliterator<TimeSeriesCollection> spliterator() {
-        return Spliterators.spliteratorUnknownSize(iterator(), NONNULL | IMMUTABLE | ORDERED);
-    }
-
-    @Override
-    public Stream<TimeSeriesCollection> stream() {
-        return stream_datafiles_()
-                .map(Map.Entry::getValue)
-                .flatMap(TSData::stream);
+        return new MultiFileIterator(stream_tsdata_suppliers_(TSData::iterator).collect(Collectors.toList()), Comparator.naturalOrder());
     }
 
     @Override
     public Stream<TimeSeriesCollection> streamReversed() {
-        final List<TSData> reversed = stream_datafiles_()
-                .map(Map.Entry::getValue)
-                .collect(Collectors.toList());
-        reverse(reversed);
-        return reversed.stream()
-                .flatMap(TSData::streamReversed);
+        return StreamSupport.stream(
+                Spliterators.spliteratorUnknownSize(
+                        new MultiFileIterator(stream_tsdata_suppliers_(tsdata -> tsdata.streamReversed().iterator()).collect(Collectors.toList()),
+                                Comparator.reverseOrder()),
+                        NONNULL | IMMUTABLE | ORDERED | DISTINCT),
+                false);
     }
 
     @Override
     public Stream<TimeSeriesCollection> stream(DateTime begin) {
-        return stream_datafiles_()
-                .filter(tsd -> !begin.isAfter(tsd.getKey().getEnd()))
-                .map(Map.Entry::getValue)
-                .flatMap(TSData::stream)
+        final List<TSDataSupplier> files = stream_tsdata_suppliers_(TSData::iterator)
+                .filter(tsd -> !begin.isAfter(tsd.getEnd()))
+                .collect(Collectors.toList());
+        return StreamSupport.stream(
+                    Spliterators.spliteratorUnknownSize(
+                            new MultiFileIterator(files, Comparator.naturalOrder()),
+                            NONNULL | IMMUTABLE | ORDERED | DISTINCT),
+                    false)
                 .filter(tsc -> !tsc.getTimestamp().isBefore(begin));
     }
 
     @Override
     public Stream<TimeSeriesCollection> stream(DateTime begin, DateTime end) {
-        return stream_datafiles_()
-                .filter(tsd -> !begin.isAfter(tsd.getKey().getEnd()) && !end.isBefore(tsd.getKey().getBegin()))
-                .map(Map.Entry::getValue)
-                .flatMap(TSData::stream)
+        final List<TSDataSupplier> files = stream_tsdata_suppliers_(TSData::iterator)
+                .filter(tsd -> !begin.isAfter(tsd.getEnd()) && !end.isBefore(tsd.getBegin()))
+                .collect(Collectors.toList());
+        return StreamSupport.stream(
+                    Spliterators.spliteratorUnknownSize(
+                            new MultiFileIterator(files, Comparator.naturalOrder()),
+                            NONNULL | IMMUTABLE | ORDERED | DISTINCT),
+                    false)
                 .filter(tsc -> !tsc.getTimestamp().isBefore(begin))
                 .filter(tsc -> !tsc.getTimestamp().isAfter(end));
     }
@@ -271,7 +291,6 @@ public class TSDataFileChain implements TSData {
     @Override
     public boolean isEmpty() {
         return stream_datafiles_()
-                .map(Map.Entry::getValue)
                 .allMatch(TSData::isEmpty);
     }
 
@@ -283,7 +302,6 @@ public class TSDataFileChain implements TSData {
     @Override
     public int size() {
         return stream_datafiles_()
-                .map(Map.Entry::getValue)
                 .mapToInt(TSData::size)
                 .sum();
     }
@@ -295,9 +313,8 @@ public class TSDataFileChain implements TSData {
         final TimeSeriesCollection tsv = (TimeSeriesCollection)o;
         final DateTime ts = tsv.getTimestamp();
         return stream_datafiles_()
-                .filter(tsd -> !ts.isBefore(tsd.getKey().getBegin()))
-                .filter(tsd -> !ts.isAfter(tsd.getKey().getEnd()))
-                .map(Map.Entry::getValue)
+                .filter(tsd -> !ts.isBefore(tsd.getBegin()))
+                .filter(tsd -> !ts.isAfter(tsd.getEnd()))
                 .anyMatch(tsd -> tsd.contains(tsv));
     }
 
@@ -314,10 +331,9 @@ public class TSDataFileChain implements TSData {
         }
 
         boolean matches = stream_datafiles_()
-                .unordered()
                 .allMatch(tsd -> {
-                    final DateTime begin = tsd.getKey().getBegin();
-                    final DateTime end = tsd.getKey().getEnd();
+                    final DateTime begin = tsd.getBegin();
+                    final DateTime end = tsd.getEnd();
                     final List<TimeSeriesCollection> filter = tsc_list.stream()
                             .filter(tsc -> !tsc.getTimestamp().isBefore(begin))
                             .filter(tsc -> !tsc.getTimestamp().isAfter(end))
@@ -325,7 +341,7 @@ public class TSDataFileChain implements TSData {
 
                     if (!filter.isEmpty()) {
                         tsc_list.removeAll(filter);
-                        return tsd.getValue().containsAll(filter);
+                        return tsd.containsAll(filter);
                     } else {
                         return true;
                     }
@@ -586,4 +602,9 @@ public class TSDataFileChain implements TSData {
             LOG.log(Level.WARNING, "unable to remove file " + key.getFile(), ex);
         }
     }
+
+    @Override
+    public boolean isOrdered() { return true; }
+    @Override
+    public boolean isUnique() { return true; }
 }
