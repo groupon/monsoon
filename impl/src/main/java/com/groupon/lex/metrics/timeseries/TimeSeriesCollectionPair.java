@@ -53,7 +53,7 @@ public interface TimeSeriesCollectionPair {
 
     public default TimeSeriesCollection getPreviousCollection() {
         return getPreviousCollection(1)
-                .orElseGet(MutableTimeSeriesCollection::new);
+                .orElseGet(() -> new MutableTimeSeriesCollection(getCurrentCollection().getTimestamp()));
     }
 
     public Optional<TimeSeriesCollection> getPreviousCollection(int n);

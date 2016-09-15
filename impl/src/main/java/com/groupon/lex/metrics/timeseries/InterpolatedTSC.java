@@ -52,6 +52,8 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.Getter;
@@ -59,6 +61,7 @@ import org.joda.time.DateTime;
 import org.joda.time.Duration;
 
 public class InterpolatedTSC implements TimeSeriesCollection {
+    private static final Logger LOG = Logger.getLogger(InterpolatedTSC.class.getName());
     /** TimeSeriesCollections used for interpolation. */
     private final List<TimeSeriesCollection> backward, forward;
     /** Current TimeSeriesCollection. */
@@ -80,20 +83,28 @@ public class InterpolatedTSC implements TimeSeriesCollection {
 
     /** Check the forward and backward invariants. */
     private void validate() {
-        DateTime ts;
+        try {
+            DateTime ts;
 
-        ts = current.getTimestamp();
-        for (TimeSeriesCollection b : backward) {
-            if (b.getTimestamp().isAfter(ts))
-                throw new IllegalArgumentException("backwards collection must be before current and be ordered in reverse chronological order");
-            ts = b.getTimestamp();
-        }
+            ts = current.getTimestamp();
+            for (TimeSeriesCollection b : backward) {
+                if (b.getTimestamp().isAfter(ts))
+                    throw new IllegalArgumentException("backwards collection must be before current and be ordered in reverse chronological order");
+                ts = b.getTimestamp();
+            }
 
-        ts = current.getTimestamp();
-        for (TimeSeriesCollection f : forward) {
-            if (f.getTimestamp().isBefore(ts))
-                throw new IllegalArgumentException("forwards collection must be after current and be ordered in chronological order");
-            ts = f.getTimestamp();
+            ts = current.getTimestamp();
+            for (TimeSeriesCollection f : forward) {
+                if (f.getTimestamp().isBefore(ts))
+                    throw new IllegalArgumentException("forwards collection must be after current and be ordered in chronological order");
+                ts = f.getTimestamp();
+            }
+        } catch (IllegalArgumentException ex) {
+            LOG.log(Level.SEVERE, "programmer error in creating interpolated TimeSeriesCollection", ex);
+            final List<DateTime> backward_ts = backward.stream().map(TimeSeriesCollection::getTimestamp).collect(Collectors.toList());
+            final List<DateTime> forward_ts = forward.stream().map(TimeSeriesCollection::getTimestamp).collect(Collectors.toList());
+            LOG.log(Level.INFO, "current = {0}, backward = {1}, forward = {2}", new Object[]{current.getTimestamp(), backward_ts, forward_ts});
+            throw ex;
         }
     }
 

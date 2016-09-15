@@ -44,7 +44,6 @@ import static org.hamcrest.CoreMatchers.hasItem;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertThat;
@@ -78,17 +77,14 @@ public class TimeSeriesCollectionPairInstanceTest {
 
     @Test
     public void constructor() {
-        DateTime before = DateTime.now(DateTimeZone.UTC);
-        TimeSeriesCollectionPair ts_data = new TimeSeriesCollectionPairInstance();
-        DateTime after = DateTime.now(DateTimeZone.UTC);
+        DateTime now = DateTime.now(DateTimeZone.UTC);
+        TimeSeriesCollectionPair ts_data = new TimeSeriesCollectionPairInstance(now);
 
         assertNotNull(ts_data.getPreviousCollection());
         assertNotNull(ts_data.getCurrentCollection());
 
-        assertFalse("before <= ts_data.previousCollection().getTimestamp()",
-                before.isAfter(ts_data.getPreviousCollection().getTimestamp()));
-        assertFalse("ts_data.currentCollection().getTimestamp() <= after",
-                ts_data.getCurrentCollection().getTimestamp().isAfter(after));
+        assertEquals(now, ts_data.getPreviousCollection().getTimestamp());
+        assertEquals(now, ts_data.getCurrentCollection().getTimestamp());
         assertNotSame(ts_data.getPreviousCollection(), ts_data.getCurrentCollection());
 
         assertTrue(ts_data.getCurrentCollection().isEmpty());
@@ -97,7 +93,7 @@ public class TimeSeriesCollectionPairInstanceTest {
 
     @Test
     public void constructor_args() {
-        TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance();
+        TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance(date2);
         ts_data.startNewCycle(collection1.getTimestamp(), ExpressionLookBack.EMPTY);
         collection1.getData().values().forEach(ts_data.getCurrentCollection()::add);
         ts_data.startNewCycle(collection0.getTimestamp(), ExpressionLookBack.EMPTY);
@@ -110,7 +106,7 @@ public class TimeSeriesCollectionPairInstanceTest {
 
     @Test
     public void lookup() {
-        TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance();
+        TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance(date2);
         ts_data.startNewCycle(collection1.getTimestamp(), ExpressionLookBack.EMPTY);
         collection1.getData().values().forEach(ts_data.getCurrentCollection()::add);
         ts_data.startNewCycle(collection0.getTimestamp(), ExpressionLookBack.EMPTY);
@@ -122,7 +118,7 @@ public class TimeSeriesCollectionPairInstanceTest {
 
     @Test
     public void lookup_current_only() {
-        TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance();
+        TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance(date2);
         ts_data.startNewCycle(collection1.getTimestamp(), ExpressionLookBack.EMPTY);
         collection1.getData().values().forEach(ts_data.getCurrentCollection()::add);
         ts_data.startNewCycle(collection0.getTimestamp(), ExpressionLookBack.EMPTY);
@@ -134,7 +130,7 @@ public class TimeSeriesCollectionPairInstanceTest {
 
     @Test
     public void lookup_past_only() {
-        TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance();
+        TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance(date2);
         ts_data.startNewCycle(collection1.getTimestamp(), ExpressionLookBack.EMPTY);
         collection1.getData().values().forEach(ts_data.getCurrentCollection()::add);
         ts_data.startNewCycle(collection0.getTimestamp(), ExpressionLookBack.EMPTY);
@@ -146,7 +142,7 @@ public class TimeSeriesCollectionPairInstanceTest {
 
     @Test
     public void lookup_non_existent() {
-        TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance();
+        TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance(date2);
         ts_data.startNewCycle(collection1.getTimestamp(), ExpressionLookBack.EMPTY);
         collection1.getData().values().forEach(ts_data.getCurrentCollection()::add);
         ts_data.startNewCycle(collection0.getTimestamp(), ExpressionLookBack.EMPTY);

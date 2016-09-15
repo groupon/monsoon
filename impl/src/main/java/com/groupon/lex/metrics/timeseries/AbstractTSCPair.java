@@ -28,6 +28,21 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
         previous_ = new ArrayList<>(original.previous_);
     }
 
+    private void validatePrevious() {
+        try {
+            DateTime ts = getCurrentCollection().getTimestamp();
+
+            for (TimeSeriesCollection p : previous_) {
+                if (!p.getTimestamp().isBefore(ts))
+                    throw new IllegalArgumentException("previous timestamps must be before current and ordered in reverse chronological order");
+                ts = p.getTimestamp();
+            }
+        } catch (IllegalArgumentException ex) {
+            LOG.log(Level.SEVERE, "programmer error", ex);
+            throw ex;
+        }
+    }
+
     @Override
     public abstract TimeSeriesCollection getCurrentCollection();
 
@@ -54,6 +69,8 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
             previous_.add(0, new BackRefTimeSeriesCollection(tsc.getTimestamp(), tsc.getTSValues()));
         }
         LOG.log(Level.INFO, "recovered {0} scrapes from history", previous_.size());
+
+        validatePrevious();  // Should never trigger.
     }
 
     @Override
@@ -64,9 +81,12 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
         return Optional.of(previous_.get(n - 1));
     }
 
-    protected void update(TimeSeriesCollection tsc, ExpressionLookBack lookback) {
+    protected final void update(TimeSeriesCollection tsc, ExpressionLookBack lookback, Runnable doBeforeValidation) {
         previous_.add(0, new BackRefTimeSeriesCollection(tsc));
         apply_lookback_(lookback);
+        doBeforeValidation.run();
+
+        validatePrevious();
     }
 
     private void apply_lookback_(ExpressionLookBack lookback) {

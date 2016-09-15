@@ -40,10 +40,6 @@ import org.joda.time.DateTime;
 public class TimeSeriesCollectionPairInstance extends AbstractTSCPair {
     private final MutableTimeSeriesCollection current_;
 
-    public TimeSeriesCollectionPairInstance() {
-        current_ = new MutableTimeSeriesCollection();
-    }
-
     public TimeSeriesCollectionPairInstance(DateTime now) {
         current_ = new MutableTimeSeriesCollection(now);
     }
@@ -54,8 +50,7 @@ public class TimeSeriesCollectionPairInstance extends AbstractTSCPair {
     }
 
     public TimeSeriesCollectionPairInstance startNewCycle(DateTime timestamp, ExpressionLookBack lookback) {
-        update(current_, lookback);
-        current_.clear(timestamp);
+        update(current_, lookback, () -> current_.clear(timestamp));
         return this;
     }
 
