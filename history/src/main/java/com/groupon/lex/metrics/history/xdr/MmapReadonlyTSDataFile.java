@@ -9,6 +9,7 @@ import com.groupon.lex.metrics.history.TSData;
 import static com.groupon.lex.metrics.history.xdr.Const.validateHeaderOrThrow;
 import static com.groupon.lex.metrics.history.xdr.Const.version_major;
 import static com.groupon.lex.metrics.history.xdr.Const.version_minor;
+import com.groupon.lex.metrics.history.xdr.support.FileIterator;
 import com.groupon.lex.metrics.history.xdr.support.GzipDecodingBufferSupplier;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID1_EXPECT;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID2_EXPECT;
@@ -28,6 +29,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.acplt.oncrpc.OncRpcException;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import lombok.Getter;
 import org.joda.time.DateTime;
 
@@ -157,10 +161,23 @@ public final class MmapReadonlyTSDataFile implements TSData {
     @Override
     public Iterator<TimeSeriesCollection> iterator() {
         try {
+            Iterator<TimeSeriesCollection> iter;
             if (is_gzippped_)
-                return new GzipTsvIterator();
+                iter = new GzipTsvIterator();
             else
-                return new TsvIterator();
+                iter = new TsvIterator();
+
+            if (!isOrdered()) {
+                List<TimeSeriesCollection> data = new ArrayList<>();
+                iter.forEachRemaining(data::add);
+                Collections.sort(data, Comparator.comparing(TimeSeriesCollection::getTimestamp));
+                iter = data.iterator();
+            }
+            if (!isUnique()) {
+                iter = new FileIterator(iter);
+            }
+
+            return iter;
         } catch (IOException ex) {
             LOG.log(Level.SEVERE, "unable to decode file", ex);
             return Collections.emptyIterator();

@@ -43,7 +43,6 @@ import static java.util.Collections.unmodifiableSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Objects;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.Set;
@@ -57,7 +56,7 @@ import org.joda.time.DateTimeZone;
  *
  * @author ariane
  */
-public class MutableTimeSeriesCollection implements TimeSeriesCollection, Cloneable {
+public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection implements TimeSeriesCollection, Cloneable {
     private static final Logger LOG = Logger.getLogger(MutableTimeSeriesCollection.class.getName());
 
     private DateTime timestamp_;
@@ -196,31 +195,6 @@ public class MutableTimeSeriesCollection implements TimeSeriesCollection, Clonea
     @Override
     public MutableTimeSeriesCollection clone() {
         return new MutableTimeSeriesCollection(getTimestamp(), getData().values().stream());
-    }
-
-    @Override
-    public int hashCode() {
-        int hash = 7;
-        hash = 59 * hash + Objects.hashCode(this.timestamp_);
-        return hash;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final MutableTimeSeriesCollection other = (MutableTimeSeriesCollection) obj;
-        if (!Objects.equals(this.timestamp_, other.timestamp_)) {
-            return false;
-        }
-        if (!Objects.equals(this.data_, other.data_)) {
-            return false;
-        }
-        return true;
     }
 
     @Override

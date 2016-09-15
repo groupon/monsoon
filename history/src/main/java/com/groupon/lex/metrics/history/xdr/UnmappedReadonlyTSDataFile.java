@@ -4,6 +4,7 @@ import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.history.TSData;
 import static com.groupon.lex.metrics.history.xdr.Const.version_major;
 import static com.groupon.lex.metrics.history.xdr.Const.version_minor;
+import com.groupon.lex.metrics.history.xdr.support.FileIterator;
 import com.groupon.lex.metrics.history.xdr.support.GzipDecodingBufferSupplier;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID1_EXPECT;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID2_EXPECT;
@@ -23,6 +24,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.acplt.oncrpc.OncRpcException;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import lombok.Getter;
 import org.joda.time.DateTime;
 
@@ -163,13 +168,26 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
     @Override
     public Iterator<TimeSeriesCollection> iterator() {
         try {
+            Iterator<TimeSeriesCollection> iter;
             BufferSupplier decoder = new UnmappedBufferSupplier();
             if (is_gzipped_) {
                 decoder = new GzipDecodingBufferSupplier(decoder);
-                return new XdrStreamIterator(decoder);
+                iter = new XdrStreamIterator(decoder);
             } else {
-                return new XdrStreamIterator(ByteBuffer.allocateDirect(1024 * 1024), decoder);
+                iter = new XdrStreamIterator(ByteBuffer.allocateDirect(1024 * 1024), decoder);
             }
+
+            if (!isOrdered()) {
+                List<TimeSeriesCollection> data = new ArrayList<>();
+                iter.forEachRemaining(data::add);
+                Collections.sort(data, Comparator.comparing(TimeSeriesCollection::getTimestamp));
+                iter = data.iterator();
+            }
+            if (!isUnique()) {
+                iter = new FileIterator(iter);
+            }
+
+            return iter;
         } catch (IOException ex) {
             LOG.log(Level.SEVERE, "unable to create iterator", ex);
             return emptyIterator();

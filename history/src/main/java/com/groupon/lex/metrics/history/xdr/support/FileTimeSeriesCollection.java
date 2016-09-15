@@ -5,6 +5,7 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.timeseries.AbstractTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
@@ -12,7 +13,6 @@ import gnu.trove.map.hash.THashMap;
 import java.util.Collection;
 import static java.util.Collections.unmodifiableCollection;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BinaryOperator;
@@ -26,7 +26,7 @@ import org.joda.time.DateTime;
  *
  * @author ariane
  */
-public class FileTimeSeriesCollection implements TimeSeriesCollection {
+public class FileTimeSeriesCollection extends AbstractTimeSeriesCollection implements TimeSeriesCollection {
     private final DateTime timestamp_;
     private final Map<SimpleGroupPath, Map<Tags, TimeSeriesValue>> path_map_;
 
@@ -117,31 +117,6 @@ public class FileTimeSeriesCollection implements TimeSeriesCollection {
     @Override
     public TimeSeriesCollection clone() {
         return this;  // Immutable
-    }
-
-    @Override
-    public int hashCode() {
-        int hash = 7;
-        hash = 97 * hash + Objects.hashCode(this.timestamp_);
-        return hash;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final FileTimeSeriesCollection other = (FileTimeSeriesCollection) obj;
-        if (!Objects.equals(this.timestamp_, other.timestamp_)) {
-            return false;
-        }
-        if (!Objects.equals(path_map_, other.path_map_)) {
-            return false;
-        }
-        return true;
     }
 
     @Override

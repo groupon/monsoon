@@ -52,10 +52,15 @@ import org.joda.time.DateTime;
  * @author ariane
  */
 public class MultiFileIterator implements Iterator<TimeSeriesCollection> {
-    private final PriorityQueue<TSDataSupplier> files = new PriorityQueue<>(Comparator.comparing(TSDataSupplier::getBegin));
-    private final PriorityQueue<PeekableIterator> fileIters = new PriorityQueue<>(Comparator.comparing(iter -> iter.peek().getTimestamp()));
+    private final Comparator<DateTime> cmp;
+    private final PriorityQueue<TSDataSupplier> files;
+    private final PriorityQueue<PeekableIterator> fileIters;
 
-    public MultiFileIterator(Collection<? extends TSDataSupplier> files) {
+    public MultiFileIterator(@NonNull Collection<? extends TSDataSupplier> files, @NonNull Comparator<DateTime> cmp) {
+        this.cmp = cmp;
+        this.files = new PriorityQueue<>(Comparator.comparing(TSDataSupplier::getBegin, this.cmp));
+        this.fileIters = new PriorityQueue<>(Comparator.comparing(iter -> iter.peek().getTimestamp(), this.cmp));
+
         this.files.addAll(files);
         updateFileIters();
     }
@@ -81,7 +86,7 @@ public class MultiFileIterator implements Iterator<TimeSeriesCollection> {
         for (;;) {
             final PeekableIterator fn = fileIters.peek();
             if (fn == null) break;
-            if (!next.getTimestamp().equals(fn.peek().getTimestamp())) break;
+            if (cmp.compare(next.getTimestamp(), fn.peek().getTimestamp()) != 0) break;
             final PeekableIterator removed = fileIters.poll();
             assert(fn == removed);
 
@@ -119,7 +124,7 @@ public class MultiFileIterator implements Iterator<TimeSeriesCollection> {
         for (;;) {
             final TSDataSupplier f0 = files.peek();
             if (f0 == null) break;
-            if (ts.isBefore(f0.getBegin())) break;
+            if (cmp.compare(ts, f0.getBegin()) < 0) break;
             final TSDataSupplier removed = files.poll(); // Use f0.
             assert(f0 == removed);
 

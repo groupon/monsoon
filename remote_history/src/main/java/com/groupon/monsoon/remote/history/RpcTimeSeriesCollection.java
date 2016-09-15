@@ -36,6 +36,7 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.timeseries.AbstractTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
@@ -50,13 +51,11 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.joda.time.DateTime;
 
-@EqualsAndHashCode
 @ToString
-public class RpcTimeSeriesCollection implements TimeSeriesCollection {
+public class RpcTimeSeriesCollection extends AbstractTimeSeriesCollection implements TimeSeriesCollection {
     private final DateTime timestamp_;
     private final Map<SimpleGroupPath, Map<Tags, TimeSeriesValue>> path_map_;
 
