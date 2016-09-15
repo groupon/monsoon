@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Spliterator;
+import static java.util.Spliterator.DISTINCT;
 import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
@@ -49,13 +50,20 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
     public short getMinor();
     /** Returns true if the file is compressed. */
     public boolean isGzipped();
+    /** Returns true if the file has ordered records. */
+    public boolean isOrdered();
+    /** Returns true if the file records are unique. */
+    public boolean isUnique();
     /** Returns a closeable iterator for this TSData. */
     @Override
     public Iterator<TimeSeriesCollection> iterator();
 
     @Override
     public default Spliterator<TimeSeriesCollection> spliterator() {
-        return Spliterators.spliteratorUnknownSize(iterator(), NONNULL | IMMUTABLE | ORDERED);
+        int flags = NONNULL | IMMUTABLE;
+        if (isOrdered()) flags |= ORDERED;
+        if (isUnique()) flags |= DISTINCT;
+        return Spliterators.spliteratorUnknownSize(iterator(), flags);
     }
 
     /** Stream the TSData contents. */

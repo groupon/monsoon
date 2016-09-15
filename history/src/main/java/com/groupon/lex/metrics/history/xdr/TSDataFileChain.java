@@ -30,6 +30,7 @@ import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Spliterator;
+import static java.util.Spliterator.DISTINCT;
 import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
@@ -39,6 +40,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
+import lombok.Getter;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -50,6 +52,8 @@ public class TSDataFileChain implements TSData {
     private static final Logger LOG = Logger.getLogger(TSDataFileChain.class.getName());
     public static long MAX_FILESIZE = 64 * 1024 * 1024;
     private final long max_filesize_;
+    @Getter
+    private final boolean ordered = true, unique = true;
 
     public static class Key implements Comparable<Key> {
         private final Path file_;
@@ -229,7 +233,7 @@ public class TSDataFileChain implements TSData {
 
     @Override
     public Spliterator<TimeSeriesCollection> spliterator() {
-        return Spliterators.spliteratorUnknownSize(iterator(), NONNULL | IMMUTABLE | ORDERED);
+        return Spliterators.spliteratorUnknownSize(iterator(), NONNULL | IMMUTABLE | ORDERED | DISTINCT);
     }
 
     @Override

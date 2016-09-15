@@ -28,18 +28,21 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.acplt.oncrpc.OncRpcException;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
+import lombok.Getter;
 import org.joda.time.DateTime;
 
 /**
  *
  * @author ariane
  */
-public class MmapReadonlyTSDataFile implements TSData {
+public final class MmapReadonlyTSDataFile implements TSData {
     private static final Logger LOG = Logger.getLogger(MmapReadonlyTSDataFile.class.getName());
     private final ByteBuffer data_;
     private final DateTime begin_, end_;
     private final int version_;
     private final boolean is_gzippped_;
+    @Getter
+    private final boolean ordered, unique;
 
     private class TsvIterator extends XdrStreamIterator {  // non-static, to keep weak reference to MmapReadonlyTSDataFile alive.
         public TsvIterator() throws IOException {
@@ -104,6 +107,31 @@ public class MmapReadonlyTSDataFile implements TSData {
         begin_ = header.getBegin();
         end_ = header.getEnd();
         LOG.log(Level.INFO, "instantiated: version={0}.{1} begin={2}, end={3}", new Object[]{version_major(version_), version_minor(version_), begin_, end_});
+
+        /*
+         * Check if the collection is ordered and unique.
+         */
+        final Iterator<TimeSeriesCollection> iter = iterator();
+        if (!iter.hasNext()) {
+            ordered = true;
+            unique = true;
+        } else {
+            boolean uniqueLoopInvariant = true;
+            boolean orderedLoopInvariant = true;
+
+            DateTime ts = iter.next().getTimestamp();
+            while (iter.hasNext()) {
+                final DateTime nextTs = iter.next().getTimestamp();
+
+                if (ts.equals(nextTs))
+                    uniqueLoopInvariant = false;
+                if (nextTs.isBefore(ts))
+                    orderedLoopInvariant = false;
+            }
+
+            ordered = orderedLoopInvariant;
+            unique = uniqueLoopInvariant;
+        }
     }
 
     public static MmapReadonlyTSDataFile open(Path file) throws IOException {
