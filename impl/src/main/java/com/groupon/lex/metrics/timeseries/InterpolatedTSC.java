@@ -290,11 +290,8 @@ public class InterpolatedTSC implements TimeSeriesCollection {
         }
 
         private MetricValue interpolate(MetricValue a, MetricValue b) {
-            if (a.getBoolValue() != null && b.getBoolValue() != null)
-                return a;
-
-            if ((a.getIntValue() != null || a.getFltValue() != null) &&
-                    (b.getIntValue() != null || b.getFltValue() != null))
+            if ((a.getBoolValue() != null || a.getIntValue() != null || a.getFltValue() != null) &&
+                    (b.getBoolValue() != null || b.getIntValue() != null || b.getFltValue() != null))
                 return MetricValue.fromDblValue(backWeight * a.value().get().doubleValue() + forwWeight * b.value().get().doubleValue());
 
             if (a.getStrValue() != null && b.getStrValue() != null)
