@@ -146,10 +146,12 @@ public class IntervalIterator implements Iterator<TimeSeriesCollection> {
 
             // If there is no data to interpolate from,
             // it's best to just skip those ranges.
-            if (underlyingNext != null &&
-                    (future.isEmpty() || (!future.getFirst().getTimestamp().equals(nextTS) && past.isEmpty()))) {
+            if (underlyingNext != null && future.isEmpty()) {
                 nextTS = underlyingNext.getTimestamp();
-                restart = true;  // Happens at most once per function invocation.
+                restart = true;
+            } else if (!future.isEmpty() && !future.getFirst().getTimestamp().equals(nextTS) && past.isEmpty()) {
+                nextTS = future.getFirst().getTimestamp();
+                restart = true;
             }
         } while (restart);
     }
