@@ -51,10 +51,7 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
     public short getMinor();
     /** Returns true if the file is compressed. */
     public boolean isGzipped();
-    /** Returns true if the file has ordered records. */
-    public boolean isOrdered();
-    /** Returns true if the file records are unique. */
-    public boolean isUnique();
+
     /**
      * Returns an iterator for this TSData.
      * Iterator is always ordered, without duplicate timestamps.

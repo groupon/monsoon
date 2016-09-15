@@ -35,7 +35,6 @@ import java.util.stream.Stream;
 import org.acplt.oncrpc.OncRpcException;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferEncodingStream;
-import lombok.Getter;
 import org.joda.time.DateTime;
 
 public final class WriteableTSDataFile implements TSData {
@@ -43,8 +42,6 @@ public final class WriteableTSDataFile implements TSData {
     private SoftReference<TSData> readonly_ = new SoftReference<>(null);
     private final HeaderRegenerator header_regenerator_;
     private final FromXdr from_xdr_ = new FromXdr();
-    @Getter
-    private boolean ordered, unique;
 
     private static class PositionalReader implements BufferSupplier {
         private final GCCloseable<FileChannel> fd_;
@@ -117,14 +114,8 @@ public final class WriteableTSDataFile implements TSData {
             write_buffer_to_file_(xdr.getBuffers(), 0);
         }
 
-        public void updateTimestamp(DateTime new_end_ts, Runnable onUnordered, Runnable onNotUnique) throws IOException {
+        public void updateTimestamp(DateTime new_end_ts) throws IOException {
             final long new_ts = ToXdr.timestamp(new_end_ts).value;
-
-            if (hdr_.last.value < new_ts)
-                onUnordered.run();
-            if (hdr_.last.value == new_ts)
-                onNotUnique.run();
-
             if (need_upgrade_ || hdr_.last.value < new_ts || hdr_.first.value > new_ts) {
                 hdr_.last.value = max(hdr_.last.value, new_ts);
                 hdr_.first.value = min(hdr_.first.value, new_ts);
@@ -180,31 +171,6 @@ public final class WriteableTSDataFile implements TSData {
         } catch (OncRpcException ex) {
             throw new IOException("RPC decoding error", ex);
         }
-
-        /*
-         * Check if the collection is ordered and unique.
-         */
-        final Iterator<TimeSeriesCollection> iter = iterator();
-        if (!iter.hasNext()) {
-            ordered = true;
-            unique = true;
-        } else {
-            boolean uniqueLoopInvariant = true;
-            boolean orderedLoopInvariant = true;
-
-            DateTime ts = iter.next().getTimestamp();
-            while (iter.hasNext()) {
-                final DateTime nextTs = iter.next().getTimestamp();
-
-                if (ts.equals(nextTs))
-                    uniqueLoopInvariant = false;
-                if (nextTs.isBefore(ts))
-                    orderedLoopInvariant = false;
-            }
-
-            ordered = orderedLoopInvariant;
-            unique = uniqueLoopInvariant;
-        }
     }
 
     public static WriteableTSDataFile open(Path file) throws IOException {
@@ -228,7 +194,7 @@ public final class WriteableTSDataFile implements TSData {
 
         final GCCloseable<FileChannel> fd = new GCCloseable<>(FileChannel.open(file, READ, WRITE, CREATE_NEW));
         try {
-            write_buffers_(fd.get(), xdr.getBuffers(), null, null, () -> {}, () -> {});
+            write_buffers_(fd.get(), xdr.getBuffers(), null, null);
             return new WriteableTSDataFile(fd);
         } catch (IOException | RuntimeException ex) {
             Files.delete(file);
@@ -240,7 +206,7 @@ public final class WriteableTSDataFile implements TSData {
         TSData result = readonly_.get();
         if (result == null) {
             try {
-                result = new UnmappedReadonlyTSDataFile(fd_, ordered, unique);
+                result = new UnmappedReadonlyTSDataFile(fd_);
             } catch (IOException ex) {
                 Logger.getLogger(WriteableTSDataFile.class.getName()).log(Level.SEVERE, "read-only stream failed", ex);
                 throw new RuntimeException("read-only stream failed", ex);
@@ -275,7 +241,7 @@ public final class WriteableTSDataFile implements TSData {
         return get_readonly_().toArray(a);
     }
 
-    private static boolean write_buffers_(FileChannel fd, List<ByteBuffer> bufs, HeaderRegenerator header_regenerator, DateTime new_end, Runnable onUnordered, Runnable onNotUnique) throws IOException {
+    private static boolean write_buffers_(FileChannel fd, List<ByteBuffer> bufs, HeaderRegenerator header_regenerator, DateTime new_end) throws IOException {
         boolean wrote_something = false;
 
         final long rollback;
@@ -297,7 +263,7 @@ public final class WriteableTSDataFile implements TSData {
             }
 
             if (header_regenerator != null)
-                header_regenerator.updateTimestamp(requireNonNull(new_end), onUnordered, onNotUnique);
+                header_regenerator.updateTimestamp(requireNonNull(new_end));
         } catch (RuntimeException | IOException ex) {
             try {
                 fd.truncate(rollback);
@@ -312,7 +278,7 @@ public final class WriteableTSDataFile implements TSData {
 
     private synchronized boolean write_buffers_(List<ByteBuffer> bufs, DateTime new_end) {
         try {
-            boolean wrote_something = write_buffers_(fd_.get(), bufs, header_regenerator_, new_end, () -> ordered = false, () -> unique = false);
+            boolean wrote_something = write_buffers_(fd_.get(), bufs, header_regenerator_, new_end);
             if (wrote_something)
                 readonly_.clear();
             return wrote_something;
