@@ -36,6 +36,7 @@ public class ExprEval extends HttpServlet {
     private static final Logger LOG = Logger.getLogger(ExprEval.class.getName());
     private final CollectHistory history_;
     private final static String EXPR_PREFIX = "expr:";
+    private final static Duration DEFAULT_INTERVAL = Duration.standardSeconds(5);
 
     public ExprEval(CollectHistory history) {
         history_ = requireNonNull(history);
@@ -43,11 +44,11 @@ public class ExprEval extends HttpServlet {
 
     private Stream<Collection<CollectHistory.NamedEvaluation>> eval_(Map<String, ? extends TimeSeriesMetricExpression> expr, Optional<DateTime> begin, Optional<DateTime> end, Optional<Duration> stepsize) {
         if (end.isPresent())
-            return history_.evaluate(expr, begin.get(), end.get(), stepsize.orElse(Duration.ZERO));
+            return history_.evaluate(expr, begin.get(), end.get(), stepsize.orElse(DEFAULT_INTERVAL));
         else if (begin.isPresent())
-            return history_.evaluate(expr, begin.get(), stepsize.orElse(Duration.ZERO));
+            return history_.evaluate(expr, begin.get(), stepsize.orElse(DEFAULT_INTERVAL));
         else
-            return history_.evaluate(expr, stepsize.orElse(Duration.ZERO));
+            return history_.evaluate(expr, stepsize.orElse(DEFAULT_INTERVAL));
     }
 
     private static Map<String, String> expressions_(HttpServletRequest hsr) {
