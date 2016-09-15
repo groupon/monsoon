@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import static java.util.Spliterator.DISTINCT;
 import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
@@ -83,17 +84,16 @@ public class WindowedTSCIterator implements Iterator<WindowedTSCIterator.Window>
         this.lookBack = lookBack;
         this.lookForward = lookForward;
         consumeUnderlyingNext();  // Initialize underlyingNext.
-        updateWindow();  // Update forward window.
     }
 
     @Override
     public boolean hasNext() {
-        return !future.isEmpty();
+        return !future.isEmpty() || underlyingNext != null;
     }
 
     @Override
     public Window next() {
-        final TimeSeriesCollection winPresent = future.removeFirst();  // Must happen before creating winFuture.
+        final TimeSeriesCollection winPresent = updateWindow();  // Must happen before creating winFuture.
         final List<TimeSeriesCollection> winPast = new ArrayList<>(past);
         final List<TimeSeriesCollection> winFuture = new ArrayList<>(future);
 
@@ -101,31 +101,33 @@ public class WindowedTSCIterator implements Iterator<WindowedTSCIterator.Window>
         return new Window(winPresent, winPast, winFuture);
     }
 
-    private void updateWindow() {
+    private TimeSeriesCollection updateWindow() {
         if (future.isEmpty()) {
             if (underlyingNext != null) {
                 future.add(underlyingNext);
                 consumeUnderlyingNext();
             } else {
-                return;
+                throw new NoSuchElementException();
             }
         }
 
-        final TimeSeriesCollection next = future.getFirst();
+        final TimeSeriesCollection next = future.removeFirst();
 
         // Remove old entries outside the lookBack window.
         final DateTime tsBegin = next.getTimestamp().minus(lookBack);
-        while (!past.isEmpty() && past.element().getTimestamp().isBefore(tsBegin))
+        while (!past.isEmpty() && past.getFirst().getTimestamp().isBefore(tsBegin))
             past.removeFirst();
 
         // Include new entries inside the lookForward window.
         final DateTime tsEnd = next.getTimestamp().plus(lookForward);
         while (underlyingNext != null) {
             if (underlyingNext.getTimestamp().isAfter(tsEnd))
-                return;
+                break;
             future.addLast(underlyingNext);
             consumeUnderlyingNext();
         }
+
+        return next;
     }
 
     private void consumeUnderlyingNext() {
