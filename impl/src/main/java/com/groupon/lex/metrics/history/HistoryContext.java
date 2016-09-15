@@ -33,8 +33,8 @@ public class HistoryContext implements Context {
 
         private TSCPair(TSCPair origin, TimeSeriesCollection next, ExpressionLookBack lookback) {
             super(origin);
-            if (origin.current_ != null) update(origin.current_, lookback);
             current_ = next;
+            if (origin.current_ != null) update(origin.current_, lookback, () -> {});
         }
 
         @Override

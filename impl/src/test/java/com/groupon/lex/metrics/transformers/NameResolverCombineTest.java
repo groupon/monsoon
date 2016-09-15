@@ -35,6 +35,8 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPairInstance;
 import com.groupon.lex.metrics.timeseries.expression.SimpleContext;
 import java.util.Optional;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -70,7 +72,7 @@ public class NameResolverCombineTest {
 
     @Test
     public void resolve() {
-        Optional<SimpleGroupPath> path = resolver.apply(new SimpleContext(new TimeSeriesCollectionPairInstance(), (alert) -> {})).map(p -> SimpleGroupPath.valueOf(p.getPath()));
+        Optional<SimpleGroupPath> path = resolver.apply(new SimpleContext(new TimeSeriesCollectionPairInstance(DateTime.now(DateTimeZone.UTC)), (alert) -> {})).map(p -> SimpleGroupPath.valueOf(p.getPath()));
 
         assertEquals(Optional.of(SimpleGroupPath.valueOf("x", "y")), path);
     }

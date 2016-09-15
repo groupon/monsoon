@@ -116,9 +116,9 @@ public class RateExpression implements TimeSeriesMetricExpression {
 
     @Override
     public TimeSeriesMetricDeltaSet apply(Context ctx) {
-        final Context previous = new PreviousContextWrapper(ctx, interval_
-                .map(intv -> ctx.getTSData().getPreviousCollectionPair(intv))
-                .orElseGet(() -> ctx.getTSData().getPreviousCollectionPair(1)));
+        final Context previous = new PreviousContextWrapper(
+                ctx,
+                ctx.getTSData().getPreviousCollectionPairAt(interval_.orElseGet(() -> ctx.getTSData().getCollectionInterval())));
         final Duration collection_interval = new Duration(
                 previous.getTSData().getCurrentCollection().getTimestamp(),
                 ctx.getTSData().getCurrentCollection().getTimestamp());

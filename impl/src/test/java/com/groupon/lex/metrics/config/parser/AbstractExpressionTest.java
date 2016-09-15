@@ -47,9 +47,12 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
+import org.joda.time.DateTime;
+import org.joda.time.Duration;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -66,14 +69,10 @@ public abstract class AbstractExpressionTest {
     private static Configuration configurationForExpr(String expr, Stream<DataPointIdentifier> vars) throws IOException, ConfigurationException {
         StringBuilder config = new StringBuilder()
                 .append("alias ").append(GROUP.configString()).append(" as test;")
-//                .append(vars
-//                        .map((var) -> new StringBuilder().append("alias ").append(var.getGroup().configString()).append(' ').append(var.getMetric()).append(" as ").append(var.getMetric()).append(";\n"))
-//                        .collect(StringBuilder::new, StringBuilder::append, StringBuilder::append)
-//                        .toString())
                 .append("alert ").append(ALERT_NAME).append(" if !(").append(expr).append(");");
 
         try (Reader input = new StringReader(config.toString())) {
-            LOG.info("using configuration: " + config);
+            LOG.log(Level.INFO, "using configuration: {0}", config);
             return Configuration.readFromFile(null, input);
         } catch (ConfigurationException ex) {
             ex.getParseErrors().forEach((error) -> LOG.log(Level.SEVERE, "parse error: {0}", error));
@@ -127,7 +126,7 @@ public abstract class AbstractExpressionTest {
 
     protected void validateExpression(String expr, DataPointStream... input) throws Exception {
         try (final PushMetricRegistryInstance registry = configurationForExpr(expr, Arrays.stream(input).map(DataPointStream::getIdentifier))
-                .create(PushMetricRegistryInstance::new, (pattern, handler) -> {})) {
+                .create(PushMetricRegistryInstance::new, new NowSupplier(), (pattern, handler) -> {})) {
             ReplayCollector replay_collector = new ReplayCollector(input);
             registry.add(replay_collector);
 
@@ -139,6 +138,17 @@ public abstract class AbstractExpressionTest {
                 final Alert alert = registry.getCollectionAlerts().get(ALERT_NAME);
                 assertEquals(AlertState.OK, alert.getAlertState());
             }
+        }
+    }
+
+    private static class NowSupplier implements Supplier<DateTime> {
+        private DateTime cur = DateTime.now();
+
+        @Override
+        public DateTime get() {
+            final DateTime rv = cur;
+            cur = cur.plus(Duration.standardMinutes(1));
+            return rv;
         }
     }
 }

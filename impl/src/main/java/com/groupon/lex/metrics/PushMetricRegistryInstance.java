@@ -56,16 +56,18 @@ import org.joda.time.DateTime;
  */
 public class PushMetricRegistryInstance extends MetricRegistryInstance {
     private static final Logger logger = Logger.getLogger(PushMetricRegistryInstance.class.getName());
-    private final TimeSeriesCollectionPairInstance data_ = new TimeSeriesCollectionPairInstance();
+    private final TimeSeriesCollectionPairInstance data_;
     private Map<GroupName, Alert> alerts_ = new HashMap<>();
     private Optional<CollectHistory> history_ = Optional.empty();
 
     public PushMetricRegistryInstance(boolean has_config, EndpointRegistration api) {
         super(has_config, api);
+        data_ = new TimeSeriesCollectionPairInstance(super.now());
     }
 
     public PushMetricRegistryInstance(Supplier<DateTime> now, boolean has_config, EndpointRegistration api) {
         super(now, has_config, api);
+        data_ = new TimeSeriesCollectionPairInstance(super.now());
     }
 
     /** Set the history module that the push processor is to use. */

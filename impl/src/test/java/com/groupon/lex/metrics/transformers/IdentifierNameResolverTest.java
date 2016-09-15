@@ -12,6 +12,8 @@ import com.groupon.lex.metrics.transformers.IdentifierNameResolver.SubSelectInde
 import com.groupon.lex.metrics.transformers.IdentifierNameResolver.SubSelectRange;
 import static java.util.Collections.EMPTY_MAP;
 import java.util.Optional;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import static org.junit.Assert.assertEquals;
 import org.junit.Before;
 import org.junit.Test;
@@ -29,7 +31,7 @@ public class IdentifierNameResolverTest {
     @Before
     public void setup() {
         final GroupName group_name = GroupName.valueOf(group_path);
-        final TimeSeriesCollectionPair ts_data = new TimeSeriesCollectionPairInstance();
+        final TimeSeriesCollectionPair ts_data = new TimeSeriesCollectionPairInstance(DateTime.now(DateTimeZone.UTC));
         tsv0 = new MutableTimeSeriesValue(ts_data.getCurrentCollection().getTimestamp(), group_name, EMPTY_MAP);
         ts_data.getCurrentCollection().add(tsv0);
 

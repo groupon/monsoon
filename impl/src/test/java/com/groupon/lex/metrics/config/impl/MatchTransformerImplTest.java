@@ -60,6 +60,8 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import static org.junit.Assert.assertEquals;
 import org.junit.Before;
 import org.junit.Test;
@@ -127,7 +129,7 @@ public class MatchTransformerImplTest {
         when(group2.getMetrics()).thenReturn(singletonMap(METRIC, MetricValue.EMPTY));
         when(group3.getMetrics()).thenReturn(singletonMap(METRIC, MetricValue.EMPTY));
 
-        final TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance();
+        final TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance(new DateTime(DateTimeZone.UTC));
         ((MutableTimeSeriesCollection)ts_data.getCurrentCollection()).add(group1);
         ((MutableTimeSeriesCollection)ts_data.getCurrentCollection()).add(group2);
         ((MutableTimeSeriesCollection)ts_data.getCurrentCollection()).add(group3);

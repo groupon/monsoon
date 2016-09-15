@@ -69,7 +69,7 @@ public class MetricSelectorTest {
     public void setup() {
         final MutableTimeSeriesCollection previous = new MutableTimeSeriesCollection(t0.minus(Duration.standardMinutes(1)));
         final MutableTimeSeriesCollection current = new MutableTimeSeriesCollection(t0, Stream.of(new MutableTimeSeriesValue(t0, GroupName.valueOf("99", "Luftballons"), singletonMap(MetricName.valueOf("value"), MetricValue.fromIntValue(17)))));
-        final TimeSeriesCollectionPair ts_data = new TimeSeriesCollectionPairInstance() {{
+        final TimeSeriesCollectionPair ts_data = new TimeSeriesCollectionPairInstance(t0.minus(Duration.standardMinutes(2))) {{
             startNewCycle(previous.getTimestamp(), ExpressionLookBack.EMPTY);
             previous.getData().values().forEach(this.getCurrentCollection()::add);
             startNewCycle(current.getTimestamp(), ExpressionLookBack.EMPTY);
