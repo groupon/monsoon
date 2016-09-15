@@ -3,6 +3,7 @@ package com.groupon.lex.metrics.history.xdr;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.xdr.TSDataScanDir.MetaData;
+import com.groupon.lex.metrics.history.xdr.support.MultiFileIterator;
 import com.groupon.lex.metrics.history.xdr.support.TSDataMap;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -226,9 +227,44 @@ public class TSDataFileChain implements TSData {
         return Stream.concat(read, write);
     }
 
+    private Stream<MultiFileIterator.TSDataSupplier> stream_tsdata_suppliers_() {
+        Stream<MultiFileIterator.TSDataSupplier> wfileStream;
+        try {
+            wfileStream = get_write_store_().map(Stream::of).orElseGet(Stream::empty)
+                    .map(wfile -> new MultiFileIterator.TSDataSupplier() {
+                        @Override
+                        public DateTime getBegin() {
+                            return wfile.getBegin();
+                        }
+
+                        @Override
+                        public Iterator<TimeSeriesCollection> getIterator() {
+                            return wfile.iterator();
+                        }
+                    });
+        } catch (IOException ex) {
+            wfileStream = Stream.empty();
+        }
+
+        final Stream<MultiFileIterator.TSDataSupplier> rfileStream = read_stores_.entrySet().stream()
+                .map(rfile -> new MultiFileIterator.TSDataSupplier() {
+                    @Override
+                    public DateTime getBegin() {
+                        return rfile.getKey().getBegin();
+                    }
+
+                    @Override
+                    public Iterator<TimeSeriesCollection> getIterator() {
+                        return rfile.getValue().iterator();
+                    }
+                });
+
+        return Stream.concat(wfileStream, rfileStream);
+    }
+
     @Override
     public Iterator<TimeSeriesCollection> iterator() {
-        return stream().iterator();
+        return new MultiFileIterator(stream_tsdata_suppliers_().collect(Collectors.toList()));
     }
 
     @Override
