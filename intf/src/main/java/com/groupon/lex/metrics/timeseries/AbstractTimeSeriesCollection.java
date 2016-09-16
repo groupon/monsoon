@@ -59,6 +59,15 @@ public abstract class AbstractTimeSeriesCollection implements TimeSeriesCollecti
     @Override
     public abstract TimeSeriesCollection clone();
 
+    @Override
+    public String toString() {
+        String className = getClass().getSimpleName();
+        if (className.isEmpty())
+            className = "anonymous-AbstractTimeSeriesCollection";
+
+        return className + "{" + getTimestamp() + "}";
+    }
+
     public static int hashCode(@NonNull TimeSeriesCollection c) {
         return c.getTimestamp().hashCode();
     }
