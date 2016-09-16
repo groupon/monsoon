@@ -179,6 +179,7 @@
 
                         <!-- Lombok generated code -->
                         <exclude>com/groupon/lex/metrics/config/MatchStatement$IdentifierPair.class</exclude>
+                        <exclude>com/groupon/lex/metrics/MetricMatcher$MatchedName.class</exclude>
 
                         <exclude>com/groupon/monsoon/remote/history/EncDec$NewIterResponse.class</exclude>
                         <exclude>com/groupon/monsoon/remote/history/EncDec$IterSuccessResponseImpl.class</exclude>
