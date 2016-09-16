@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -37,7 +37,6 @@ import com.groupon.lex.metrics.MetricValue;
 import gnu.trove.map.hash.THashMap;
 import static java.util.Collections.unmodifiableMap;
 import java.util.Map;
-import java.util.Objects;
 import static java.util.Objects.requireNonNull;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -47,7 +46,7 @@ import org.joda.time.DateTime;
  *
  * @author ariane
  */
-public final class MutableTimeSeriesValue implements TimeSeriesValue {
+public final class MutableTimeSeriesValue extends AbstractTimeSeriesValue implements TimeSeriesValue {
     private DateTime timestamp_;
     private GroupName group_;
     private final Map<MetricName, MetricValue> metrics_ = new THashMap<>(4, 1);  // Favour small, dense hashmaps, since there are a lot of instances.
@@ -108,39 +107,6 @@ public final class MutableTimeSeriesValue implements TimeSeriesValue {
     public <T> MutableTimeSeriesValue addMetrics(Stream<T> values, Function<? super T, ? extends MetricName> name_fn, Function<? super T, ? extends MetricValue> value_fn) {
         values.forEach(v -> addMetric(requireNonNull(name_fn.apply(v)), requireNonNull(value_fn.apply(v))));
         return this;
-    }
-
-    @Override
-    public String toString() {
-        return "TimeSeriesValue{" + "timestamp=" + timestamp_ + ", group=" + group_ + ", metrics=" + metrics_ + '}';
-    }
-
-    @Override
-    public int hashCode() {
-        int hash = 7;
-        hash = 59 * hash + Objects.hashCode(this.group_);
-        return hash;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (!(obj instanceof TimeSeriesValue)) {
-            return false;
-        }
-        final TimeSeriesValue other = (TimeSeriesValue) obj;
-        if (!Objects.equals(this.getTimestamp(), other.getTimestamp())) {
-            return false;
-        }
-        if (!Objects.equals(this.getGroup(), other.getGroup())) {
-            return false;
-        }
-        if (!Objects.equals(this.getMetrics(), other.getMetrics())) {
-            return false;
-        }
-        return true;
     }
 
     @Override

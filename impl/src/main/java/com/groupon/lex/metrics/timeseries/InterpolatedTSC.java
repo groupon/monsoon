@@ -252,7 +252,7 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
     }
 
     @Getter
-    private static class InterpolatedTSV implements TimeSeriesValue {
+    private static class InterpolatedTSV extends AbstractTimeSeriesValue implements TimeSeriesValue {
         private final DateTime timestamp;
         private final GroupName group;
         private final Map<MetricName, MetricValue> backward, forward;

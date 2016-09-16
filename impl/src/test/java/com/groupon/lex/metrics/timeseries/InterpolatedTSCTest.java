@@ -197,4 +197,17 @@ public class InterpolatedTSCTest {
     public void throwsIfFutureMisordered() {
         new InterpolatedTSC(new BackRefTimeSeriesCollection(pastDate.minus(Duration.standardDays(1))), EMPTY_LIST, Arrays.asList(future, past));
     }
+
+    @Test
+    public void equality() {
+        when(pastValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromIntValue(4)));
+        when(futureValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromIntValue(8)));
+
+        final BackRefTimeSeriesCollection expected = new BackRefTimeSeriesCollection(midDate, singletonList(new MutableTimeSeriesValue(midDate, TESTGROUP, singletonMap(TESTMETRIC, MetricValue.fromDblValue(5)))));
+        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new BackRefTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
+
+        assertEquals(expected.hashCode(), interpolatedTSC.hashCode());
+        assertTrue(interpolatedTSC.equals(expected));
+        assertTrue(expected.equals(interpolatedTSC));
+    }
 }
