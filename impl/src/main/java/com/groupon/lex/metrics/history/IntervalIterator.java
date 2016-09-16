@@ -108,48 +108,47 @@ public class IntervalIterator implements Iterator<TimeSeriesCollection> {
         return interpolated(updateWindow(), past, future);
     }
 
+    private void updatePastAndFuture() {
+        final DateTime tsBegin = nextTS.minus(lookBack);
+        final DateTime tsEnd = nextTS.plus(lookForward);
+
+        // Remove old entries outside the lookBack window.
+        while (!past.isEmpty() && past.getLast().getTimestamp().isBefore(tsBegin))
+            past.removeLast();
+
+        // Move everything in future into past, that has a timestamp before nextTS.
+        while (!future.isEmpty() && future.getFirst().getTimestamp().isBefore(nextTS)) {
+            final TimeSeriesCollection f0 = future.removeFirst();
+            if (!f0.getTimestamp().isBefore(tsBegin))
+                past.addFirst(f0);
+        }
+
+        // Move underlying into past, until we reach nextTS.
+        while (underlyingNext != null && underlyingNext.getTimestamp().isBefore(nextTS)) {
+            if (!underlyingNext.getTimestamp().isBefore(tsBegin))
+                past.addFirst(underlyingNext);
+            consumeUnderlyingNext();
+        }
+
+        // Add items to future set until underlyingNext exceeds forward window.
+        while (underlyingNext != null && !underlyingNext.getTimestamp().isAfter(tsEnd)) {
+            future.addLast(underlyingNext);
+            consumeUnderlyingNext();
+        }
+    }
+
     private void updateWindowBoundaries() {
-        boolean restart;
+        updatePastAndFuture();
 
-        do {
-            restart = false;
-            final DateTime tsBegin = nextTS.minus(lookBack);
-            final DateTime tsEnd = nextTS.plus(lookForward);
-
-            // Remove old entries outside the lookBack window.
-            while (!past.isEmpty() && past.getLast().getTimestamp().isBefore(tsBegin))
-                past.removeLast();
-
-            // Move everything in future into past, that has a timestamp before nextTS.
-            while (!future.isEmpty() && future.getFirst().getTimestamp().isBefore(nextTS)) {
-                final TimeSeriesCollection f0 = future.removeFirst();
-                if (!f0.getTimestamp().isBefore(tsBegin))
-                    past.addFirst(f0);
-            }
-
-            // Move underlying into past, until we reach nextTS.
-            while (underlyingNext != null && underlyingNext.getTimestamp().isBefore(nextTS)) {
-                if (!underlyingNext.getTimestamp().isBefore(tsBegin))
-                    past.addFirst(underlyingNext);
-                consumeUnderlyingNext();
-            }
-
-            // Add items to future set until underlyingNext exceeds forward window.
-            while (underlyingNext != null && !underlyingNext.getTimestamp().isAfter(tsEnd)) {
-                future.addLast(underlyingNext);
-                consumeUnderlyingNext();
-            }
-
-            // If there is no data to interpolate from,
-            // it's best to just skip those ranges.
-            if (underlyingNext != null && future.isEmpty()) {
-                nextTS = underlyingNext.getTimestamp();
-                restart = true;
-            } else if (!future.isEmpty() && !future.getFirst().getTimestamp().equals(nextTS) && past.isEmpty()) {
-                nextTS = future.getFirst().getTimestamp();
-                restart = true;
-            }
-        } while (restart);
+        if (underlyingNext != null && future.isEmpty()) {
+            // Skip forward until new data points are available.
+            nextTS = underlyingNext.getTimestamp();
+            updatePastAndFuture();
+        } else if (!future.isEmpty() && !future.getFirst().getTimestamp().equals(nextTS)) {
+            // Skip forward to next datapoint inside the window.
+            nextTS = future.getFirst().getTimestamp();
+            updatePastAndFuture();
+        }
     }
 
     private TimeSeriesCollection updateWindow() {
