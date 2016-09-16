@@ -89,9 +89,6 @@ public class IntervalIterator implements Iterator<TimeSeriesCollection> {
         this.lookBack = lookBack;
         this.lookForward = lookForward;
 
-        if (!interval.isLongerThan(Duration.ZERO))
-            throw new IllegalArgumentException("You don't really expect me to iterate with a negative/zero interval, do you?");
-
         consumeUnderlyingNext();  // Initialize underlyingNext.
         if (underlyingNext != null)
             nextTS = underlyingNext.getTimestamp();  // Initalize next timestamp.
