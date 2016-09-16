@@ -31,14 +31,13 @@
  */
 package com.groupon.lex.metrics.timeseries;
 
-import java.util.Collection;
 import java.util.Objects;
-import lombok.NonNull;
 
 /**
- * Helper base class, that implements equals and hashCode for TimeSeriesCollection.
+ * Provides hashCode, equality functions.
+ * @author ariane
  */
-public abstract class AbstractTimeSeriesCollection implements TimeSeriesCollection {
+public abstract class AbstractTimeSeriesValue implements TimeSeriesValue {
     @Override
     public int hashCode() {
         return hashCode(this);
@@ -49,34 +48,37 @@ public abstract class AbstractTimeSeriesCollection implements TimeSeriesCollecti
         if (obj == null) {
             return false;
         }
-        if (!(obj instanceof TimeSeriesCollection)) {
+        if (!(obj instanceof TimeSeriesValue)) {
             return false;
         }
-        final TimeSeriesCollection other = (TimeSeriesCollection) obj;
+        final TimeSeriesValue other = (TimeSeriesValue) obj;
         return equals(this, other);
     }
 
     @Override
-    public abstract TimeSeriesCollection clone();
+    public String toString() {
+        return "TimeSeriesValue{" + "timestamp=" + getTimestamp() + ", group=" + getGroup() + ", metrics=" + getMetrics() + '}';
+    }
 
     @Override
-    public String toString() {
-        String className = getClass().getSimpleName();
-        if (className.isEmpty())
-            className = "anonymous-AbstractTimeSeriesCollection";
+    public abstract TimeSeriesValue clone();
 
-        return className + "{" + getTimestamp() + "}";
+    public static int hashCode(TimeSeriesValue v) {
+        int hash = 7;
+        hash = 59 * hash + Objects.hashCode(v.getGroup());
+        return hash;
     }
 
-    public static int hashCode(@NonNull TimeSeriesCollection c) {
-        return c.getTimestamp().hashCode();
-    }
-
-    public static boolean equals(@NonNull TimeSeriesCollection a, @NonNull TimeSeriesCollection b) {
-        if (!Objects.equals(a.getTimestamp(), b.getTimestamp()))
+    public static boolean equals(TimeSeriesValue a, TimeSeriesValue b) {
+        if (!Objects.equals(a.getTimestamp(), b.getTimestamp())) {
             return false;
-        final Collection<TimeSeriesValue> aTSData = a.getTSValues();
-        final Collection<TimeSeriesValue> bTSData = b.getTSValues();
-        return aTSData.containsAll(bTSData) && bTSData.containsAll(aTSData);
+        }
+        if (!Objects.equals(a.getGroup(), b.getGroup())) {
+            return false;
+        }
+        if (!Objects.equals(a.getMetrics(), b.getMetrics())) {
+            return false;
+        }
+        return true;
     }
 }

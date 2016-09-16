@@ -102,6 +102,7 @@ public class Client implements CollectHistory {
 
     private rh_protoClient getRpcClient(int protocol) throws IOException, OncRpcException {
         final rh_protoClient client = new rh_protoClient(this.host, this.port, protocolOverride.orElse(protocol));
+        client.getClient().setCharacterEncoding("UTF-8");
         return client;
     }
 

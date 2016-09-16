@@ -67,7 +67,7 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
     /** TimeSeriesValues. */
     private final Map<GroupName, TimeSeriesValue> interpolatedTsvMap;
 
-    public InterpolatedTSC(TimeSeriesCollection current, List<TimeSeriesCollection> backward, List<TimeSeriesCollection> forward) {
+    public InterpolatedTSC(TimeSeriesCollection current, Collection<TimeSeriesCollection> backward, Collection<TimeSeriesCollection> forward) {
         this.current = current;
         this.backward = unmodifiableList(new ArrayList<>(backward));
         this.forward = unmodifiableList(new ArrayList<>(forward));
@@ -147,16 +147,18 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
 
     @Override
     public Set<GroupName> getGroups() {
-        Set<GroupName> groups =  new HashSet<>(current.getGroups());
+        Set<GroupName> groups = new HashSet<>(current.getGroups());
         groups.addAll(interpolatedTsvMap.keySet());
         return groups;
     }
 
     @Override
     public Set<SimpleGroupPath> getGroupPaths() {
-        return interpolatedTsvMap.keySet().stream()
+        Set<SimpleGroupPath> paths = new HashSet<>(current.getGroupPaths());
+        interpolatedTsvMap.keySet().stream()
                 .map(GroupName::getPath)
-                .collect(Collectors.toSet());
+                .forEach(paths::add);
+        return paths;
     }
 
     @Override
@@ -184,7 +186,10 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
 
     @Override
     public InterpolatedTSC clone() {
-        return this;  // Immutable.
+        final TimeSeriesCollection currentClone = current.clone();
+        if (currentClone == current) return this;
+
+        return new InterpolatedTSC(currentClone, backward, forward);
     }
 
     /**
@@ -247,7 +252,7 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
     }
 
     @Getter
-    private static class InterpolatedTSV implements TimeSeriesValue {
+    private static class InterpolatedTSV extends AbstractTimeSeriesValue implements TimeSeriesValue {
         private final DateTime timestamp;
         private final GroupName group;
         private final Map<MetricName, MetricValue> backward, forward;

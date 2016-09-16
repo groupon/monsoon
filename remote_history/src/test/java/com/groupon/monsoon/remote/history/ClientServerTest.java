@@ -69,17 +69,17 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import org.junit.After;
-import static org.junit.Assert.assertEquals;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import org.mockito.runners.MockitoJUnitRunner;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.verify;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ClientServerTest {
@@ -104,6 +104,7 @@ public class ClientServerTest {
             OncRpcServerTransport transport = null;
             try {
                 transport = new OncRpcUdpServerTransport(server, Inet4Address.getLoopbackAddress(), 0, server.info, 32768);
+                transport.setCharacterEncoding("UTF-8");
                 portFuture.complete(transport.getPort());
                 server.run(new OncRpcServerTransport[] { transport });
             } catch (IOException | OncRpcException ex) {
@@ -346,6 +347,38 @@ public class ClientServerTest {
                                 new ExprEqualTo(expr))),
                 Mockito.eq(begin),
                 Mockito.eq(end),
+                Mockito.eq(stepSize));
+        verifyNoMoreInteractions(history);
+    }
+
+    @Test(timeout = 20000)
+    public void slowEvaluate() {
+        final int LIMIT = 10;  // To make the test not take forever.
+        final Duration stepSize = Duration.standardMinutes(1);
+        final List<Collection<CollectHistory.NamedEvaluation>> expected = generateEvaluation().limit(LIMIT).collect(Collectors.toList());
+        when(history.evaluate(Mockito.any(), Mockito.isA(Duration.class)))
+                .thenAnswer((invocation) -> {
+                    return generateEvaluation()
+                            .limit(LIMIT)
+                            .map(x -> {
+                                try {
+                                    Thread.sleep(1000);
+                                } catch (InterruptedException ex) {
+                                    Logger.getLogger(ClientServerTest.class.getName()).log(Level.SEVERE, null, ex);
+                                }
+                                return x;
+                            });
+                });
+
+        final List<Collection<CollectHistory.NamedEvaluation>> result = client.evaluate(singletonMap("name", expr), stepSize).collect(Collectors.toList());
+
+        assertEquals(expected, result);
+
+        verify(history, times(1)).evaluate(
+                Mockito.<Map>argThat(
+                        Matchers.hasEntry(
+                                Matchers.equalTo("name"),
+                                new ExprEqualTo(expr))),
                 Mockito.eq(stepSize));
         verifyNoMoreInteractions(history);
     }

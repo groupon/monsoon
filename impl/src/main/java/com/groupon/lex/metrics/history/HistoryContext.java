@@ -18,12 +18,16 @@ import java.util.Spliterators;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import org.joda.time.Duration;
 
 /**
  *
  * @author ariane
  */
 public class HistoryContext implements Context {
+    public final static Duration LOOK_BACK = Duration.standardMinutes(5);
+    public final static Duration LOOK_FORWARD = Duration.standardMinutes(5);
+
     private static class TSCPair extends AbstractTSCPair {
         private final TimeSeriesCollection current_;
 

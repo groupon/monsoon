@@ -68,6 +68,13 @@ import org.joda.time.DateTime;
 import org.joda.time.Duration;
 
 public abstract class AbstractServer extends rh_protoServerStub {
+    /**
+     * We try to maintain at most MAX_REQUEST_DURATION in an iterator fetch request.
+     * If we exceed that time, bail out early and return a short result.
+     * We always emit at least 1 result.
+     */
+    public static final Duration MAX_REQUEST_DURATION = Duration.millis(800);
+
     private static final Logger LOG = Logger.getLogger(AbstractServer.class.getName());
     /** Default port for the RPC server. */
     public static final int DEFAULT_PORT = Client.DEFAULT_PORT;
@@ -144,12 +151,20 @@ public abstract class AbstractServer extends rh_protoServerStub {
      * @return A list with items fetched from the iterator.
      */
     private static <T> List<T> fetchFromIter(Iterator<T> iter, int fetch, int max_fetch) {
+        final long t0 = System.currentTimeMillis();
         assert(max_fetch >= 1);
         if (fetch < 0 || fetch > max_fetch) fetch = max_fetch;
 
         final List<T> result = new ArrayList<>(fetch);
-        for (int i = 0; i < fetch && iter.hasNext(); ++i)
+        for (int i = 0; i < fetch && iter.hasNext(); ++i) {
             result.add(iter.next());
+
+            // Decide if we should cut the fetch short.
+            // Note that we always emit at least 1 element.
+            final long tCur = System.currentTimeMillis();
+            if (tCur - t0 >= MAX_REQUEST_DURATION.getMillis())
+                break;
+        }
         return result;
     }
 
