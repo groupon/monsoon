@@ -37,8 +37,6 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.lib.LazyMap;
-import gnu.trove.map.TObjectIntMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
 import gnu.trove.set.hash.THashSet;
 import static java.lang.Math.max;
 import java.util.ArrayList;
@@ -60,7 +58,7 @@ import lombok.Getter;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 
-public class InterpolatedTSC implements TimeSeriesCollection {
+public class InterpolatedTSC extends AbstractTimeSeriesCollection implements TimeSeriesCollection {
     private static final Logger LOG = Logger.getLogger(InterpolatedTSC.class.getName());
     /** TimeSeriesCollections used for interpolation. */
     private final List<TimeSeriesCollection> backward, forward;
@@ -68,9 +66,6 @@ public class InterpolatedTSC implements TimeSeriesCollection {
     private final TimeSeriesCollection current;
     /** TimeSeriesValues. */
     private final Map<GroupName, TimeSeriesValue> interpolatedTsvMap;
-
-    private final TObjectIntMap<GroupName> backwardNameMap = new TObjectIntHashMap<>(5, 1, -1);
-    private final TObjectIntMap<GroupName> forwardNameMap = new TObjectIntHashMap<>(5, 1, -1);
 
     public InterpolatedTSC(TimeSeriesCollection current, List<TimeSeriesCollection> backward, List<TimeSeriesCollection> forward) {
         this.current = current;
@@ -117,24 +112,26 @@ public class InterpolatedTSC implements TimeSeriesCollection {
 
     @Override
     public TimeSeriesCollection renameGroup(GroupName oldname, GroupName newname) {
-        final TimeSeriesValue interpolated = interpolatedTsvMap.remove(oldname);
+        final TimeSeriesValue interpolated = interpolatedTsvMap.get(oldname);
         if (interpolated != null) {
             current.add(interpolated);
-        } else {
-            current.renameGroup(oldname, newname);
-            interpolatedTsvMap.remove(newname);
+            interpolatedTsvMap.remove(oldname);
         }
+        current.renameGroup(oldname, newname);
+        interpolatedTsvMap.remove(newname);
         return this;
     }
 
     @Override
     public TimeSeriesCollection addMetrics(GroupName group, Map<MetricName, MetricValue> metrics) {
-        final TimeSeriesValue interpolated = interpolatedTsvMap.remove(group);
+        final TimeSeriesValue interpolated = interpolatedTsvMap.get(group);
         if (interpolated != null) {
             metrics = new HashMap<>(metrics);
             metrics.putAll(interpolated.getMetrics());
         }
         current.addMetrics(group, metrics);
+        if (interpolated != null)
+            interpolatedTsvMap.remove(group);
         return this;
     }
 
@@ -214,8 +211,8 @@ public class InterpolatedTSC implements TimeSeriesCollection {
      */
     private TimeSeriesValue interpolateTSV(GroupName name) {
         final TimeSeriesValue
-                backTSV = findName(backward, name, backwardNameMap),
-                forwTSV = findName(forward, name, forwardNameMap);
+                backTSV = findName(backward, name),
+                forwTSV = findName(forward, name);
 
         final long backMillis = max(new Duration(backTSV.getTimestamp(), getTimestamp()).getMillis(), 0),
                 forwMillis = max(new Duration(getTimestamp(), forwTSV.getTimestamp()).getMillis(), 0);
@@ -235,21 +232,15 @@ public class InterpolatedTSC implements TimeSeriesCollection {
      * @return The first TimeSeriesValue in the list of TSCollections with the given name.
      * @throws IllegalStateException if the name was not found.
      */
-    private static TimeSeriesValue findName(List<TimeSeriesCollection> c, GroupName name, TObjectIntMap<GroupName> cache) {
-        final int cachedIdx = cache.get(name);
-        if (cachedIdx != cache.getNoEntryValue())
-            return c.get(cachedIdx).get(name).orElseThrow(IllegalStateException::new);
-
+    private static TimeSeriesValue findName(List<TimeSeriesCollection> c, GroupName name) {
         ListIterator<TimeSeriesCollection> iter = c.listIterator();
         while (iter.hasNext()) {
             final int idx = iter.nextIndex();
             final TimeSeriesCollection tsdata = iter.next();
 
             final Optional<TimeSeriesValue> found = tsdata.get(name);
-            if (found.isPresent()) {
-                cache.put(name, idx);
+            if (found.isPresent())
                 return found.get();
-            }
         }
 
         throw new IllegalStateException("name not present in list of time series collections");
