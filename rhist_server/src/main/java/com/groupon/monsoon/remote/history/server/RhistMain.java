@@ -104,7 +104,9 @@ public class RhistMain {
         CollectHistoryServer server = new CollectHistoryServer(new DirCollectHistory(path_));
 
         OncRpcUdpServerTransport rpcUdp = new OncRpcUdpServerTransport(server, null, port, server.info, 32768);
+        rpcUdp.setCharacterEncoding("UTF-8");
         OncRpcTcpServerTransport rpcTcp = new OncRpcTcpServerTransport(server, null, port, server.info, 32768);
+        rpcTcp.setCharacterEncoding("UTF-8");
         server.run(new OncRpcServerTransport[]{ rpcUdp, rpcTcp });
         rpcTcp.close();
         rpcUdp.close();
