@@ -35,12 +35,9 @@ import com.groupon.lex.metrics.timeseries.BackRefTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.InterpolatedTSC;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Collection;
-import static java.util.Collections.reverse;
 import java.util.Deque;
 import java.util.Iterator;
-import java.util.List;
 import java.util.NoSuchElementException;
 import static java.util.Spliterator.DISTINCT;
 import static java.util.Spliterator.IMMUTABLE;
@@ -51,7 +48,6 @@ import java.util.Spliterators;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import lombok.NonNull;
-import lombok.Value;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 
@@ -182,38 +178,10 @@ public class IntervalIterator implements Iterator<TimeSeriesCollection> {
             underlyingNext = null;
     }
 
-    /**
-     * A window over the iterator stream.
-     */
-    @Value
-    public static class Window implements Comparable<Window> {
-        /** The currently emitted value. */
-        private TimeSeriesCollection present;
-        /** Past values, in chronological order. */
-        private final List<TimeSeriesCollection> past;
-        /** Future values, in chronological order. */
-        private final List<TimeSeriesCollection> future;
-
-        @Override
-        public int compareTo(Window o) {
-            return getPresent().compareTo(o.getPresent());
-        }
-
-        public TimeSeriesCollection getInterpolated() {
-            if (future.isEmpty() || past.isEmpty())
-                return present;  // Can't interpolate anything without them.
-
-            final List<TimeSeriesCollection> forward = new ArrayList<>(future);
-            final List<TimeSeriesCollection> backward = new ArrayList<>(past);
-            reverse(backward);
-            return new InterpolatedTSC(present, backward, forward);
-        }
-    }
-
     private static TimeSeriesCollection interpolated(TimeSeriesCollection present, Collection<TimeSeriesCollection> past, Collection<TimeSeriesCollection> future) {
         if (future.isEmpty() || past.isEmpty())
             return present;  // Can't interpolate anyway.
 
-        return new InterpolatedTSC(present, new ArrayList<>(past), new ArrayList<>(future));
+        return new InterpolatedTSC(present, past, future);
     }
 }

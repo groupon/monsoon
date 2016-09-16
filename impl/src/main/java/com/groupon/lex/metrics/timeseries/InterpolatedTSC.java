@@ -67,7 +67,7 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
     /** TimeSeriesValues. */
     private final Map<GroupName, TimeSeriesValue> interpolatedTsvMap;
 
-    public InterpolatedTSC(TimeSeriesCollection current, List<TimeSeriesCollection> backward, List<TimeSeriesCollection> forward) {
+    public InterpolatedTSC(TimeSeriesCollection current, Collection<TimeSeriesCollection> backward, Collection<TimeSeriesCollection> forward) {
         this.current = current;
         this.backward = unmodifiableList(new ArrayList<>(backward));
         this.forward = unmodifiableList(new ArrayList<>(forward));
