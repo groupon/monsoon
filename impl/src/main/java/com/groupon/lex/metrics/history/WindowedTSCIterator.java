@@ -34,11 +34,9 @@ package com.groupon.lex.metrics.history;
 import com.groupon.lex.metrics.timeseries.InterpolatedTSC;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
-import static java.util.Collections.reverse;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.Iterator;
-import java.util.List;
 import java.util.NoSuchElementException;
 import static java.util.Spliterator.DISTINCT;
 import static java.util.Spliterator.IMMUTABLE;
@@ -49,7 +47,6 @@ import java.util.Spliterators;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import lombok.NonNull;
-import lombok.Value;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 
@@ -59,17 +56,19 @@ import org.joda.time.Duration;
  * The underlying iterator must emit unique collections in chronological order.
  * @author ariane
  */
-public class WindowedTSCIterator implements Iterator<WindowedTSCIterator.Window> {
+public class WindowedTSCIterator implements Iterator<TimeSeriesCollection> {
     /** Iterator supplying items. */
     private final Iterator<TimeSeriesCollection> underlying;
     /** Window duration. */
     private final Duration lookBack, lookForward;
-    /** Window items.  Future always holds the next item to consume. */
-    private final Deque<TimeSeriesCollection> past = new ArrayDeque<>(), future = new ArrayDeque<>();
+    /** Past window items in reverse chronological order. */
+    private final Deque<TimeSeriesCollection> past = new ArrayDeque<>();
+    /** Future window items in chronological order. */
+    private final Deque<TimeSeriesCollection> future = new ArrayDeque<>();
     /** Look ahead item from underlying iterator. */
     private TimeSeriesCollection underlyingNext;
 
-    public static Stream<WindowedTSCIterator.Window> stream(Iterator<TimeSeriesCollection> in, Duration lookBack, Duration lookForward) {
+    public static Stream<TimeSeriesCollection> stream(Iterator<TimeSeriesCollection> in, Duration lookBack, Duration lookForward) {
         return StreamSupport.stream(
                 Spliterators.spliteratorUnknownSize(
                         new WindowedTSCIterator(in, lookBack, lookForward),
@@ -77,7 +76,7 @@ public class WindowedTSCIterator implements Iterator<WindowedTSCIterator.Window>
                 false);
     }
 
-    public static Stream<WindowedTSCIterator.Window> stream(Stream<TimeSeriesCollection> in, Duration lookBack, Duration lookForward) {
+    public static Stream<TimeSeriesCollection> stream(Stream<TimeSeriesCollection> in, Duration lookBack, Duration lookForward) {
         return stream(in.iterator(), lookBack, lookForward);
     }
 
@@ -94,13 +93,10 @@ public class WindowedTSCIterator implements Iterator<WindowedTSCIterator.Window>
     }
 
     @Override
-    public Window next() {
+    public TimeSeriesCollection next() {
         final TimeSeriesCollection winPresent = updateWindow();  // Must happen before creating winFuture.
-        final List<TimeSeriesCollection> winPast = new ArrayList<>(past);
-        final List<TimeSeriesCollection> winFuture = new ArrayList<>(future);
-
-        past.addLast(winPresent);
-        return new Window(winPresent, winPast, winFuture);
+        past.addFirst(winPresent);
+        return interpolated(winPresent, past, future);
     }
 
     private TimeSeriesCollection updateWindow() {
@@ -117,8 +113,8 @@ public class WindowedTSCIterator implements Iterator<WindowedTSCIterator.Window>
 
         // Remove old entries outside the lookBack window.
         final DateTime tsBegin = next.getTimestamp().minus(lookBack);
-        while (!past.isEmpty() && past.getFirst().getTimestamp().isBefore(tsBegin))
-            past.removeFirst();
+        while (!past.isEmpty() && past.getLast().getTimestamp().isBefore(tsBegin))
+            past.removeLast();
 
         // Include new entries inside the lookForward window.
         final DateTime tsEnd = next.getTimestamp().plus(lookForward);
@@ -139,31 +135,10 @@ public class WindowedTSCIterator implements Iterator<WindowedTSCIterator.Window>
             underlyingNext = null;
     }
 
-    /**
-     * A window over the iterator stream.
-     */
-    @Value
-    public static class Window implements Comparable<Window> {
-        /** The currently emitted value. */
-        private TimeSeriesCollection present;
-        /** Past values, in chronological order. */
-        private final List<TimeSeriesCollection> past;
-        /** Future values, in chronological order. */
-        private final List<TimeSeriesCollection> future;
+    private TimeSeriesCollection interpolated(TimeSeriesCollection present, Collection<TimeSeriesCollection> past, Collection<TimeSeriesCollection> future) {
+        if (future.isEmpty() || past.isEmpty())
+            return present;
 
-        @Override
-        public int compareTo(Window o) {
-            return getPresent().compareTo(o.getPresent());
-        }
-
-        public TimeSeriesCollection getInterpolated() {
-            if (future.isEmpty() || past.isEmpty())
-                return present;  // Can't interpolate anything without them.
-
-            final List<TimeSeriesCollection> forward = new ArrayList<>(future);
-            final List<TimeSeriesCollection> backward = new ArrayList<>(past);
-            reverse(backward);
-            return new InterpolatedTSC(present, backward, forward);
-        }
+        return new InterpolatedTSC(present, past, future);
     }
 }

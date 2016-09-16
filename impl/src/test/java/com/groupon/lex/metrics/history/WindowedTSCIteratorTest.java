@@ -32,9 +32,11 @@
 package com.groupon.lex.metrics.history;
 
 import com.groupon.lex.metrics.timeseries.BackRefTimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.InterpolatedTSC;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.util.ArrayList;
 import static java.util.Collections.emptyIterator;
+import static java.util.Collections.reverse;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
@@ -48,7 +50,7 @@ import org.junit.Test;
 
 public class WindowedTSCIteratorTest {
     private List<TimeSeriesCollection> collections;
-    private List<WindowedTSCIterator.Window> expected;
+    private List<TimeSeriesCollection> expected;
     private static final Duration lookBack = Duration.standardHours(3);
     private static final Duration lookForward = Duration.standardHours(2);
 
@@ -67,17 +69,18 @@ public class WindowedTSCIteratorTest {
                     .filter(elem -> !elem.getTimestamp().isBefore(c.getTimestamp().minus(lookBack)))
                     .filter(elem -> elem.getTimestamp().isBefore(c.getTimestamp()))
                     .collect(Collectors.toList());
+            reverse(past);
             List<TimeSeriesCollection> future = collections.stream()
                     .filter(elem -> !elem.getTimestamp().isAfter(c.getTimestamp().plus(lookForward)))
                     .filter(elem -> elem.getTimestamp().isAfter(c.getTimestamp()))
                     .collect(Collectors.toList());
-            expected.add(new WindowedTSCIterator.Window(c, past, future));
+            expected.add(new InterpolatedTSC(c, past, future));
         }
     }
 
     @Test
     public void constructor() {
-        final List<WindowedTSCIterator.Window> result = new ArrayList<>();
+        final List<TimeSeriesCollection> result = new ArrayList<>();
         new WindowedTSCIterator(collections.iterator(), lookBack, lookForward)
                 .forEachRemaining(result::add);
 
@@ -115,7 +118,7 @@ public class WindowedTSCIteratorTest {
 
     @Test
     public void stream() {
-        final List<WindowedTSCIterator.Window> result = WindowedTSCIterator.stream(collections.stream(), lookBack, lookForward)
+        final List<TimeSeriesCollection> result = WindowedTSCIterator.stream(collections.stream(), lookBack, lookForward)
                 .collect(Collectors.toList());
 
         assertEquals(expected, result);
