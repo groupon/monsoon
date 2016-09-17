@@ -1,6 +1,13 @@
 Change log
 ====
 
+monsoon-2.2-SNAPSHOT
+----
+
+Features:
+
+Bug fixes:
+
 monsoon-2.1
 ----
 
