@@ -7,6 +7,7 @@ monsoon-2.2-SNAPSHOT
 Features:
 
 Bug fixes:
+- Fix nullpointer exception on IntervalIterator if traversing empty collection.
 
 monsoon-2.1
 ----
