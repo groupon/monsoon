@@ -1,11 +1,10 @@
 import { Component, ViewChild, Inject }     from '@angular/core'
-import { NgForm }                           from '@angular/common'
-import { MODAL_DIRECTIVES, ModalComponent } from 'ng2-bs3-modal/ng2-bs3-modal';
+import { NgForm }                           from '@angular/forms'
 import { ChartTimeSpecService }             from './chart-time-spec.service';
 import { ChartTimeSpec }                    from './chart-time-spec';
+import { ModalComponent }                   from 'ng2-bs3-modal/ng2-bs3-modal';
 
 @Component({
-  directives: [MODAL_DIRECTIVES],
   selector: 'chart-time-spec-modal',
   templateUrl: 'app/chart/chart-time-spec-modal.html'
 })

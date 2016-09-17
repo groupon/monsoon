@@ -1,12 +1,12 @@
 import { Component }                                   from '@angular/core';
 import { ChartExprFormComponent }                      from './chart-expr-form.component';
 import { ChartExpr }                                   from './chart-expr';
-import { OnActivate, Router, RouteSegment, RouteTree } from '@angular/router';
+import { Router, ActivatedRoute }                      from '@angular/router';
+import { Observable }                                  from 'rxjs/Observable';
 
 
 @Component({
   selector: 'chart-edit',
-  directives: [ChartExprFormComponent],
   styles: [`
     .chart-edit {
       width: 100%;
@@ -15,38 +15,38 @@ import { OnActivate, Router, RouteSegment, RouteTree } from '@angular/router';
   `],
   template: `
     <h1>Monsoon Chart</h1>
-    <chart-expr-form #form (expr)="onRender($event)" [initial]="exprs"></chart-expr-form>
+    <chart-expr-form #form (expr)="onRender($event)" [initial]="exprs | async"></chart-expr-form>
     `
 })
-export class ChartEditComponent implements OnActivate {
-  private exprs: Map<string, string> = new Map<string, string>();
+export class ChartEditComponent {
+  private exprs: Observable<Map<string, string>>;
 
-  constructor(private router: Router) {}
-
-  routerOnActivate(curr: RouteSegment, prev?: RouteSegment, currTree?: RouteTree, prevTree?: RouteTree): void {
-    let exprs: Map<string, string> = new Map<string, string>();
-
-    Object.keys(curr.parameters).forEach((enc_k) => {
-      let k: string = decodeURIComponent(enc_k);
-      let v: string = decodeURIComponent(curr.getParam(enc_k));
-      if (k.startsWith("expr:")) {
-        exprs[k.substr(5)] = v;
-      }
-    });
-    this.exprs = exprs;
+  constructor(private router: Router, private route: ActivatedRoute) {
+    this.exprs = this.route
+        .params
+        .map((params) => ChartEditComponent._paramsToExprMap(params));
   }
 
   onRender(m: ChartExpr) {
     let args = {};
     Object.keys(m.expr).forEach((k) => {
-      args[this._encode('expr:' + k)] = this._encode(m.expr[k]);
+      args['expr:' + k] = m.expr[k];
     });
 
     this.router.navigate(['/fe/chart-view', args]);
   }
 
-  _encode(s: string): string {
-    // Angular cannot handle round brackets in its argument. :'(
-    return encodeURIComponent(s).replace(/\(/g, '%28').replace(/\)/g, '%29');
+  private static _paramsToExprMap(params: { [key: string]: any; }): Map<string, string> {
+    let exprs = new Map<string, string>();
+
+    Object.keys(params).forEach((enc_k) => {
+      let k: string = enc_k;
+
+      if (k.startsWith("expr:")) {
+        let v: string = params[k];
+        exprs[k.substr(5)] = v;
+      }
+    });
+    return exprs;
   }
 }

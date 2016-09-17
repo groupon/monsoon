@@ -1,7 +1,16 @@
-import { Component, EventEmitter, OnInit, Input, Output }              from '@angular/core'
-import { NgForm, ControlArray, ControlGroup, FormBuilder, Validators } from '@angular/common'
-import { ChartExpr }                                                   from './chart-expr';
-import { ExprValidator }                                               from './expr-validator';
+import { Component,
+         EventEmitter,
+         OnInit,
+         Input,
+         Output }                     from '@angular/core'
+import { FormArray,
+         FormGroup,
+         FormBuilder,
+         Validators }                 from '@angular/forms'
+import { ChartExpr }                  from './chart-expr';
+import { createExprValidator }        from './expr-validator';
+import { Http }                       from '@angular/http';
+
 
 class LabeledExpr {
   constructor(public label: string, public expr: string) {}
@@ -11,18 +20,19 @@ class Model {
   public lines: Array<LabeledExpr> = new Array();
 }
 
+
 @Component({
   selector: 'chart-expr-form',
-  directives: [ExprValidator],
   templateUrl: 'app/chart/chart-expr-form.html'
 })
 export class ChartExprFormComponent implements OnInit {
-  model = new Model();
-  formModel: ControlGroup;
+  formModel: FormGroup;
+  lines: FormArray;
 
-  constructor(private fb: FormBuilder) {
+  constructor(private fb: FormBuilder, private http: Http) {
+    this.lines = fb.array([]);
     this.formModel = fb.group({
-      lines: fb.array([])
+      lines: this.lines
     });
   }
 
@@ -30,33 +40,32 @@ export class ChartExprFormComponent implements OnInit {
   public expr: EventEmitter<ChartExpr> = new EventEmitter<ChartExpr>();
 
   onSubmit() {
+    // Create result from form value.
     var result = new ChartExpr(new Map<string, string>());
-    for (let i = 0; i < this.model.lines.length; i++) {
-      let line: LabeledExpr = this.model.lines[i];
-      result.expr[line.label] = line.expr;
+    var formVal = this.formModel.value;
+    for (let i = 0; i < formVal.lines.length; i++) {
+      result.expr[formVal.lines[i].label] = formVal.lines[i].expr;
     }
     this.expr.next(result);
   }
 
   ngOnInit() {
-    if (this.model.lines.length == 0) this.add(null);
+    if (this.lines.length == 0) this.add(null);
   }
 
   add(le: LabeledExpr) {
     let label: string = le ? le.label : '';
     let expr: string = le ? le.expr : '';
-    (<ControlArray>this.formModel.controls['lines']).push(this.fb.group({
+    this.lines.push(this.fb.group({
       label: this.fb.control(label, Validators.required),
-      expr: this.fb.control(expr, Validators.required)
+      expr: this.fb.control(expr, Validators.required, createExprValidator(this.http))
     }));
-    this.model.lines.push(new LabeledExpr(label, expr));
   }
 
   @Input()
   public set initial(exprs: Map<string, string>) {
-    while ((<ControlArray>this.formModel.controls['lines']).length > 0)
-      (<ControlArray>this.formModel.controls['lines']).removeAt(0);
-    this.model.lines = [];
+    while (this.lines.length > 0)
+      this.lines.removeAt(0);
 
     let keys = Object.keys(exprs);
     if (keys.length == 0) this.add(null);
