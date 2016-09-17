@@ -1,5 +1,7 @@
 package com.groupon.lex.metrics.history;
 
+import static com.groupon.lex.metrics.history.HistoryContext.LOOK_BACK;
+import static com.groupon.lex.metrics.history.HistoryContext.LOOK_FORWARD;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
@@ -36,7 +38,7 @@ public interface CollectHistory {
     public Stream<TimeSeriesCollection> stream();
     /** Stream the TSData contents. */
     public default Stream<TimeSeriesCollection> stream(Duration stepsize) {
-        return IntervalIterator.stream(stream(), stepsize, HistoryContext.LOOK_BACK, HistoryContext.LOOK_FORWARD);
+        return IntervalIterator.stream(stream(), stepsize, LOOK_BACK, LOOK_FORWARD);
     }
 
     /** Stream all contents of the TSData, start at the 'begin' timestamp (inclusive). */
@@ -46,7 +48,8 @@ public interface CollectHistory {
     }
     /** Stream all contents of the TSData, start at the 'begin' timestamp (inclusive). */
     public default Stream<TimeSeriesCollection> stream(DateTime begin, Duration stepsize) {
-        return IntervalIterator.stream(stream(begin), stepsize, HistoryContext.LOOK_BACK, HistoryContext.LOOK_FORWARD);
+        return IntervalIterator.stream(stream(begin.minus(LOOK_BACK)), stepsize, LOOK_BACK, LOOK_FORWARD)
+                .filter(ts -> !ts.getTimestamp().isBefore(begin));
     }
 
     /** Stream all contents of the TSData, between the 'begin' timestamp (inclusive) and the 'end' timestamp (inclusive). */
@@ -56,7 +59,8 @@ public interface CollectHistory {
     }
     /** Stream all contents of the TSData, between the 'begin' timestamp (inclusive) and the 'end' timestamp (inclusive). */
     public default Stream<TimeSeriesCollection> stream(DateTime begin, DateTime end, Duration stepsize) {
-        return IntervalIterator.stream(stream(begin, end), stepsize, HistoryContext.LOOK_BACK, HistoryContext.LOOK_FORWARD);
+        return IntervalIterator.stream(stream(begin.minus(LOOK_BACK), end.plus(LOOK_FORWARD)), stepsize, LOOK_BACK, LOOK_FORWARD)
+                .filter(ts -> !ts.getTimestamp().isBefore(begin) && !ts.getTimestamp().isAfter(end));
     }
 
     /** Return a History Context for evaluating expressions. */
