@@ -2,6 +2,7 @@ package com.groupon.lex.metrics.history;
 
 import static com.groupon.lex.metrics.history.HistoryContext.LOOK_BACK;
 import static com.groupon.lex.metrics.history.HistoryContext.LOOK_FORWARD;
+import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
@@ -9,6 +10,7 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -65,18 +67,18 @@ public interface CollectHistory {
 
     /** Return a History Context for evaluating expressions. */
     public default Stream<Context> getContext(Duration stepsize, ExpressionLookBack lookback) {
-        return HistoryContext.stream(stream(stepsize), lookback);
+        return HistoryContext.stream(BufferedIterator.stream(ForkJoinPool.commonPool(), stream(stepsize)), lookback);
     }
 
     /** Return a History Context for evaluating expressions, starting at the 'begin' timestamp (inclusive). */
     public default Stream<Context> getContext(DateTime begin, Duration stepsize, ExpressionLookBack lookback) {
-        return HistoryContext.stream(stream(begin.minus(lookback.hintDuration()), stepsize), lookback)
+        return HistoryContext.stream(BufferedIterator.stream(ForkJoinPool.commonPool(), stream(begin.minus(lookback.hintDuration()), stepsize)), lookback)
                 .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin));
     }
 
     /** Return a History Context for evaluating expressions, between the 'begin' timestamp (inclusive) and the 'end' timestamp (inclusive). */
     public default Stream<Context> getContext(DateTime begin, DateTime end, Duration stepsize, ExpressionLookBack lookback) {
-        return HistoryContext.stream(stream(begin.minus(lookback.hintDuration()), end, stepsize), lookback)
+        return HistoryContext.stream(BufferedIterator.stream(ForkJoinPool.commonPool(), stream(begin.minus(lookback.hintDuration()), end, stepsize)), lookback)
                 .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin));
     }
 
