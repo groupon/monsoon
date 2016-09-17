@@ -3,7 +3,7 @@
     <parent>
         <groupId>com.github.groupon.monsoon</groupId>
         <artifactId>monsoon-basepom</artifactId>
-        <version>2.1-SNAPSHOT</version>
+        <version>2.1</version>
     </parent>
     <artifactId>monsoon-export</artifactId>
     <packaging>jar</packaging>
