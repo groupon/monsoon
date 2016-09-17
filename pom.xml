@@ -58,6 +58,7 @@
         <module>history</module>
         <module>remote_history</module>
         <module>rhist_server</module>
+        <module>api_bin</module>
         <module>prometheus</module>
         <module>verify</module>
         <module>file_convert</module>
