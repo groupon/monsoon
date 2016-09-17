@@ -32,6 +32,7 @@
 package com.groupon.monsoon.remote.history.server;
 
 import com.groupon.lex.metrics.history.xdr.DirCollectHistory;
+import com.groupon.lex.metrics.lib.BytesParser.BytesParserOptionHandler;
 import com.groupon.monsoon.remote.history.CollectHistoryServer;
 import java.io.IOException;
 import java.nio.file.FileSystems;
@@ -59,6 +60,9 @@ public class RhistMain {
 
     @Option(name="-p", usage="list on given port")
     private int port = CollectHistoryServer.DEFAULT_PORT;
+
+    @Option(name="-s", usage="limit history size", handler = BytesParserOptionHandler.class)
+    private long size = 16L << 30;
 
     @Argument(metaVar="/path/to/history/dir", usage="path: which dir contains the history files", index=0)
     private String dir;
@@ -101,7 +105,7 @@ public class RhistMain {
     }
 
     public void run() throws IOException, OncRpcException {
-        CollectHistoryServer server = new CollectHistoryServer(new DirCollectHistory(path_));
+        final CollectHistoryServer server = new CollectHistoryServer(new DirCollectHistory(path_, size));
 
         OncRpcUdpServerTransport rpcUdp = new OncRpcUdpServerTransport(server, null, port, server.info, 32768);
         rpcUdp.setCharacterEncoding("UTF-8");
