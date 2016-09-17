@@ -106,6 +106,7 @@ public class IntervalIterator implements Iterator<TimeSeriesCollection> {
     }
 
     private void updatePastAndFuture() {
+        if (nextTS == null) return;
         final DateTime tsBegin = nextTS.minus(lookBack);
         final DateTime tsEnd = nextTS.plus(lookForward);
 
