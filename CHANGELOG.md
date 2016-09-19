@@ -9,7 +9,7 @@ Features:
 Bug fixes:
 - Fix nullpointer exception on IntervalIterator if traversing empty collection.
 
-monsoon-2.1
+monsoon-2.1 (Sep 17, 2016)
 ----
 
 Features:
@@ -26,7 +26,7 @@ Bug fixes:
 - Pipeline builders now work correctly, if supplied with API server.
 - Work around spontaneous reactor shutdown in URL collectors.
 
-monsoon-2.0
+monsoon-2.0 (aug 31, 2016)
 ----
 
 - Opensourced monsoon!
