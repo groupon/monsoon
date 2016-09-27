@@ -5,6 +5,7 @@ monsoon-2.2-SNAPSHOT
 ----
 
 Features:
+- Create stand-alone frontend for graphing, that queries a remote history server for data.
 
 Bug fixes:
 - Fix nullpointer exception on IntervalIterator if traversing empty collection.
