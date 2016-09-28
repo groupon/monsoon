@@ -10,8 +10,6 @@ import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.Iterator;
 import static java.util.Objects.requireNonNull;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -25,7 +23,6 @@ import javax.servlet.WriteListener;
  */
 public class StreamingJsonListEntity<T> implements WriteListener {
     private static final Logger LOG = Logger.getLogger(StreamingJsonListEntity.class.getName());
-    private static final ExecutorService work_queue_ = Executors.newFixedThreadPool(Integer.max(Runtime.getRuntime().availableProcessors() - 1, 2));
     private static final Gson gson_ = new GsonBuilder().setPrettyPrinting().create();
     private final BufferedIterator<T> iter_;
     private final JsonWriter writer_;
@@ -35,7 +32,7 @@ public class StreamingJsonListEntity<T> implements WriteListener {
     public StreamingJsonListEntity(AsyncContext ctx, ServletOutputStream out, Iterator<T> iter) throws IOException {
         ctx_ = requireNonNull(ctx);
         out_ = requireNonNull(out);
-        iter_ = new BufferedIterator<>(work_queue_, iter);
+        iter_ = new BufferedIterator<>(iter);
         ctx_.setTimeout(300000);
         try {
             writer_ = gson_.newJsonWriter(new OutputStreamWriter(new NonClosingOutputStreamWrapper(out), "UTF-8"));

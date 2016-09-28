@@ -11,16 +11,18 @@ import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import java.util.Spliterators;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 
 public final class BufferedIterator<T> {
     private static final Logger LOG = Logger.getLogger(BufferedIterator.class.getName());
-    private final ExecutorService work_queue_;
+    private final ForkJoinPool work_queue_;
     private final Iterator<? extends T> iter_;
     private final List<T> queue_;
     private Exception exception = null;
@@ -29,7 +31,7 @@ public final class BufferedIterator<T> {
     private boolean running_ = false;
     private Optional<Runnable> wakeup_ = Optional.empty();
 
-    public BufferedIterator(ExecutorService work_queue, Iterator<? extends T> iter, int queue_size) {
+    public BufferedIterator(ForkJoinPool work_queue, Iterator<? extends T> iter, int queue_size) {
         if (queue_size <= 0) throw new IllegalArgumentException("queue size must be at least 1");
         work_queue_ = requireNonNull(work_queue);
         iter_ = requireNonNull(iter);
@@ -40,8 +42,16 @@ public final class BufferedIterator<T> {
         if (iter_.hasNext()) fire_();
     }
 
-    public BufferedIterator(ExecutorService work_queue, Iterator<? extends T> iter) {
+    public BufferedIterator(Iterator<? extends T> iter, int queue_size) {
+        this(ForkJoinPool.commonPool(), iter, queue_size);
+    }
+
+    public BufferedIterator(ForkJoinPool work_queue, Iterator<? extends T> iter) {
         this(work_queue, iter, 16);
+    }
+
+    public BufferedIterator(Iterator<? extends T> iter) {
+        this(ForkJoinPool.commonPool(), iter);
     }
 
     /** Adapt the IterQueue as a blocking iterator. */
@@ -55,24 +65,42 @@ public final class BufferedIterator<T> {
         return StreamSupport.stream(spliter, false);
     }
 
-    public static <T> Iterator<T> iterator(ExecutorService work_queue, Iterator<? extends T> iter, int queue_size) {
+    public static <T> Iterator<T> iterator(ForkJoinPool work_queue, Iterator<? extends T> iter, int queue_size) {
         return new BufferedIterator<>(work_queue, iter, queue_size).asIterator();
     }
-    public static <T> Iterator<T> iterator(ExecutorService work_queue, Iterator<? extends T> iter) {
+    public static <T> Iterator<T> iterator(ForkJoinPool work_queue, Iterator<? extends T> iter) {
         return new BufferedIterator<>(work_queue, iter).asIterator();
     }
+    public static <T> Iterator<T> iterator(Iterator<? extends T> iter, int queue_size) {
+        return new BufferedIterator<>(iter, queue_size).asIterator();
+    }
+    public static <T> Iterator<T> iterator(Iterator<? extends T> iter) {
+        return new BufferedIterator<>(iter).asIterator();
+    }
 
-    public static <T> Stream<T> stream(ExecutorService work_queue, Iterator<? extends T> iter, int queue_size) {
+    public static <T> Stream<T> stream(ForkJoinPool work_queue, Iterator<? extends T> iter, int queue_size) {
         return new BufferedIterator<>(work_queue, iter, queue_size).asStream();
     }
-    public static <T> Stream<T> stream(ExecutorService work_queue, Iterator<? extends T> iter) {
+    public static <T> Stream<T> stream(ForkJoinPool work_queue, Iterator<? extends T> iter) {
         return new BufferedIterator<>(work_queue, iter).asStream();
     }
-    public static <T> Stream<T> stream(ExecutorService work_queue, Stream<? extends T> stream, int queue_size) {
+    public static <T> Stream<T> stream(ForkJoinPool work_queue, Stream<? extends T> stream, int queue_size) {
         return stream(work_queue, stream.iterator(), queue_size);
     }
-    public static <T> Stream<T> stream(ExecutorService work_queue, Stream<? extends T> stream) {
+    public static <T> Stream<T> stream(ForkJoinPool work_queue, Stream<? extends T> stream) {
         return stream(work_queue, stream.iterator());
+    }
+    public static <T> Stream<T> stream(Iterator<? extends T> iter, int queue_size) {
+        return new BufferedIterator<>(iter, queue_size).asStream();
+    }
+    public static <T> Stream<T> stream(Iterator<? extends T> iter) {
+        return new BufferedIterator<>(iter).asStream();
+    }
+    public static <T> Stream<T> stream(Stream<? extends T> stream, int queue_size) {
+        return stream(stream.iterator(), queue_size);
+    }
+    public static <T> Stream<T> stream(Stream<? extends T> stream) {
+        return stream(stream.iterator());
     }
 
     public synchronized boolean atEnd() {
@@ -186,20 +214,36 @@ public final class BufferedIterator<T> {
          * May be interrupted, in which case it will return before the wakeup arrives.
          */
         private void wait_() {
-            while (!(BufferedIterator.this.nextAvail() || BufferedIterator.this.atEnd())) {
-                synchronized(this) {
-                    BufferedIterator.this.setWakeup(() -> {
-                        synchronized(BlockingIterator.this) {
-                            BlockingIterator.this.notify();
-                        }
-                    });
-                    try {
-                        this.wait();
-                    } catch (InterruptedException ex) {
-                        Logger.getLogger(BufferedIterator.class.getName()).log(Level.WARNING, "interrupted wait", ex);
-                    }
+            final WakeupListener w = new WakeupListener(() -> BufferedIterator.this.nextAvail() || BufferedIterator.this.atEnd());
+            BufferedIterator.this.setWakeup(w::wakeup);
+            while (!w.isReleasable()) {
+                try {
+                    ForkJoinPool.managedBlock(w);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(BufferedIterator.class.getName()).log(Level.WARNING, "interrupted wait", ex);
                 }
             }
+        }
+    }
+
+    @RequiredArgsConstructor
+    private static class WakeupListener implements ForkJoinPool.ManagedBlocker {
+        private final BooleanSupplier predicate;
+
+        public synchronized void wakeup() {
+            this.notify();
+        }
+
+        @Override
+        public synchronized boolean block() throws InterruptedException {
+            while (!predicate.getAsBoolean())
+                this.wait();
+            return true;
+        }
+
+        @Override
+        public boolean isReleasable() {
+            return predicate.getAsBoolean();
         }
     }
 }
