@@ -9,6 +9,7 @@ Features:
 
 Bug fixes:
 - Fix nullpointer exception on IntervalIterator if traversing empty collection.
+- Fix deadlock during expression evaluation if BufferedIterators nested deep enough to exhaust fork-join pool.
 
 monsoon-2.1 (Sep 17, 2016)
 ----
