@@ -1,7 +1,7 @@
 Change log
 ====
 
-monsoon-2.2-SNAPSHOT
+monsoon-2.1.1 (Sep 28, 2016)
 ----
 
 Features:
