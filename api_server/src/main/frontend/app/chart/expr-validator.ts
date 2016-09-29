@@ -1,6 +1,8 @@
 import { FormControl }                      from '@angular/forms';
 import { Http, URLSearchParams }            from '@angular/http';
-import 'rxjs/Rx';
+import { Observable }                       from 'rxjs/Observable';
+import                                           'rxjs/add/operator/map';
+import                                           'rxjs/add/operator/toPromise';
 
 export class ExprValidationResult {
   constructor(public ok: boolean,

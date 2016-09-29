@@ -3,6 +3,7 @@ import { ChartExprFormComponent }                      from './chart-expr-form.c
 import { ChartExpr }                                   from './chart-expr';
 import { Router, ActivatedRoute }                      from '@angular/router';
 import { Observable }                                  from 'rxjs/Observable';
+import                                                      'rxjs/add/operator/map';
 
 
 @Component({

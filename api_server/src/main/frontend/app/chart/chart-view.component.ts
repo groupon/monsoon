@@ -2,7 +2,9 @@ import { OnInit, OnDestroy, Component }      from '@angular/core';
 import { ChartExpr }                         from './chart-expr';
 import { ActivatedRoute, Params }            from '@angular/router';
 import { ChartEditArgumentsService }         from './chart-edit-arguments.service';
-import { Observable, Subscription }          from 'rxjs';
+import { Observable }                        from 'rxjs/Observable';
+import { Subscription }                      from 'rxjs/Subscription';
+import                                            'rxjs/add/operator/map';
 
 
 @Component({
