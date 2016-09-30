@@ -6,14 +6,14 @@
     <modal-body>
       <div class="form-group">
         <label for="begin">Duration (seconds)</label>
-        <input type="text" [(ngModel)]="model.duration_seconds" ngControl="duration" #duration="ngForm" class="form-control" required #spy />
+        <input type="text" [(ngModel)]="model.duration_seconds" ngControl="duration" name="duration" #duration="ngModel" class="form-control" required #spy />
         <div [hidden]="duration.valid || duration.pristine" class="alert alert-danger">
           Duration is required
         </div>
       </div>
       <div class="form-group">
         <label for="end">End</label>
-        <input type="text" [(ngModel)]="model.end" ngControl="end" #end="ngForm" class="form-control" #spy />
+        <input type="text" [(ngModel)]="model.end" ngControl="end" name="end" #end="ngModel" class="form-control" #spy />
         <div [hidden]="end.valid || end.pristine" class="alert alert-danger">
           End timestamp is required
         </div>

@@ -1,38 +1,35 @@
 <div class="container">
-  <form (ngSubmit)="onSubmit()" [ngFormModel]="formModel" #chartExprForm="ngForm">
-    <div *ngFor="let line of model.lines; let i = index" class="form-group">
-      <label for="label">Label</label>
-      <input type="text"
-             [(ngModel)]="line.label"
-             [ngFormControl]="formModel.controls['lines'].at(i).find('label')"
-             #name="ngForm"
-             placeholder="Specify a label..."
-             class="form-control"
-             required
-             #spy />
-      <div *ngIf="!formModel.controls['lines'].at(i).find('label').valid && formModel.controls['lines'].at(i).find('label').dirty" class="alert alert-danger">
-        <p *ngIf="formModel.controls['lines'].at(i).find('label').hasError('required')">
-          Label is required
-        </p>
-      </div>
+  <form (ngSubmit)="onSubmit()" [formGroup]="formModel" #chartExprForm="ngForm">
+    <div formArrayName="lines">
+      <div *ngFor="let line of lines.controls; let i=index">
+        <div [formGroupName]="i" class="form-group" class="form-group">
+          <label for="label">Label</label>
+          <input type="text"
+                 formControlName="label"
+                 placeholder="Specify a label..."
+                 class="form-control"
+                 required />
+          <div *ngIf="!formModel.get(['lines', i, 'label']).valid && formModel.get(['lines', i, 'label']).dirty" class="alert alert-danger">
+            <p *ngIf="formModel.get(['lines', i, 'label']).hasError('required')">
+              Label is required
+            </p>
+          </div>
 
-      <label for="expr">Expression</label>
-      <textarea type="text"
-                [(ngModel)]="line.expr"
-                [ngFormControl]="formModel.controls['lines'].at(i).find('expr')"
-                #expr="ngForm"
-                placeholder="Specify a monsoon expression to graph..."
-                class="form-control"
-                required
-                validate-expr
-                #spy></textarea>
-      <div *ngIf="!formModel.controls['lines'].at(i).find('expr').valid && !formModel.controls['lines'].at(i).find('expr').pending && formModel.controls['lines'].at(i).find('expr').dirty" class="alert alert-danger">
-        <p *ngIf="formModel.controls['lines'].at(i).find('expr').hasError('required')">
-          Expression is required
-        </p>
-        <p *ngFor="let pe of formModel.controls['lines'].at(i).find('expr').getError('validateExpr').parseErrors">
-          {{ pe }}
-        </p>
+          <label for="expr">Expression</label>
+          <textarea type="text"
+                    formControlName="expr"
+                    placeholder="Specify a monsoon expression to graph..."
+                    class="form-control"
+                    required></textarea>
+          <div *ngIf="!formModel.get(['lines', i, 'expr']).valid && !formModel.get(['lines', i, 'expr']).pending && formModel.get(['lines', i, 'expr']).dirty" class="alert alert-danger">
+            <p *ngIf="formModel.get(['lines', i, 'expr']).hasError('required')">
+              Expression is required
+            </p>
+            <p *ngFor="let pe of formModel.get(['lines', i, 'expr']).getError('validateExpr').parseErrors">
+              {{ pe }}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 

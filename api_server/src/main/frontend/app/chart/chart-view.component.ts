@@ -1,43 +1,59 @@
-import { Component }                                   from '@angular/core';
-import { ChartComponent }                              from './chart.component';
-import { ChartExpr }                                   from './chart-expr';
-import { OnActivate, Router, RouteSegment, RouteTree } from '@angular/router';
-import { ChartEditArgumentsService }                   from './chart-edit-arguments.service';
+import { OnInit, OnDestroy, Component }      from '@angular/core';
+import { ChartExpr }                         from './chart-expr';
+import { ActivatedRoute, Params }            from '@angular/router';
+import { ChartEditArgumentsService }         from './chart-edit-arguments.service';
+import { Observable }                        from 'rxjs/Observable';
+import { Subscription }                      from 'rxjs/Subscription';
+import                                            'rxjs/add/operator/map';
 
 
 @Component({
   selector: 'chart-view',
-  directives: [ChartComponent],
-  template: '<chart #chart [expr]="exprs"></chart>'
+  template: '<chart #chart [expr]="exprs | async"></chart>'
 })
-export class ChartViewComponent implements OnActivate {
-  private exprs: ChartExpr;
+export class ChartViewComponent implements OnInit, OnDestroy {
+  private exprs: Observable<ChartExpr>;
+  private subscription: Subscription;
 
-  constructor(private chartEditArgumentsService: ChartEditArgumentsService) {}
+  constructor(private chartEditArgumentsService: ChartEditArgumentsService, private route: ActivatedRoute) {
+    this.exprs = this.route
+        .params
+        .map((params) => ChartViewComponent._paramsToExprMap(params))
+        .map((exprs) => new ChartExpr(exprs));
+  }
 
-  routerOnActivate(curr: RouteSegment, prev?: RouteSegment, currTree?: RouteTree, prevTree?: RouteTree): void {
-    // Decode arguments.
-    let exprs: Map<string, string> = new Map<string, string>();
-    Object.keys(curr.parameters).forEach((enc_k) => {
-      let k: string = decodeURIComponent(enc_k);
-      let v: string = decodeURIComponent(curr.getParam(enc_k));
+  ngOnInit() {
+    this.subscription = this.route
+        .params
+        .map((params) => ChartViewComponent._paramsToExprMap(params))
+        .subscribe((params) => this._exprsToChartExpr(params));
+  }
+
+  ngOnDestroy() {
+    this.subscription.unsubscribe();
+  }
+
+  private static _paramsToExprMap(params: Params): Map<string, string> {
+    let exprs = new Map<string, string>();
+
+    Object.keys(params).forEach((enc_k) => {
+      let k: string = enc_k;
+
       if (k.startsWith("expr:")) {
+        let v: string = params[k];
         exprs[k.substr(5)] = v;
       }
     });
-    this.exprs = new ChartExpr(exprs);
-
-    // Publish relevant arguments, so the edit link will cause us to edit the active chart.
-    let cea_map: Map<string, string> = new Map<string, string>();
-    Object.keys(exprs).forEach((k) => {
-      let v: string = exprs[k];
-      cea_map[this._encode('expr:' + k)] = this._encode(v);
-    });
-    this.chartEditArgumentsService.value = cea_map;
+    return exprs;
   }
 
-  _encode(s: string): string {
-    // Angular cannot handle round brackets in its argument. :'(
-    return encodeURIComponent(s).replace(/\(/g, '%28').replace(/\)/g, '%29');
+  _exprsToChartExpr(exprs: Map<string, string>) {
+    let cea_map = new Map<string, string>();
+    Object.keys(exprs).forEach((k) => {
+      let v: string = exprs[k];
+      cea_map['expr:' + k] = v;
+    });
+
+    this.chartEditArgumentsService.value = cea_map;
   }
 }
