@@ -109,6 +109,7 @@ class EvaluationStream {
 
   constructor(private http: Http, private params: URLSearchParams) {
     this.inFlight = new EvalDataSet(null);
+    this.params.set('delay', '3000');  // Try to retrieve data every 3 seconds.
   }
 
   begin(): Observable<EvalDataSet> {
