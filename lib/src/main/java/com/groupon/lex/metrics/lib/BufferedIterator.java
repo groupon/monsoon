@@ -269,8 +269,11 @@ public final class BufferedIterator<T> {
 
         private synchronized void fireWakeup() {
             if (wakeup == null) return;
-            workQueue.submit(wakeup);
-            wakeup = null;
+            try {
+                wakeup.run();
+            } finally {
+                wakeup = null;
+            }
         }
 
         public synchronized void deliverWakeup() {
