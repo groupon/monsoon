@@ -3,6 +3,7 @@ import { Http, URLSearchParams }            from '@angular/http';
 import { Observable }                       from 'rxjs/Observable';
 import                                           'rxjs/add/operator/map';
 import                                           'rxjs/add/operator/toPromise';
+import { ApiQueryEncoder }                  from '../ApiQueryEncoder';
 
 export class ExprValidationResult {
   constructor(public ok: boolean,
@@ -22,10 +23,10 @@ export function createExprValidator(http: Http) {
   return function(c: FormControl): Promise<any> {
     if (c.value == "") return Promise.resolve(null);
 
-    let params: URLSearchParams = new URLSearchParams();
-    // params.set('expr', c.value);  // For now, use manual escape to work around bug in Angular2.0.0-rc.6
+    let params: URLSearchParams = new URLSearchParams('', new ApiQueryEncoder());
+    params.set('expr', c.value);
 
-    return http.get('/api/monsoon/eval/validate?expr=' + encodeURIComponent(c.value), { search: params })
+    return http.get('/api/monsoon/eval/validate', { search: params })
         .map(response => response.json())
         .map(json => exprValidationResultFromJson(json))
         .toPromise()
