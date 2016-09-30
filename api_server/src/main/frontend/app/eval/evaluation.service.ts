@@ -95,8 +95,10 @@ export class EvaluationService {
     let params: URLSearchParams = new URLSearchParams('', new ApiQueryEncoder());
     let end = ts.getEnd();
     let begin = ts.getBegin();
+    let stepSize = ts.getStepsizeMsec();
     if (end != null) params.set('end', end.getTime().toString());
     if (begin != null) params.set('begin', begin.getTime().toString());
+    if (stepSize != null) params.set('stepsize', stepSize);
     return params;
   }
 }
