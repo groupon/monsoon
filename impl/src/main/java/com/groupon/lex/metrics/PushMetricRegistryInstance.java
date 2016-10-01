@@ -32,7 +32,6 @@
 package com.groupon.lex.metrics;
 
 import com.groupon.lex.metrics.api.endpoints.ExprEval;
-import com.groupon.lex.metrics.api.endpoints.ExprEvalGraphServlet;
 import com.groupon.lex.metrics.api.endpoints.ExprValidate;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
@@ -75,7 +74,6 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
         history_ = Optional.of(history);
         getApi().addEndpoint("/monsoon/eval", new ExprEval(history_.get()));
         getApi().addEndpoint("/monsoon/eval/validate", new ExprValidate());
-        getApi().addEndpoint("/monsoon/eval/gchart", new ExprEvalGraphServlet(history_.get()));
         data_.initWithHistoricalData(history, getDecoratorLookBack());
     }
     /** Clear the history module. */
