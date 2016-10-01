@@ -8,6 +8,7 @@ import                                'rxjs/add/operator/concat';
 import                                'rxjs/add/operator/map';
 import                                'rxjs/add/operator/mergeMap';
 import                                'rxjs/add/operator/switchMap';
+import                                'rxjs/add/operator/do';
 import                                'rxjs/add/observable/combineLatest';
 import                                'rxjs/add/observable/of';
 
@@ -65,6 +66,7 @@ export class EvaluationService {
   constructor(private http: Http, private timeSpecService: ChartTimeSpecService) {}
 
   evaluate(exprsObservable: Observable<Map<string, string>>): Observable<EvalDataSet> {
+    console.log('EvaluationService: evaluate');
     let exprsParams = exprsObservable.map((exprs) => {
       let params: URLSearchParams = new URLSearchParams('', new ApiQueryEncoder());
       Object.keys(exprs).forEach((k) => {
@@ -81,13 +83,18 @@ export class EvaluationService {
   // Combine query parameters with timespec information.
   private _paramsWithTimeStream(paramsObservable: Observable<URLSearchParams>): Observable<URLSearchParams> {
     return Observable.combineLatest(
-        paramsObservable,
-        this.timeSpecService.onChange.map(EvaluationService._timeSpecToSearchParams),
+        paramsObservable
+            .do((p) => console.log('EvaluationService: new params ' + JSON.stringify(p))),
+        Observable.of(this.timeSpecService.time)
+            .concat(this.timeSpecService.onChange)
+            .map(EvaluationService._timeSpecToSearchParams)
+            .do((ts) => console.log('EvaluationService: new time spec ' + JSON.stringify(ts))),
         (params, tsParams) => {
           let copy: URLSearchParams = params.clone();
           copy.appendAll(tsParams)
           return copy;
-        });
+        })
+        .do((p) => console.log('EvaluationService: updated params ' + JSON.stringify(p)));
   }
 
   // Convert timespec to query parameters.
@@ -98,7 +105,7 @@ export class EvaluationService {
     let stepSize = ts.getStepsizeMsec();
     if (end != null) params.set('end', end.getTime().toString());
     if (begin != null) params.set('begin', begin.getTime().toString());
-    if (stepSize != null) params.set('stepsize', stepSize);
+    if (stepSize != null) params.set('stepsize', stepSize.toString());
     return params;
   }
 }
@@ -108,17 +115,21 @@ export class EvaluationService {
 // Has an internal state and a begin() method that starts the observable.
 class EvaluationStream {
   private inFlight: EvalDataSet;
+  private params: URLSearchParams;
 
-  constructor(private http: Http, private params: URLSearchParams) {
+  constructor(private http: Http, params: URLSearchParams) {
     this.inFlight = new EvalDataSet(null);
+    this.params = params.clone();
     this.params.set('delay', '3000');  // Try to retrieve data every 3 seconds.
   }
 
   begin(): Observable<EvalDataSet> {
-    return this.http.get('/api/monsoon/eval/iter', { search: this.params })
+    console.log('EvaluationStream: begin');
+    return this.http.get('/api/monsoon/eval', { search: this.params })
         .map((response) => response.json())
         .map((json) => new EvalIterResponse(json))
-        .flatMap((resp) => this.emitAndContinue(resp));
+        .flatMap((resp) => this.emitAndContinue(resp))
+        .do((v) => console.log('EvaluationStream: emiting ' + JSON.stringify(v)));
   }
 
   private emitAndContinue(resp: EvalIterResponse): Observable<EvalDataSet> {
@@ -133,7 +144,7 @@ class EvaluationStream {
       this.params.set('begin', resp.newBegin.getTime().toString());
       this.params.set('cookie', resp.cookie);
       this.params.set('iter', resp.iter);
-      let next: Observable<EvalDataSet> = this.http.get('/api/monsoon/eval/iter', { search: this.params })
+      let next: Observable<EvalDataSet> = this.http.get('/api/monsoon/eval', { search: this.params })
           .map((response) => response.json())
           .map((json) => new EvalIterResponse(json))
           .flatMap((resp) => this.emitAndContinue(resp));
