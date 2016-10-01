@@ -9,8 +9,6 @@ import                                'rxjs/add/operator/concat';
 import                                'rxjs/add/operator/map';
 import                                'rxjs/add/operator/mergeMap';
 import                                'rxjs/add/operator/switchMap';
-import                                'rxjs/add/operator/do';
-import                                'rxjs/add/operator/share';
 import                                'rxjs/add/observable/combineLatest';
 import                                'rxjs/add/observable/of';
 
@@ -68,7 +66,6 @@ export class EvaluationService {
   constructor(private http: Http, private timeSpecService: ChartTimeSpecService) {}
 
   evaluate(exprsObservable: Observable<Map<string, string>>): Observable<EvalDataSet> {
-    console.log('EvaluationService: evaluate');
     let exprsParams = exprsObservable.map((exprs) => {
       let params: URLSearchParams = new URLSearchParams('', new ApiQueryEncoder());
       Object.keys(exprs).forEach((k) => {
@@ -85,18 +82,15 @@ export class EvaluationService {
   // Combine query parameters with timespec information.
   private _paramsWithTimeStream(paramsObservable: Observable<URLSearchParams>): Observable<URLSearchParams> {
     return Observable.combineLatest(
-        paramsObservable
-            .do((p) => console.log('EvaluationService: new params ' + JSON.stringify(p))),
+        paramsObservable,
         Observable.of(this.timeSpecService.time)
             .concat(this.timeSpecService.onChange)
-            .map(EvaluationService._timeSpecToSearchParams)
-            .do((ts) => console.log('EvaluationService: new time spec ' + JSON.stringify(ts))),
+            .map(EvaluationService._timeSpecToSearchParams),
         (params, tsParams) => {
           let copy: URLSearchParams = params.clone();
           copy.appendAll(tsParams)
           return copy;
-        })
-        .do((p) => console.log('EvaluationService: updated params ' + JSON.stringify(p)));
+        });
   }
 
   // Convert timespec to query parameters.
@@ -118,9 +112,10 @@ export class EvaluationService {
 class EvaluationStream {
   private inFlight: EvalDataSet;
   private params: URLSearchParams;
-  private _out: Subscriber<EvalDataSet>;
+  private stopped: boolean;
 
   constructor(private http: Http, params: URLSearchParams) {
+    this.stopped = false;
     this.inFlight = new EvalDataSet(null);
     this.params = params.clone();
     this.params.set('delay', '3000');  // Try to retrieve data every 3 seconds.
@@ -129,39 +124,34 @@ class EvaluationStream {
   begin(): Observable<EvalDataSet> {
     console.log('EvaluationStream: begin');
     return Observable.create((inner) => {
-          this._out = inner;
           this._onNext(inner);
           return () => { this._stop() };
         })
   }
 
   // Fetch 1 update from API iterator.
-  private _onNext(inner: Observable<EvalDataSet>): void {
+  private _onNext(inner: Subscriber<EvalDataSet>): void {
     this.http.get('/api/monsoon/eval', { search: this.params })
-        .map((response) => response.json())
-        .map((json) => new EvalIterResponse(json))
+        .map((response) => new EvalIterResponse(response.json()))
         .toPromise()  // Means we don't have to manage a subscription.
         .then(
             (resp) => this._update(inner, resp),
             (err) => {
               console.log('EvaluationStream: error ' + err.toString());
-              if (this._out != null) this._out.error(err);  // Propagate error.
-              this._stop();
+              if (!this.stopped) inner.error(err);  // Propagate error.
+              inner.complete();
             }
         );
   }
 
   // Mark output as complete.
   private _stop(): void {
-    if (this._out != null) {
-      console.log('ChartStream: _out.complete()');
-      this._out.complete();
-      this._out = null;
-    }
+    console.log('EvaluationStream: stopped');
+    this.stopped = true;
   }
 
   // Process promise response from _onNext.
-  private _update(inner: Observable<EvalDataSet>, resp: EvalIterResponse): void {
+  private _update(inner: Subscriber<EvalDataSet>, resp: EvalIterResponse): void {
     // Merge with everything collected so far.
     this.inFlight.merge(resp.data);
 
@@ -170,13 +160,13 @@ class EvaluationStream {
     this.params.set('cookie', resp.cookie);
     this.params.set('iter', resp.iter);
 
-    // Only continue fetching more data if _out is still live.
-    if (this._out != null) {
+    // Only continue fetching more data if still live.
+    if (!this.stopped) {
       // Emit copy of current inflight.
-      this._out.next(this.inFlight.clone());
+      inner.next(this.inFlight.clone());
 
       if (resp.last)  // Close after last item emit.
-        this._stop();
+        inner.complete();
       else  // Continue fetching more data.
         this._onNext(inner);
     }

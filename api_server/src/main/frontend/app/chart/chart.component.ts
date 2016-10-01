@@ -17,7 +17,6 @@ import                                   'rxjs/add/operator/map';
 import                                   'rxjs/add/observable/defer';
 import                                   'rxjs/add/observable/combineLatest';
 import                                   'rxjs/add/observable/zip';
-import                                   'rxjs/add/operator/do';
 
 
 class ChartSize {
@@ -43,7 +42,6 @@ export class ChartComponent implements OnInit, OnDestroy {
 
   @Input()
   set expr(s: ChartExpr) {
-    console.log('ChartComponent: new expr ' + JSON.stringify(s));
     this._expr = s;
     this.exprSubject.next(s);
   }
@@ -74,26 +72,22 @@ export class ChartComponent implements OnInit, OnDestroy {
     let onResize: Observable<ChartSize> = Observable.of(new ChartSize(this.div.nativeElement.offsetWidth, this.div.nativeElement.offsetHeight))
         .concat(Observable.fromEvent(window, 'resize')
             .map(() => new ChartSize(this.div.nativeElement.offsetWidth, this.div.nativeElement.offsetHeight)))
-        .debounceTime(500 /* ms */)
-        .do((size) => console.log('ChartComponent: size updated ' + JSON.stringify(size)));
+        .debounceTime(300 /* ms */);
 
     // Adapt expr subject to always emit current value.
     let exprObs: Observable<Map<string, string>> = Observable.of(this._expr)
         .concat(this.exprSubject)
-        .map((cexpr) => cexpr.expr)
-        .do((v) => console.log('ChartComponent: requesting evaluation for ' + JSON.stringify(v)))
+        .map((cexpr) => cexpr.expr);
 
     // Create table stream from exprObs.
     let table: Observable<any> = this.evalService.evaluate(exprObs)
-        .map(convertDataTable)
-        .do((table) => console.log('ChartComponent: data updated ' + JSON.stringify(table)));
+        .map(convertDataTable);
 
     // Combine table and size.
     let input: Observable<ChartData> = Observable.combineLatest(table, onResize, (table, size) => new ChartData(table, size));
 
     // Emit table and size, only once for each emitted chartPauser event.
-    return Observable.zip(this.chartPauser.asObservable().do((v) => console.log('ChartComponent: chartPauser emit')), input, (_, inpVal) => inpVal)
-        .do((v) => console.log('ChartComponent: emitting ChartData ' + JSON.stringify(v)));
+    return Observable.zip(this.chartPauser.asObservable(), input, (_, inpVal) => inpVal);
   }
 
   private drawChart(table: any, size: ChartSize): void {
@@ -111,18 +105,15 @@ export class ChartComponent implements OnInit, OnDestroy {
 
       (<any>window).google.visualization.events.addListener(this._chart, 'ready', () => this.chartReady());
     } else {
-      console.log('ChartComponent: updating chart...');
       this._chart.setOption('width', size.width);
       this._chart.setOption('height', size.height);
       this._chart.setDataTable(table);
     }
 
-    console.log('ChartComponent: drawing chart...');
     this._chart.draw(this.div.nativeElement);
   }
 
   private chartReady(): void {
-    console.log('ChartComponent: chart ready for new data...');
     this.chartPauser.next(true);
   }
 
@@ -131,13 +122,8 @@ export class ChartComponent implements OnInit, OnDestroy {
 
     // We must subscribe before emitting anything, as items emitted
     // prior to subscription are never seen again.
-    console.log('ChartComponent: creating query subscription...');
     this.subscription = this._createChartData()
-        .do((v) => console.log('ChartComponent: ChartData subscription seeing ' + JSON.stringify(v)))
-        .subscribe((dataAndSize) => {
-          console.log('ChartComponent: ChartData = ' + JSON.stringify(dataAndSize, null, '  '));
-          this.drawChart(dataAndSize.table, dataAndSize.size);
-        });
+        .subscribe((dataAndSize) => this.drawChart(dataAndSize.table, dataAndSize.size));
 
     // Emit first event; must happen after subscription is created
     // or it'll be lost.
