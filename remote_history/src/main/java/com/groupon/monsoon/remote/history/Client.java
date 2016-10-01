@@ -37,6 +37,7 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import static com.groupon.monsoon.remote.history.EncDec.decodeTimestamp;
 import static com.groupon.monsoon.remote.history.EncDec.encodeTSCCollection;
+import com.groupon.monsoon.remote.history.xdr.list_of_timeseries_collection;
 import com.groupon.monsoon.remote.history.xdr.named_evaluation_map;
 import com.groupon.monsoon.remote.history.xdr.rh_protoClient;
 import java.io.IOException;
@@ -55,12 +56,14 @@ import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import java.util.Spliterators;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.OncRpcProtocols;
 import org.joda.time.DateTime;
@@ -86,7 +89,9 @@ public class Client implements CollectHistory {
 
         final rh_protoClient client = getRpcClient(OncRpcProtocols.ONCRPC_UDP);
         try {
-            client.nullproc();  // Test the connection.
+            BlockingWrapper.execute(() -> client.nullproc());  // Test the connection.
+        } catch (InterruptedException ex) {
+            throw new RuntimeException(ex);
         } finally {
             client.close();
         }
@@ -118,11 +123,12 @@ public class Client implements CollectHistory {
         try {
             final rh_protoClient client = getRpcClient(OncRpcProtocols.ONCRPC_TCP);
             try {
-                return client.addTSData_1(encodeTSCCollection(c));
+                final list_of_timeseries_collection enc_c = encodeTSCCollection(c);
+                return BlockingWrapper.execute(() -> client.addTSData_1(enc_c));
             } finally {
                 client.close();
             }
-        } catch (OncRpcException | IOException ex) {
+        } catch (OncRpcException | IOException | InterruptedException | RuntimeException ex) {
             LOG.log(Level.SEVERE, "addAll RPC call failed", ex);
             throw new RuntimeException("RPC call failed", ex);
         }
@@ -137,11 +143,11 @@ public class Client implements CollectHistory {
         try {
             final rh_protoClient client = getRpcClient(OncRpcProtocols.ONCRPC_UDP);
             try {
-                return client.getFileSize_1();
+                return BlockingWrapper.execute(() -> client.getFileSize_1());
             } finally {
                 client.close();
             }
-        } catch (OncRpcException | IOException ex) {
+        } catch (OncRpcException | IOException | InterruptedException | RuntimeException ex) {
             LOG.log(Level.SEVERE, "getFileSize RPC call failed", ex);
             throw new RuntimeException("RPC call failed", ex);
         }
@@ -156,11 +162,11 @@ public class Client implements CollectHistory {
         try {
             final rh_protoClient client = getRpcClient(OncRpcProtocols.ONCRPC_UDP);
             try {
-                return decodeTimestamp(client.getEnd_1());
+                return decodeTimestamp(BlockingWrapper.execute(() -> client.getEnd_1()));
             } finally {
                 client.close();
             }
-        } catch (OncRpcException | IOException ex) {
+        } catch (OncRpcException | IOException | InterruptedException | RuntimeException ex) {
             LOG.log(Level.SEVERE, "getEnd RPC call failed", ex);
             throw new RuntimeException("RPC call failed", ex);
         }
@@ -513,8 +519,6 @@ public class Client implements CollectHistory {
      * The iterator is able to resume if the remote iterator disappears.
      */
     private static class RpcIterator<T> implements Iterator<T> {
-        public static final int INITIAL_BATCH_SIZE = 10;
-        public static final int BATCH_SIZE = 50;
         private long id;
         private rh_protoClient rpcClient;
         private boolean fin = false;
@@ -537,7 +541,12 @@ public class Client implements CollectHistory {
             this.continueCall = continueCall;
 
             try {
-                final EncDec.NewIterResponse<T> sr = this.restartCall.call(this.rpcClient, this.restartTS);
+                final EncDec.NewIterResponse<T> sr;
+                try {
+                    sr = BlockingWrapper.execute(() -> this.restartCall.call(this.rpcClient, this.restartTS));
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException("interrupted during start of iterator", ex);
+                }
                 id = sr.getIterIdx();
                 applyValues(sr);
             } catch (RuntimeException | IOException | OncRpcException ex) {
@@ -575,27 +584,29 @@ public class Client implements CollectHistory {
             if (fin) return;
             assert(nextValues.isEmpty());
 
-            final Any2<EncDec.IterSuccessResponse<T>, EncDec.IterErrorResponse> response;
-            try {
-                response = continueCall.call(rpcClient, id, cookie);
-            } catch (IOException | OncRpcException ex) {
-                LOG.log(Level.WARNING, "error fetching next set from iterator", ex);
-                restart();
-                return;
-            }
-            final Optional<EncDec.IterSuccessResponse<T>> success = response.getLeft();
-            if (success.isPresent()) {
-                applyValues(success.get());
-                return;
-            }
-
-            final Optional<EncDec.IterErrorResponse> lost = response.getRight();
-            assert(lost.isPresent());
-            switch (lost.get().getError()) {
-                case UNKNOWN_ITERATOR:
+            do {
+                final Any2<EncDec.IterSuccessResponse<T>, EncDec.IterErrorResponse> response;
+                try {
+                    response = BlockingWrapper.execute(() -> continueCall.call(rpcClient, id, cookie));
+                } catch (IOException | OncRpcException | InterruptedException ex) {
+                    LOG.log(Level.WARNING, "error fetching next set from iterator", ex);
                     restart();
-                    break;
-            }
+                    continue;
+                }
+                final Optional<EncDec.IterSuccessResponse<T>> success = response.getLeft();
+                if (success.isPresent()) {
+                    applyValues(success.get());
+                    continue;
+                }
+
+                final Optional<EncDec.IterErrorResponse> lost = response.getRight();
+                assert(lost.isPresent());
+                switch (lost.get().getError()) {
+                    case UNKNOWN_ITERATOR:
+                        restart();
+                        break;
+                }
+            } while (nextValues.isEmpty() && !fin);
         }
 
         private void applyValues(EncDec.IterSuccessResponse<T> sr) {
@@ -607,8 +618,8 @@ public class Client implements CollectHistory {
                 computeRestartTs.apply(this.nextValues).ifPresent(ts -> this.restartTS = ts);
             if (fin) {
                 try {
-                    rpcClient.closeIterTsc_1(id, this.cookie);
-                } catch (IOException | OncRpcException ex) {
+                    BlockingWrapper.execute(() -> rpcClient.closeIterTsc_1(id, this.cookie));
+                } catch (IOException | OncRpcException | InterruptedException | RuntimeException ex) {
                     /* Ignore, server will drop iterator at some point. */
                 }
                 try {
@@ -622,10 +633,13 @@ public class Client implements CollectHistory {
 
         private void restart() {
             try {
-                final EncDec.NewIterResponse<T> sr = restartCall.call(rpcClient, restartTS);
+                final EncDec.NewIterResponse<T> sr = BlockingWrapper.execute(() -> restartCall.call(rpcClient, restartTS));
                 id = sr.getIterIdx();
                 applyValues(sr);
-            } catch (IOException | OncRpcException ex) {
+            } catch (RuntimeException ex) {
+                LOG.log(Level.WARNING, "unable to restart iteration", ex);
+                throw ex;
+            } catch (IOException | OncRpcException | InterruptedException ex) {
                 LOG.log(Level.WARNING, "unable to restart iteration", ex);
                 throw new RuntimeException("unable to restart iteration", ex);
             }
@@ -638,5 +652,64 @@ public class Client implements CollectHistory {
 
     private static interface RpcContinue<T> {
         public Any2<EncDec.IterSuccessResponse<T>, EncDec.IterErrorResponse> call(rh_protoClient rpcClient, long id, long cookie) throws IOException, OncRpcException;
+    }
+
+    /** Wrapper around RPC calls, to play nice with ForkJoinPool. */
+    @RequiredArgsConstructor
+    private static class BlockingWrapper<T> implements ForkJoinPool.ManagedBlocker {
+        private T result;
+        private IOException ioException;
+        private OncRpcException oncRpcException;
+        private RuntimeException runtimeException;
+        private final RpcCall<? extends T> call;
+
+        public static <T> T execute(RpcCall<? extends T> call) throws InterruptedException, IOException, OncRpcException, RuntimeException {
+            final BlockingWrapper<T> blocker = new BlockingWrapper<>(call);
+            ForkJoinPool.managedBlock(blocker);
+            return blocker.get();
+        }
+
+        public static void execute(RpcRunnable call) throws InterruptedException, IOException, OncRpcException, RuntimeException {
+            final BlockingWrapper<Void> blocker = new BlockingWrapper<>(() -> { call.call(); return null; });
+            ForkJoinPool.managedBlock(blocker);
+            blocker.get();  // Propagate exceptions.
+        }
+
+        public T get() throws IOException, OncRpcException, RuntimeException {
+            if (ioException != null) throw ioException;
+            if (oncRpcException != null) throw oncRpcException;
+            if (runtimeException != null) throw runtimeException;
+            return result;
+        }
+
+        @Override
+        public boolean block() throws InterruptedException {
+            if (isReleasable()) return true;
+            try {
+                result = call.call();
+            } catch (InterruptedException ex) {
+                throw ex;
+            } catch (OncRpcException ex) {
+                oncRpcException = ex;
+            } catch (IOException ex) {
+                ioException = ex;
+            } catch (RuntimeException ex) {
+                runtimeException = ex;
+            }
+            return true;
+        }
+
+        @Override
+        public boolean isReleasable() {
+            return result != null || ioException != null || oncRpcException != null || runtimeException != null;
+        }
+
+        public static interface RpcCall<T> {
+            public T call() throws IOException, OncRpcException, RuntimeException, InterruptedException;
+        }
+
+        public static interface RpcRunnable {
+            public void call() throws IOException, OncRpcException, RuntimeException, InterruptedException;
+        }
     }
 }
