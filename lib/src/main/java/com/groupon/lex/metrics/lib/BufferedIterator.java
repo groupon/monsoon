@@ -12,11 +12,13 @@ import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import java.util.Spliterators;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 
@@ -138,6 +140,12 @@ public final class BufferedIterator<T> {
         if (run_immediately_) work_queue_.submit(wakeup);
     }
 
+    public void setWakeup(Runnable wakeup, long tv, TimeUnit tu) {
+        final Delay delay = new Delay(work_queue_, wakeup, tv, tu);
+        setWakeup(delay::deliverWakeup);
+        work_queue_.submit(delay);
+    }
+
     private synchronized void fire_() {
         if (at_end_) return;
         if (queue_.size() >= queue_size_) return;
@@ -220,7 +228,7 @@ public final class BufferedIterator<T> {
                 try {
                     ForkJoinPool.managedBlock(w);
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(BufferedIterator.class.getName()).log(Level.WARNING, "interrupted wait", ex);
+                    LOG.log(Level.WARNING, "interrupted wait", ex);
                 }
             }
         }
@@ -244,6 +252,64 @@ public final class BufferedIterator<T> {
         @Override
         public boolean isReleasable() {
             return predicate.getAsBoolean();
+        }
+    }
+
+    private static class Delay implements ForkJoinPool.ManagedBlocker, Runnable {
+        private final ForkJoinPool workQueue;
+        private Runnable wakeup;
+        private final long deadline;
+        private boolean wakeupReceived = false;
+
+        public Delay(@NonNull ForkJoinPool workQueue, @NonNull Runnable wakeup, long tv, TimeUnit tu) {
+            this.workQueue = workQueue;
+            this.deadline = System.currentTimeMillis() + TimeUnit.MILLISECONDS.convert(tv, tu);
+            this.wakeup = wakeup;
+        }
+
+        private synchronized void fireWakeup() {
+            if (wakeup == null) return;
+            try {
+                wakeup.run();
+            } finally {
+                wakeup = null;
+            }
+        }
+
+        public synchronized void deliverWakeup() {
+            wakeupReceived = true;
+            this.notify();
+            fireWakeup();
+        }
+
+        @Override
+        public void run() {
+            try {
+                ForkJoinPool.managedBlock(this);
+            } catch (InterruptedException ex) {
+                LOG.log(Level.WARNING, "interrupted wait", ex);
+            }
+        }
+
+        @Override
+        public synchronized boolean block() throws InterruptedException {
+            final long now = System.currentTimeMillis();
+            if (wakeupReceived || deadline <= now) return true;
+
+            this.wait(deadline - now);
+            fireWakeup();
+            return true;
+        }
+
+        @Override
+        public boolean isReleasable() {
+            synchronized(this) {
+                if (wakeupReceived) {
+                    fireWakeup();
+                    return true;
+                }
+            }
+            return deadline <= System.currentTimeMillis();
         }
     }
 }

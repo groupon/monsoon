@@ -1,119 +1,179 @@
-import { Component, ElementRef, Input, Inject, OnInit, OnDestroy } from '@angular/core';
-import { ChartExpr }                                               from './chart-expr';
-import { ChartTimeSpec }                                           from './chart-time-spec';
-import { ChartTimeSpecService }                                    from './chart-time-spec.service';
+import { Component,
+         ElementRef,
+         Input,
+         Inject,
+         OnInit,
+         OnDestroy }                from '@angular/core';
+import { ChartExpr }                from './chart-expr';
+import { ChartTimeSpec }            from './chart-time-spec';
+import { ChartTimeSpecService }     from './chart-time-spec.service';
+import { EvaluationService,
+         EvalDataSet }              from '../eval/evaluation.service';
+import { Subscription }             from 'rxjs/Subscription';
+import { Subject }                  from 'rxjs/Subject';
+import { Observable }               from 'rxjs/Observable';
+import                                   'rxjs/add/operator/debounceTime';
+import                                   'rxjs/add/operator/map';
+import                                   'rxjs/add/observable/defer';
+import                                   'rxjs/add/observable/combineLatest';
+import                                   'rxjs/add/observable/zip';
+
+
+class ChartSize {
+  constructor(public width: number, public height: number) {}
+}
+
+class ChartData {
+  constructor(public table: any, public size: ChartSize) {}
+}
+
 
 @Component({
   selector: 'chart',
   template: 'Loading...'
 })
 export class ChartComponent implements OnInit, OnDestroy {
-  _expr: ChartExpr;
   _chart: any;
-  _chart_width: number;
-  _chart_height: number;
-  _w_resize_fn: any;
-  
-  w: any;
+  _expr: ChartExpr;
+  private subscription: Subscription;
+  private chartPauser: Subject<boolean>;
+  private exprSubject: Subject<ChartExpr>;
   div: any;
-  cts: ChartTimeSpec;
 
   @Input()
   set expr(s: ChartExpr) {
     this._expr = s;
-    this.draw();
+    this.exprSubject.next(s);
   }
   get expr() {
     return this._expr;
   }
 
-  constructor(@Inject(ElementRef) element: ElementRef, ts: ChartTimeSpecService) {
-    this.w = window;
+  constructor(@Inject(ElementRef) element: ElementRef, private evalService: EvaluationService) {
     this.div = element;
-    if (!this.w.google) { console.error("Google script not loaded."); };
-    this.cts = ts.time;
-    ts.onChange.subscribe(time => this.updateTs(time));
-
-    this._w_resize_fn = () => { this.onResize(); };
+    if (!(<any>window).google) { console.error("Google script not loaded."); };
+    this.chartPauser = new Subject<boolean>();
+    this.exprSubject = new Subject<ChartExpr>();
   }
 
-  updateTs(cts: ChartTimeSpec) {
-    this.cts = cts;
-    if (this._expr) this.draw();
+  /* Create ChartData observable.
+   *
+   * We want to do this late, since:
+   * - we depend on the Google Chart library to have loaded (for DataTable type)
+   * - we want to use the actual size of our container element (size = 0 until rendered)
+   *
+   * Due to this, we miss initial events for expression updates, so we'll need
+   * to replay the current value immediately.
+   * We also need to replay the container size initially, since the event
+   * listener will only respond to updates; it won't have an initial value.
+   */
+  private _createChartData(): Observable<ChartData> {
+    // Start of with current value emitted, since event will only listen for resize events.
+    let onResize: Observable<ChartSize> = Observable.of(new ChartSize(this.div.nativeElement.offsetWidth, this.div.nativeElement.offsetHeight))
+        .concat(Observable.fromEvent(window, 'resize')
+            .map(() => new ChartSize(this.div.nativeElement.offsetWidth, this.div.nativeElement.offsetHeight)))
+        .debounceTime(300 /* ms */);
+
+    // Adapt expr subject to always emit current value.
+    let exprObs: Observable<Map<string, string>> = Observable.of(this._expr)
+        .concat(this.exprSubject)
+        .map((cexpr) => cexpr.expr);
+
+    // Create table stream from exprObs.
+    let table: Observable<any> = this.evalService.evaluate(exprObs)
+        .map(convertDataTable);
+
+    // Combine table and size.
+    let input: Observable<ChartData> = Observable.combineLatest(table, onResize, (table, size) => new ChartData(table, size));
+
+    // Emit table and size, only once for each emitted chartPauser event.
+    return Observable.zip(this.chartPauser.asObservable(), input, (_, inpVal) => inpVal);
   }
 
-  draw() {
-    var self = this;
+  private drawChart(table: any, size: ChartSize): void {
+    if (this._chart == null) {
+      console.log('ChartComponent: creating chart...');
+      this._chart = new (<any>window).google.visualization.ChartWrapper({
+        'chartType': 'LineChart',
+        'dataTable': table,
+        'options': {
+          'title': 'Expression',
+          'width': size.width,
+          'height': size.height,
+        }
+      });
 
-    this.w.google.load('visualization', '1.0', {'packages':['corechart'], callback: function() { self.drawChart(); }});
-  }
-
-  drawChart() {
-    this._chart = null;
-    let extra_args:string = '?begin=' + encodeURIComponent(String(this.cts.getBegin().getTime())) + '&end=' + encodeURIComponent(String(this.cts.getEnd().getTime()));
-    if (this.cts.getStepsizeMsec())
-      extra_args += '&stepsize=' + encodeURIComponent(String(this.cts.getStepsizeMsec()));
-
-    let keys: Array<string> = Object.keys(this._expr.expr);
-    for (let i = 0; i < keys.length; ++i) {
-      let k = keys[i];
-      let v = this._expr.expr[k];
-      extra_args += '&' + encodeURIComponent('expr:' + k) + '=' + encodeURIComponent(v);
+      (<any>window).google.visualization.events.addListener(this._chart, 'ready', () => this.chartReady());
+    } else {
+      this._chart.setOption('width', size.width);
+      this._chart.setOption('height', size.height);
+      this._chart.setDataTable(table);
     }
 
-    this._chart_width = this.div.nativeElement.offsetWidth;
-    this._chart_height = this.div.nativeElement.offsetHeight;
-
-    var wrap = new this.w.google.visualization.ChartWrapper({
-      'chartType': 'LineChart',
-      'dataSourceUrl': '/api/monsoon/eval/gchart' + extra_args,
-      'options': {
-        'title': 'Expression',
-        'width': this._chart_width,
-        'height': this._chart_height
-      }
-    });
-
-    var self = this;
-    var onReady = function() {
-      self._chart = wrap;
-      self.onReady();
-    }
-    this.w.google.visualization.events.addListener(wrap, 'ready', onReady);
-    wrap.draw(this.div.nativeElement);
-  }
-
-  onReady() {
-    this.onResize();
-  }
-
-  onResize() {
-    if (this._chart) {
-      let do_update: boolean = false;
-      if (this._chart_width != this.div.nativeElement.offsetWidth) {
-        this._chart_width = this.div.nativeElement.offsetWidth;
-        do_update = true;
-      }
-      if (this._chart_height != this.div.nativeElement.offsetHeight) {
-        this._chart_height = this.div.nativeElement.offsetHeight;
-        do_update = true;
-      }
-      if (do_update) this._updateSize();
-    }
-  }
-
-  _updateSize() {
-    this._chart.setOption('width', this._chart_width);
-    this._chart.setOption('height', this._chart_height);
     this._chart.draw(this.div.nativeElement);
-    this._chart = null;
+  }
+
+  private chartReady(): void {
+    this.chartPauser.next(true);
+  }
+
+  private chartLibReady(): void {
+    console.log('ChartComponent: chart library ready...');
+
+    // We must subscribe before emitting anything, as items emitted
+    // prior to subscription are never seen again.
+    this.subscription = this._createChartData()
+        .subscribe((dataAndSize) => this.drawChart(dataAndSize.table, dataAndSize.size));
+
+    // Emit first event; must happen after subscription is created
+    // or it'll be lost.
+    this.chartPauser.next(true);
   }
 
   ngOnInit() {
-    window.addEventListener("resize", this._w_resize_fn);
+    console.log('ChartComponent: loading google visualization library...');
+    var self = this;
+    (<any>window).google.load('visualization', '1.0', {'packages':['corechart'], callback: function() { self.chartLibReady(); }});
   }
 
   ngOnDestroy() {
-    window.removeEventListener("resize", this._w_resize_fn);
+    this.subscription.unsubscribe();
   }
+}
+
+
+function emptyDataTable(): any {
+  let data: any = new (<any>window).google.visualization.DataTable();
+
+  data.addColumn('datetime', 'Timestamp');
+  data.addColumn('number', 'Placeholder');
+  data.addRows(1);
+  data.setCell(0, 0, new Date());
+  data.setCell(0, 1, 0);
+  return data;
+}
+
+function convertDataTable(eds: EvalDataSet): any {
+  if (eds.lines.length == 0 || eds.headers.length == 0) return emptyDataTable();
+
+  var data = new (<any>window).google.visualization.DataTable();
+
+  // Create columns.
+  data.addColumn('datetime', 'Timestamp');
+  eds.headers.forEach((h) => {
+    data.addColumn('number', h);
+  });
+
+  // Reserve space for all rows.
+  data.addRows(eds.lines.length);
+
+  // Fill all rows.
+  eds.lines.forEach((line, lineNo) => {
+    data.setCell(lineNo, 0, line.date);
+    eds.headers.forEach((h, hIdx) => {
+      data.setCell(lineNo, hIdx + 1, line.scrape[h]);
+    });
+  });
+
+  return data;
 }

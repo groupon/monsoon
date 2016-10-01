@@ -14,6 +14,7 @@ import { DashboardComponent }          from './dashboard.component';
 import { ChartEditArgumentsService }   from './chart/chart-edit-arguments.service';
 import { ChartTimeSpecService }        from './chart/chart-time-spec.service';
 import { HttpModule }                  from '@angular/http';
+import { EvaluationService }           from './eval/evaluation.service';
 
 
 @NgModule({
@@ -34,7 +35,11 @@ import { HttpModule }                  from '@angular/http';
     ChartViewComponent,
     DashboardComponent,
   ],
-  providers: [ ChartEditArgumentsService, ChartTimeSpecService ],
+  providers: [
+    ChartEditArgumentsService,
+    ChartTimeSpecService,
+    EvaluationService
+  ],
   bootstrap: [ AppComponent ]
 })
 export class AppModule {

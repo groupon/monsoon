@@ -33,7 +33,6 @@ package com.github.groupon.monsoon.api.bin;
 
 import com.groupon.lex.metrics.api.ApiServer;
 import com.groupon.lex.metrics.api.endpoints.ExprEval;
-import com.groupon.lex.metrics.api.endpoints.ExprEvalGraphServlet;
 import com.groupon.lex.metrics.api.endpoints.ExprValidate;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.monsoon.remote.history.Client;
@@ -103,7 +102,6 @@ public class ApiBin {
 
         api.addEndpoint("/monsoon/eval", new ExprEval(history));
         api.addEndpoint("/monsoon/eval/validate", new ExprValidate());
-        api.addEndpoint("/monsoon/eval/gchart", new ExprEvalGraphServlet(history));
 
         api.start();
         Runtime.getRuntime().addShutdownHook(new Thread(api::close));

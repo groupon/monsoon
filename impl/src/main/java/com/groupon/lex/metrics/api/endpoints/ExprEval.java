@@ -1,21 +1,29 @@
 package com.groupon.lex.metrics.api.endpoints;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.gson.annotations.SerializedName;
+import static com.groupon.lex.metrics.ConfigSupport.quotedString;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.config.ConfigurationException;
 import com.groupon.lex.metrics.config.ParserSupport;
 import com.groupon.lex.metrics.history.CollectHistory;
+import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import java.io.IOException;
+import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -25,7 +33,11 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 
 /**
@@ -34,8 +46,14 @@ import org.joda.time.Duration;
  */
 public class ExprEval extends HttpServlet {
     private static final Logger LOG = Logger.getLogger(ExprEval.class.getName());
-    private final CollectHistory history_;
+    private static final Cache<String, IteratorAndCookie> ITERATORS = CacheBuilder.newBuilder()
+                .expireAfterAccess(5, TimeUnit.MINUTES)
+                .softValues()
+                .build();
+    private static final int ITER_BUFCOUNT = 4;
+    private static final AtomicLong ITERATORS_SEQUENCE = new AtomicLong();
     private final static String EXPR_PREFIX = "expr:";
+    private final CollectHistory history_;
 
     public ExprEval(CollectHistory history) {
         history_ = requireNonNull(history);
@@ -67,67 +85,60 @@ public class ExprEval extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        final Optional<DateTime> begin, end;
-        final Optional<Duration> stepsize;
-        final Map<String, TimeSeriesMetricExpression> exprs;
-
+        final Optional<Long> deadline;
+        final DateTime begin;
         try {
-            final Optional<String> s_begin = Optional.ofNullable(req.getParameter("begin"));
-            final Optional<String> s_end = Optional.ofNullable(req.getParameter("end"));
-            final Map<String, String> s_exprs = expressions_(req);
-            final Optional<String> s_stepsize = Optional.ofNullable(req.getParameter("stepsize"));
-
-            if (s_begin.isPresent())
-                begin = Optional.of(Long.valueOf(s_begin.get()))
-                        .map(DateTime::new);
-            else
-                begin = Optional.empty();
-            if (s_end.isPresent())
-                end = Optional.of(Long.valueOf(s_end.get()))
-                        .map(DateTime::new);
-            else
-                end = Optional.empty();
-            if (s_stepsize.isPresent())
-                stepsize = Optional.of(Long.valueOf(s_stepsize.get()))
-                        .map(Duration::new);
-            else
-                stepsize = Optional.empty();
-
-            if (end.isPresent() && !begin.isPresent())
-                throw new Exception("end specified without begin");
-            if (s_exprs.isEmpty())
-                throw new Exception("no expressions defined");
-            exprs = s_exprs.entrySet().stream()
-                    .collect(Collectors.toMap(entry -> entry.getKey(), entry -> {
-                        try {
-                            return new ParserSupport(entry.getValue()).expression();
-                        } catch (IOException ex) {
-                            throw new RuntimeException(ex);
-                        } catch (ConfigurationException ex) {
-                            if (ex.getParseErrors().isEmpty()) throw new RuntimeException(ex);
-                            throw new RuntimeException(String.join("\n", ex.getParseErrors()), ex);
-                        }
-                    }));
+            deadline = Optional.ofNullable(req.getParameter("delay"))
+                    .map(Long::parseLong)
+                    .map(delay -> System.currentTimeMillis() + delay);
+            begin = Optional.ofNullable(req.getParameter("begin"))
+                    .map(Long::valueOf)
+                    .map(msecSinceEpoch -> new DateTime(msecSinceEpoch, DateTimeZone.UTC))
+                    .orElseGet(() -> new DateTime(0, DateTimeZone.UTC));
         } catch (Exception ex) {
             resp.sendError(HttpServletResponse.SC_BAD_REQUEST, ex.getMessage());
             return;
         }
 
-        LOG.log(Level.INFO, "expression evaluation requested {0}-{1} stepping {2}: {3}", new Object[]{begin, end, stepsize, exprs});
+        final IteratorAndCookie iterator;
+        final String iteratorName;
 
-        try {
-            resp.setStatus(HttpServletResponse.SC_OK);
-            resp.setContentType("application/json");
-            resp.setCharacterEncoding("UTF-8");
-
-            final AsyncContext ctx = req.startAsync();
-            final ServletOutputStream out = resp.getOutputStream();
-
-            final StreamingJsonListEntity expr_result = new StreamingJsonListEntity(ctx, out, encode_evaluation_result_(eval_(exprs, begin, end, stepsize)));
-            out.setWriteListener(expr_result);
-        } finally {
-            LOG.log(Level.INFO, "leaving expression evaluation: {0}", exprs);
+        final Optional<Map.Entry<String, IteratorAndCookie>> cachedIterator = getCachedIterator(req);
+        if (cachedIterator.isPresent()) {
+            // Use cached iterator, ignore other arguments.
+            iterator = cachedIterator.get().getValue();
+            iteratorName = cachedIterator.get().getKey();
+        } else {
+            // Build new cached iterator from arguments.
+            try {
+                Map.Entry<String, IteratorAndCookie> newIterator = newIterator(req);
+                iterator = newIterator.getValue();
+                iteratorName = newIterator.getKey();
+            } catch (Exception ex) {
+                resp.sendError(HttpServletResponse.SC_BAD_REQUEST, ex.getMessage());
+                return;
+            }
         }
+
+        resp.setStatus(HttpServletResponse.SC_OK);
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding("UTF-8");
+
+        final AsyncContext ctx = req.startAsync();
+        final ServletOutputStream out = resp.getOutputStream();
+
+        final StreamingJsonListEntity<TSV> expr_result = new StreamingJsonListEntity<>(
+                ctx,
+                out,
+                iterator.getIterator(),
+                iteratorName,
+                iterator.getCookie(),
+                begin,
+                iterator.getStepSize(),
+                (TSV tsv) -> tsv.timestamp,
+                () -> ITERATORS.invalidate(iteratorName),
+                deadline);
+        out.setWriteListener(expr_result);
     }
 
     private static class Metric {
@@ -168,6 +179,7 @@ public class ExprEval extends HttpServlet {
     }
 
     private static class TSV {
+        public transient DateTime timestamp;  // Transient keyword excludes it from GSon serialization/deserialization.
         @SerializedName("timestamp_msec")
         public long timestamp_msec;
         @SerializedName("timestamp_str")
@@ -176,6 +188,7 @@ public class ExprEval extends HttpServlet {
         public Map<String, List<Metric>> metrics;
 
         public TSV(DateTime timestamp, Collection<CollectHistory.NamedEvaluation> named_data) {
+            this.timestamp = timestamp;
             timestamp_msec = timestamp.getMillis();
             timestamp_iso8601 = timestamp.toString();
             metrics = named_data.stream()
@@ -188,6 +201,96 @@ public class ExprEval extends HttpServlet {
                         return SimpleMapEntry.create(name, ts_metrics);
                     })
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        }
+    }
+
+    @RequiredArgsConstructor
+    @Getter
+    private static class IteratorAndCookie {
+        private static final SecureRandom RANDOM = new SecureRandom();
+        @NonNull
+        private final BufferedIterator<TSV> iterator;
+        @NonNull
+        private final Duration stepSize;
+        private String cookie = Long.toHexString(RANDOM.nextLong());
+
+        /**
+         * Change the cookie.
+         * @return True indicating the expected value matched and the cookie was changed.
+         *   If the operation fails, false is returned.
+         */
+        synchronized public boolean update(String expected) {
+            if (!cookie.equals(expected)) return false;
+
+            String newCookie;
+            do {
+                newCookie = Long.toHexString(RANDOM.nextLong());
+            } while (cookie.equals(newCookie));  // Always change the cookie.
+            cookie = newCookie;
+
+            return true;
+        }
+    }
+
+    private static Optional<Map.Entry<String, IteratorAndCookie>> getCachedIterator(HttpServletRequest req) {
+        final String iter = req.getParameter("iter");
+        final String cookie = req.getParameter("cookie");
+        if (iter == null || cookie == null) return Optional.empty();
+        return Optional.ofNullable(ITERATORS.getIfPresent(iter))
+                .filter(ic -> ic.update(cookie))
+                .map(cached -> SimpleMapEntry.create(iter, cached));
+    }
+
+    private Map.Entry<String, IteratorAndCookie> newIterator(HttpServletRequest req) throws Exception {
+        final Optional<DateTime> begin = Optional.ofNullable(req.getParameter("begin"))
+                .map(Long::valueOf)
+                .map(msecSinceEpoch -> new DateTime(msecSinceEpoch, DateTimeZone.UTC));
+        final Optional<DateTime> end = Optional.ofNullable(req.getParameter("end"))
+                .map(Long::valueOf)
+                .map(msecSinceEpoch -> new DateTime(msecSinceEpoch, DateTimeZone.UTC));
+        final Optional<Duration> stepsize = Optional.ofNullable(req.getParameter("stepsize"))
+                .map(Long::valueOf)
+                .map(Duration::new);
+        final Map<String, String> s_exprs = expressions_(req);
+
+        if (end.isPresent() && !begin.isPresent())
+            throw new Exception("end specified without begin");
+        if (s_exprs.isEmpty())
+            throw new Exception("no expressions defined");
+        final Map<String, TimeSeriesMetricExpression> exprs = s_exprs.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
+                    try {
+                        return new ParserSupport(entry.getValue()).expression();
+                    } catch (IOException ex) {
+                        throw new RuntimeException(ex);
+                    } catch (ConfigurationException ex) {
+                        if (ex.getParseErrors().isEmpty()) throw new RuntimeException(ex);
+                        throw new RuntimeException(String.join("\n", ex.getParseErrors()), ex);
+                    }
+                }));
+
+        final IteratorAndCookie iterator = new IteratorAndCookie(
+                new BufferedIterator<>(encode_evaluation_result_(eval_(exprs, begin, end, stepsize)).iterator(), ITER_BUFCOUNT),
+                stepsize.filter(d -> d.getMillis() >= 1000).orElseGet(() -> Duration.standardSeconds(1)));
+        final String iteratorName = Long.toHexString(ITERATORS_SEQUENCE.incrementAndGet());
+        ITERATORS.put(iteratorName, iterator);
+
+        LOG.log(Level.INFO, "expression evaluation 0x{4} requested {0}-{1} stepping {2}: {3}", new Object[]{begin, end, stepsize, new exprsMapToString(exprs), iteratorName});
+
+        return SimpleMapEntry.create(iteratorName, iterator);
+    }
+
+    /** Tiny toString adapter for the logging of expressions. */
+    @RequiredArgsConstructor
+    private static class exprsMapToString {
+        private final Map<String, TimeSeriesMetricExpression> exprs;
+
+        @Override
+        public String toString() {
+            return exprs.entrySet().stream()
+                    .sorted(Comparator.comparing(Map.Entry::getKey))
+                    .map(entry -> quotedString(entry.getKey()).toString() + '=' + entry.getValue().configString().toString())
+                    .collect(Collectors.joining(", ", "{", "}"));
         }
     }
 }
