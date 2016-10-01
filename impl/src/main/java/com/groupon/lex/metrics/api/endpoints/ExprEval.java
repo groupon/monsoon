@@ -3,6 +3,7 @@ package com.groupon.lex.metrics.api.endpoints;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.annotations.SerializedName;
+import static com.groupon.lex.metrics.ConfigSupport.quotedString;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.config.ConfigurationException;
@@ -16,6 +17,7 @@ import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
@@ -273,8 +275,22 @@ public class ExprEval extends HttpServlet {
         final String iteratorName = Long.toHexString(ITERATORS_SEQUENCE.incrementAndGet());
         ITERATORS.put(iteratorName, iterator);
 
-        LOG.log(Level.INFO, "expression evaluation 0x{4} requested {0}-{1} stepping {2}: {3}", new Object[]{begin, end, stepsize, exprs, iteratorName});
+        LOG.log(Level.INFO, "expression evaluation 0x{4} requested {0}-{1} stepping {2}: {3}", new Object[]{begin, end, stepsize, new exprsMapToString(exprs), iteratorName});
 
         return SimpleMapEntry.create(iteratorName, iterator);
+    }
+
+    /** Tiny toString adapter for the logging of expressions. */
+    @RequiredArgsConstructor
+    private static class exprsMapToString {
+        private final Map<String, TimeSeriesMetricExpression> exprs;
+
+        @Override
+        public String toString() {
+            return exprs.entrySet().stream()
+                    .sorted(Comparator.comparing(Map.Entry::getKey))
+                    .map(entry -> quotedString(entry.getKey()).toString() + '=' + entry.getValue().configString().toString())
+                    .collect(Collectors.joining(", ", "{", "}"));
+        }
     }
 }
