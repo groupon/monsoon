@@ -1,6 +1,7 @@
 import { Injectable }            from '@angular/core';
 import { Http, URLSearchParams } from '@angular/http';
 import { Observable }            from 'rxjs/Observable';
+import { Subscriber }            from 'rxjs/Subscriber';
 import { ChartTimeSpecService }  from '../chart/chart-time-spec.service';
 import { ChartTimeSpec }         from '../chart/chart-time-spec';
 import { ApiQueryEncoder }       from '../ApiQueryEncoder';
@@ -9,6 +10,7 @@ import                                'rxjs/add/operator/map';
 import                                'rxjs/add/operator/mergeMap';
 import                                'rxjs/add/operator/switchMap';
 import                                'rxjs/add/operator/do';
+import                                'rxjs/add/operator/share';
 import                                'rxjs/add/observable/combineLatest';
 import                                'rxjs/add/observable/of';
 
@@ -116,6 +118,7 @@ export class EvaluationService {
 class EvaluationStream {
   private inFlight: EvalDataSet;
   private params: URLSearchParams;
+  private _out: Subscriber<EvalDataSet>;
 
   constructor(private http: Http, params: URLSearchParams) {
     this.inFlight = new EvalDataSet(null);
@@ -125,33 +128,58 @@ class EvaluationStream {
 
   begin(): Observable<EvalDataSet> {
     console.log('EvaluationStream: begin');
-    return this.http.get('/api/monsoon/eval', { search: this.params })
-        .map((response) => response.json())
-        .map((json) => new EvalIterResponse(json))
-        .flatMap((resp) => this.emitAndContinue(resp))
-        .do((v) => console.log('EvaluationStream: emiting ' + JSON.stringify(v)));
+    return Observable.create((inner) => {
+          this._out = inner;
+          this._onNext(inner);
+          return () => { this._stop() };
+        })
   }
 
-  private emitAndContinue(resp: EvalIterResponse): Observable<EvalDataSet> {
+  // Fetch 1 update from API iterator.
+  private _onNext(inner: Observable<EvalDataSet>): void {
+    this.http.get('/api/monsoon/eval', { search: this.params })
+        .map((response) => response.json())
+        .map((json) => new EvalIterResponse(json))
+        .toPromise()  // Means we don't have to manage a subscription.
+        .then(
+            (resp) => this._update(inner, resp),
+            (err) => {
+              console.log('EvaluationStream: error ' + err.toString());
+              if (this._out != null) this._out.error(err);  // Propagate error.
+              this._stop();
+            }
+        );
+  }
+
+  // Mark output as complete.
+  private _stop(): void {
+    if (this._out != null) {
+      console.log('ChartStream: _out.complete()');
+      this._out.complete();
+      this._out = null;
+    }
+  }
+
+  // Process promise response from _onNext.
+  private _update(inner: Observable<EvalDataSet>, resp: EvalIterResponse): void {
     // Merge with everything collected so far.
     this.inFlight.merge(resp.data);
 
-    // Create observable that'll emit the result so far.
-    let result: Observable<EvalDataSet> = Observable.of(this.inFlight.clone());
+    // Update request parameters for next request.
+    this.params.set('begin', resp.newBegin.getTime().toString());
+    this.params.set('cookie', resp.cookie);
+    this.params.set('iter', resp.iter);
 
-    // Create continuation observable, that'll get the next result delta.
-    if (!resp.last) {
-      this.params.set('begin', resp.newBegin.getTime().toString());
-      this.params.set('cookie', resp.cookie);
-      this.params.set('iter', resp.iter);
-      let next: Observable<EvalDataSet> = this.http.get('/api/monsoon/eval', { search: this.params })
-          .map((response) => response.json())
-          .map((json) => new EvalIterResponse(json))
-          .flatMap((resp) => this.emitAndContinue(resp));
+    // Only continue fetching more data if _out is still live.
+    if (this._out != null) {
+      // Emit copy of current inflight.
+      this._out.next(this.inFlight.clone());
 
-      result = result.concat(next);
+      if (resp.last)  // Close after last item emit.
+        this._stop();
+      else  // Continue fetching more data.
+        this._onNext(inner);
     }
-    return result;
   }
 }
 
