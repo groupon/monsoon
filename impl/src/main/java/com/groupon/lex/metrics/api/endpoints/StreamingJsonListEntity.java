@@ -28,7 +28,7 @@ import org.joda.time.Duration;
  */
 public class StreamingJsonListEntity<T> implements WriteListener {
     private static final Logger LOG = Logger.getLogger(StreamingJsonListEntity.class.getName());
-    private static final Gson gson_ = new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson gson_ = new GsonBuilder().create();
     private final BufferedIterator<T> iter_;
     private final JsonWriter writer_;
     private final ServletOutputStream out_;
