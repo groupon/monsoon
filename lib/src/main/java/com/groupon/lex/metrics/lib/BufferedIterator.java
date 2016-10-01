@@ -113,6 +113,30 @@ public final class BufferedIterator<T> {
         return !queue_.isEmpty() || exception != null;
     }
 
+    public void waitAvail() throws InterruptedException {
+        synchronized(this) {
+            if (nextAvail() || atEnd()) return;
+        }
+
+        final WakeupListener w = new WakeupListener(() -> nextAvail() || atEnd());
+        setWakeup(w::wakeup);
+        ForkJoinPool.managedBlock(w);
+    }
+
+    public void waitAvail(long tv, TimeUnit tu) throws InterruptedException {
+        synchronized(this) {
+            if (nextAvail() || atEnd()) return;
+        }
+
+        final Delay w = new Delay(() -> {}, tv, tu);
+        setWakeup(w::deliverWakeup);
+        try {
+            ForkJoinPool.managedBlock(w);
+        } catch (InterruptedException ex) {
+            throw ex;
+        }
+    }
+
     @SneakyThrows
     public synchronized T next() {
         if (exception != null) throw exception;
@@ -141,7 +165,7 @@ public final class BufferedIterator<T> {
     }
 
     public void setWakeup(Runnable wakeup, long tv, TimeUnit tu) {
-        final Delay delay = new Delay(work_queue_, wakeup, tv, tu);
+        final Delay delay = new Delay(wakeup, tv, tu);
         setWakeup(delay::deliverWakeup);
         work_queue_.submit(delay);
     }
@@ -256,13 +280,11 @@ public final class BufferedIterator<T> {
     }
 
     private static class Delay implements ForkJoinPool.ManagedBlocker, Runnable {
-        private final ForkJoinPool workQueue;
         private Runnable wakeup;
         private final long deadline;
         private boolean wakeupReceived = false;
 
-        public Delay(@NonNull ForkJoinPool workQueue, @NonNull Runnable wakeup, long tv, TimeUnit tu) {
-            this.workQueue = workQueue;
+        public Delay(@NonNull Runnable wakeup, long tv, TimeUnit tu) {
             this.deadline = System.currentTimeMillis() + TimeUnit.MILLISECONDS.convert(tv, tu);
             this.wakeup = wakeup;
         }

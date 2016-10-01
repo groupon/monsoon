@@ -351,6 +351,7 @@ public class ClientServerTest {
         verifyNoMoreInteractions(history);
     }
 
+    // Triggers the min-timeout durations.
     @Test(timeout = 20000)
     public void slowEvaluate() {
         final int LIMIT = 10;  // To make the test not take forever.
@@ -366,6 +367,41 @@ public class ClientServerTest {
                                 } catch (InterruptedException ex) {
                                     Logger.getLogger(ClientServerTest.class.getName()).log(Level.SEVERE, null, ex);
                                 }
+                                Logger.getLogger(ClientServerTest.class.getName()).log(Level.INFO, "emitting {0}", x);
+                                return x;
+                            });
+                });
+
+        final List<Collection<CollectHistory.NamedEvaluation>> result = client.evaluate(singletonMap("name", expr), stepSize).collect(Collectors.toList());
+
+        assertEquals(expected, result);
+
+        verify(history, times(1)).evaluate(
+                Mockito.<Map>argThat(
+                        Matchers.hasEntry(
+                                Matchers.equalTo("name"),
+                                new ExprEqualTo(expr))),
+                Mockito.eq(stepSize));
+        verifyNoMoreInteractions(history);
+    }
+
+    // Triggers the max timeout durations.
+    @Test(timeout = 20000)
+    public void verySlowEvaluate() {
+        final int LIMIT = 1;  // To make the test not take forever.
+        final Duration stepSize = Duration.standardMinutes(1);
+        final List<Collection<CollectHistory.NamedEvaluation>> expected = generateEvaluation().limit(LIMIT).collect(Collectors.toList());
+        when(history.evaluate(Mockito.any(), Mockito.isA(Duration.class)))
+                .thenAnswer((invocation) -> {
+                    return generateEvaluation()
+                            .limit(LIMIT)
+                            .map(x -> {
+                                try {
+                                    Thread.sleep(10000);
+                                } catch (InterruptedException ex) {
+                                    Logger.getLogger(ClientServerTest.class.getName()).log(Level.SEVERE, null, ex);
+                                }
+                                Logger.getLogger(ClientServerTest.class.getName()).log(Level.INFO, "emitting {0}", x);
                                 return x;
                             });
                 });

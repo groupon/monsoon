@@ -51,7 +51,6 @@ import java.net.InetAddress;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ForkJoinPool;
@@ -69,11 +68,16 @@ import org.joda.time.Duration;
 
 public abstract class AbstractServer extends rh_protoServerStub {
     /**
+     * We try to spend at least MIN_REQUEST_DURATION in an iterator fetch request.
+     * We only bail out after that time, if we have at least some results to return.
+     */
+    public static final Duration MIN_REQUEST_DURATION = Duration.millis(800);
+    /**
      * We try to maintain at most MAX_REQUEST_DURATION in an iterator fetch request.
      * If we exceed that time, bail out early and return a short result.
-     * We always emit at least 1 result.
+     * We may emit at no results.
      */
-    public static final Duration MAX_REQUEST_DURATION = Duration.millis(800);
+    public static final Duration MAX_REQUEST_DURATION = Duration.millis(8000);
 
     private static final Logger LOG = Logger.getLogger(AbstractServer.class.getName());
     /** Default port for the RPC server. */
@@ -83,9 +87,9 @@ public abstract class AbstractServer extends rh_protoServerStub {
     /** Limit evaluation fetch size. */
     private static final int MAX_EVAL_FETCH = 500;
     /** Background prefetch queue size for TimeSeriesCollection iterators. */
-    private static final int TSC_QUEUE_SIZE = MAX_TSC_FETCH;
+    private static final int TSC_QUEUE_SIZE = 8;
     /** Background prefetch queue size for evaluation iterators. */
-    private static final int EVAL_QUEUE_SIZE = MAX_EVAL_FETCH;
+    private static final int EVAL_QUEUE_SIZE = 64;
     /** Cache iterators, so subsequent requests can refer to existing iterator. */
     private static final Cache<Long, IteratorAndCookie<TimeSeriesCollection>> TSC_ITERS = CacheBuilder.newBuilder()
                 .expireAfterAccess(5, TimeUnit.MINUTES)
@@ -116,28 +120,28 @@ public abstract class AbstractServer extends rh_protoServerStub {
 
     /** Create a new TimeSeriesCollection iterator from the given stream. */
     private static stream_response newTscStream(Stream<TimeSeriesCollection> tsc, int fetch) {
-        final Iterator<TimeSeriesCollection> iter = BufferedIterator.iterator(ForkJoinPool.commonPool(), tsc.iterator(), TSC_QUEUE_SIZE);
+        final BufferedIterator<TimeSeriesCollection> iter = new BufferedIterator(tsc.iterator(), TSC_QUEUE_SIZE);
         final long idx = TSC_ITERS_ALLOC.getAndIncrement();
         final IteratorAndCookie<TimeSeriesCollection> iterAndCookie = new IteratorAndCookie<>(iter);
         TSC_ITERS.put(idx, iterAndCookie);
 
         final List<TimeSeriesCollection> result = fetchFromIter(iter, fetch, MAX_TSC_FETCH);
         EncDec.NewIterResponse<TimeSeriesCollection> responseObj =
-                new EncDec.NewIterResponse<>(idx, result, !iter.hasNext(), iterAndCookie.getCookie());
+                new EncDec.NewIterResponse<>(idx, result, iter.atEnd(), iterAndCookie.getCookie());
         LOG.log(Level.FINE, "responseObj = {0}", responseObj);
         return EncDec.encodeStreamResponse(responseObj);
     }
 
     /** Create a new evaluation iterator from the given stream. */
     private static evaluate_response newEvalStream(Stream<Collection<CollectHistory.NamedEvaluation>> tsc, int fetch) {
-        final Iterator<Collection<CollectHistory.NamedEvaluation>> iter = BufferedIterator.iterator(ForkJoinPool.commonPool(), tsc.iterator(), EVAL_QUEUE_SIZE);
+        final BufferedIterator<Collection<CollectHistory.NamedEvaluation>> iter = new BufferedIterator(ForkJoinPool.commonPool(), tsc.iterator(), EVAL_QUEUE_SIZE);
         final long idx = EVAL_ITERS_ALLOC.getAndIncrement();
         final IteratorAndCookie<Collection<CollectHistory.NamedEvaluation>> iterAndCookie = new IteratorAndCookie<>(iter);
         EVAL_ITERS.put(idx, iterAndCookie);
 
         final List<Collection<CollectHistory.NamedEvaluation>> result = fetchFromIter(iter, fetch, MAX_EVAL_FETCH);
         EncDec.NewIterResponse<Collection<CollectHistory.NamedEvaluation>> responseObj =
-                new EncDec.NewIterResponse<>(idx, result, !iter.hasNext(), iterAndCookie.getCookie());
+                new EncDec.NewIterResponse<>(idx, result, iter.atEnd(), iterAndCookie.getCookie());
         LOG.log(Level.FINE, "responseObj = {0}", responseObj);
         return EncDec.encodeEvaluateResponse(responseObj);
     }
@@ -150,20 +154,30 @@ public abstract class AbstractServer extends rh_protoServerStub {
      * @param max_fetch The hard limit on how many items to fetch.
      * @return A list with items fetched from the iterator.
      */
-    private static <T> List<T> fetchFromIter(Iterator<T> iter, int fetch, int max_fetch) {
+    private static <T> List<T> fetchFromIter(BufferedIterator<T> iter, int fetch, int max_fetch) {
         final long t0 = System.currentTimeMillis();
         assert(max_fetch >= 1);
         if (fetch < 0 || fetch > max_fetch) fetch = max_fetch;
 
         final List<T> result = new ArrayList<>(fetch);
-        for (int i = 0; i < fetch && iter.hasNext(); ++i) {
-            result.add(iter.next());
+        for (int i = 0; i < fetch && !iter.atEnd(); ++i) {
+            if (iter.nextAvail()) result.add(iter.next());
 
             // Decide if we should cut the fetch short.
-            // Note that we always emit at least 1 element.
+            // We stop fetching more items if the time delay exceeds the deadline.
             final long tCur = System.currentTimeMillis();
-            if (tCur - t0 >= MAX_REQUEST_DURATION.getMillis())
+            if (!result.isEmpty() && tCur - t0 >= MIN_REQUEST_DURATION.getMillis())
                 break;
+            else if (tCur - t0 >= MAX_REQUEST_DURATION.getMillis())
+                break;
+            else if (!iter.nextAvail()) {
+                // Block until next is available, or until deadline is exceeded.
+                try {
+                    iter.waitAvail((t0 + MAX_REQUEST_DURATION.getMillis() - tCur), TimeUnit.MILLISECONDS);
+                } catch (InterruptedException ex) {
+                    /* SKIP */
+                }
+            }
         }
         return result;
     }
@@ -209,7 +223,7 @@ public abstract class AbstractServer extends rh_protoServerStub {
             return EncDec.encodeStreamIterTscResponse(new EncDec.IterErrorResponse(IteratorErrorCode.UNKNOWN_ITERATOR));
 
         final List<TimeSeriesCollection> result = fetchFromIter(iter.getIterator(), fetch, MAX_TSC_FETCH);
-        return EncDec.encodeStreamIterTscResponse(new EncDec.IterSuccessResponseImpl<>(result, !iter.getIterator().hasNext(), iter.getCookie()));
+        return EncDec.encodeStreamIterTscResponse(new EncDec.IterSuccessResponseImpl<>(result, iter.getIterator().atEnd(), iter.getCookie()));
     }
 
     @Override
@@ -267,7 +281,7 @@ public abstract class AbstractServer extends rh_protoServerStub {
             return EncDec.encodeEvaluateIterResponse(new EncDec.IterErrorResponse(IteratorErrorCode.UNKNOWN_ITERATOR));
 
         final List<Collection<CollectHistory.NamedEvaluation>> result = fetchFromIter(iter.getIterator(), fetch, MAX_EVAL_FETCH);
-        return EncDec.encodeEvaluateIterResponse(new EncDec.IterSuccessResponseImpl<>(result, !iter.getIterator().hasNext(), iter.getCookie()));
+        return EncDec.encodeEvaluateIterResponse(new EncDec.IterSuccessResponseImpl<>(result, iter.getIterator().atEnd(), iter.getCookie()));
     }
 
     @Override
@@ -311,7 +325,7 @@ public abstract class AbstractServer extends rh_protoServerStub {
     @Getter
     private static class IteratorAndCookie<T> {
         private static final SecureRandom RANDOM = new SecureRandom();
-        private final Iterator<T> iterator;
+        private final BufferedIterator<T> iterator;
         private long cookie = RANDOM.nextLong();
 
         /**
