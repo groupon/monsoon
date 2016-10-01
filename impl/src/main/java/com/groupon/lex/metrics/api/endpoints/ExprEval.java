@@ -218,7 +218,7 @@ public class ExprEval extends HttpServlet {
          *   If the operation fails, false is returned.
          */
         synchronized public boolean update(String expected) {
-            if (cookie.equals(expected)) return false;
+            if (!cookie.equals(expected)) return false;
 
             String newCookie;
             do {
