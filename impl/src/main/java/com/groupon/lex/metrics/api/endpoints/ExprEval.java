@@ -85,6 +85,21 @@ public class ExprEval extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        final Optional<Long> deadline;
+        final DateTime begin;
+        try {
+            deadline = Optional.ofNullable(req.getParameter("delay"))
+                    .map(Long::parseLong)
+                    .map(delay -> System.currentTimeMillis() + delay);
+            begin = Optional.ofNullable(req.getParameter("begin"))
+                    .map(Long::valueOf)
+                    .map(msecSinceEpoch -> new DateTime(msecSinceEpoch, DateTimeZone.UTC))
+                    .orElseGet(() -> new DateTime(0, DateTimeZone.UTC));
+        } catch (Exception ex) {
+            resp.sendError(HttpServletResponse.SC_BAD_REQUEST, ex.getMessage());
+            return;
+        }
+
         final IteratorAndCookie iterator;
         final String iteratorName;
 
@@ -103,21 +118,6 @@ public class ExprEval extends HttpServlet {
                 resp.sendError(HttpServletResponse.SC_BAD_REQUEST, ex.getMessage());
                 return;
             }
-        }
-
-        final Optional<Long> deadline;
-        final DateTime begin;
-        try {
-            deadline = Optional.ofNullable(req.getParameter("delay"))
-                    .map(Long::parseLong)
-                    .map(delay -> System.currentTimeMillis() + delay);
-            begin = Optional.ofNullable(req.getParameter("begin"))
-                    .map(Long::valueOf)
-                    .map(msecSinceEpoch -> new DateTime(msecSinceEpoch, DateTimeZone.UTC))
-                    .orElseGet(() -> new DateTime(0, DateTimeZone.UTC));
-        } catch (Exception ex) {
-            resp.sendError(HttpServletResponse.SC_BAD_REQUEST, ex.getMessage());
-            return;
         }
 
         resp.setStatus(HttpServletResponse.SC_OK);
