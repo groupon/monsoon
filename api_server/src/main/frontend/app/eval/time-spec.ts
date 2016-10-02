@@ -56,7 +56,7 @@ export class InvalidDurationException {
 
 /** Test if the string is a valid duration. */
 export function validDurationString(s: string): boolean {
-  return /^\s*(?:\d+[dhms])(?:\s+\d+[dhms])+\s*$/.test(s);
+  return /^\s*(?:\d+[dhms])(?:\s+\d+[dhms])*\s*$/.test(s);
 }
 
 /** Convert a number (in seconds) to a duration string. */
