@@ -1,6 +1,7 @@
 import { Component, ViewChild }              from '@angular/core';
 import { ChartEditArgumentsService }         from './chart/chart-edit-arguments.service';
 import { ChartTimeSpecModalComponent }       from './chart/chart-time-spec-modal.component';
+import { TimeSpecService }                   from './eval/time-spec';
 
 
 @Component({
@@ -28,7 +29,7 @@ import { ChartTimeSpecModalComponent }       from './chart/chart-time-spec-modal
             <li><a [routerLink]="['/fe/chart-edit', chartEditArguments.value]">Edit Chart</a></li>
           </ul>
           <ul class="nav navbar-nav navbar-right">
-            <li><a href="#" (click)="_chartTimeSpecModal($event)">Change Time</a></li>
+            <li><a href="#" (click)="_chartTimeSpecModal($event)">{{ timeSpecService.representationObservable | async }}</a></li>
           </ul>
         </div>
       </div>
@@ -43,7 +44,7 @@ export class AppComponent {
   @ViewChild('chartTimeSpecModal')
   chartTimeSpecModal: ChartTimeSpecModalComponent;
 
-  constructor(private chartEditArguments: ChartEditArgumentsService) {
+  constructor(private chartEditArguments: ChartEditArgumentsService, private timeSpecService: TimeSpecService) {
   }
 
   _chartTimeSpecModal(event) {

@@ -12,7 +12,7 @@ import { ChartExprFormComponent }      from './chart/chart-expr-form.component';
 import { ChartComponent }              from './chart/chart.component';
 import { DashboardComponent }          from './dashboard.component';
 import { ChartEditArgumentsService }   from './chart/chart-edit-arguments.service';
-import { ChartTimeSpecService }        from './chart/chart-time-spec.service';
+import { TimeSpecService }             from './eval/time-spec';
 import { HttpModule }                  from '@angular/http';
 import { EvaluationService }           from './eval/evaluation.service';
 
@@ -37,7 +37,7 @@ import { EvaluationService }           from './eval/evaluation.service';
   ],
   providers: [
     ChartEditArgumentsService,
-    ChartTimeSpecService,
+    TimeSpecService,
     EvaluationService
   ],
   bootstrap: [ AppComponent ]
