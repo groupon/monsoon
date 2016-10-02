@@ -22,7 +22,7 @@ export class ChartEditArgumentsService {
  * escape everything.
  */
 export function encodeExpr(s: string): string {
-  return encodeURIComponent(s).replace(/\(/g, '%28').replace(/\)/g, '%29');
+  return s.replace(/%/g, '%25').replace(/\(/g, '%28').replace(/\)/g, '%29');
 }
 
 /*
