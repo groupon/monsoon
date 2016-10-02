@@ -5,8 +5,6 @@ import { Component,
          OnInit,
          OnDestroy }                from '@angular/core';
 import { ChartExpr }                from './chart-expr';
-import { ChartTimeSpec }            from './chart-time-spec';
-import { ChartTimeSpecService }     from './chart-time-spec.service';
 import { EvaluationService,
          EvalDataSet }              from '../eval/evaluation.service';
 import { Subscription }             from 'rxjs/Subscription';

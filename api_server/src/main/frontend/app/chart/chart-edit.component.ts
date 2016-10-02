@@ -34,7 +34,7 @@ export class ChartEditComponent {
       args['expr:' + k] = m.expr[k];
     });
 
-    this.router.navigate(['/fe/chart-view', args]);
+    this.router.navigate(['/fe/chart-view', args], {preserveQueryParams: true});
   }
 
   private static _paramsToExprMap(params: { [key: string]: any; }): Map<string, string> {

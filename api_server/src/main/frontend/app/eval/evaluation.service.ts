@@ -2,8 +2,9 @@ import { Injectable }            from '@angular/core';
 import { Http, URLSearchParams } from '@angular/http';
 import { Observable }            from 'rxjs/Observable';
 import { Subscriber }            from 'rxjs/Subscriber';
-import { ChartTimeSpecService }  from '../chart/chart-time-spec.service';
-import { ChartTimeSpec }         from '../chart/chart-time-spec';
+import { TimeSpecService,
+         RequestTimeSpec,
+         FilterTimeSpec }        from './time-spec';
 import { ApiQueryEncoder }       from '../ApiQueryEncoder';
 import                                'rxjs/add/operator/concat';
 import                                'rxjs/add/operator/map';
@@ -45,6 +46,7 @@ export class EvalDataSet {
     }
   }
 
+  /* Merge other data set into this. */
   merge(other: EvalDataSet): EvalDataSet {
     this.lines = this.lines.concat(other.lines);
     other.headers.forEach((h) => {
@@ -52,6 +54,19 @@ export class EvalDataSet {
     });
 
     return this;
+  }
+
+  /* Drop all scrapes before the given date. */
+  retainIf(linePred: (line: EvalDataSetLine) => boolean): void {
+    this.lines = this.lines.filter(linePred);
+
+    let newKeySet: Array<string> = new Array<string>();
+    this.lines.forEach((line) => {
+      Object.keys(line.scrape).forEach((key) => {
+        if (newKeySet.indexOf(key) == -1) newKeySet.push(key);
+      });
+    });
+    this.headers = newKeySet;
   }
 
   clone(): EvalDataSet {
@@ -63,7 +78,7 @@ export class EvalDataSet {
 // This class handles the creation of evaluation iterators.
 @Injectable()
 export class EvaluationService {
-  constructor(private http: Http, private timeSpecService: ChartTimeSpecService) {}
+  constructor(private http: Http, private timeSpecService: TimeSpecService) {}
 
   evaluate(exprsObservable: Observable<Map<string, string>>): Observable<EvalDataSet> {
     let exprsParams = exprsObservable.map((exprs) => {
@@ -75,7 +90,7 @@ export class EvaluationService {
     });
 
     return this._paramsWithTimeStream(exprsParams)
-        .map((params) => new EvaluationStream(this.http, params))
+        .map((params) => new EvaluationStream(this.http, this.timeSpecService, params))
         .switchMap((es) => es.begin());
   }
 
@@ -83,26 +98,12 @@ export class EvaluationService {
   private _paramsWithTimeStream(paramsObservable: Observable<URLSearchParams>): Observable<URLSearchParams> {
     return Observable.combineLatest(
         paramsObservable,
-        Observable.of(this.timeSpecService.time)
-            .concat(this.timeSpecService.onChange)
-            .map(EvaluationService._timeSpecToSearchParams),
+        this.timeSpecService.requestObservable.map((r) => r.params),
         (params, tsParams) => {
           let copy: URLSearchParams = params.clone();
           copy.appendAll(tsParams)
           return copy;
         });
-  }
-
-  // Convert timespec to query parameters.
-  private static _timeSpecToSearchParams(ts: ChartTimeSpec): URLSearchParams {
-    let params: URLSearchParams = new URLSearchParams('', new ApiQueryEncoder());
-    let end = ts.getEnd();
-    let begin = ts.getBegin();
-    let stepSize = ts.getStepsizeMsec();
-    if (end != null) params.set('end', end.getTime().toString());
-    if (begin != null) params.set('begin', begin.getTime().toString());
-    if (stepSize != null) params.set('stepsize', stepSize.toString());
-    return params;
   }
 }
 
@@ -114,7 +115,7 @@ class EvaluationStream {
   private params: URLSearchParams;
   private stopped: boolean;
 
-  constructor(private http: Http, params: URLSearchParams) {
+  constructor(private http: Http, private timeSpecService: TimeSpecService, params: URLSearchParams) {
     this.stopped = false;
     this.inFlight = new EvalDataSet(null);
     this.params = params.clone();
@@ -123,10 +124,17 @@ class EvaluationStream {
 
   begin(): Observable<EvalDataSet> {
     console.log('EvaluationStream: begin');
-    return Observable.create((inner) => {
+    let dataStream: Observable<EvalDataSet> = Observable.create((inner) => {
           this._onNext(inner);
           return () => { this._stop() };
-        })
+        });
+    return Observable.combineLatest(
+        this.timeSpecService.filterObservable,
+        dataStream,
+        (filter, data) => {
+          if (filter.active) data.retainIf((line) => filter.test(line.date));
+          return data;
+        });
   }
 
   // Fetch 1 update from API iterator.
@@ -148,12 +156,18 @@ class EvaluationStream {
   private _stop(): void {
     console.log('EvaluationStream: stopped');
     this.stopped = true;
+    this.inFlight = new EvalDataSet(null);  // Drop memory held by inflight data.
   }
 
   // Process promise response from _onNext.
   private _update(inner: Subscriber<EvalDataSet>, resp: EvalIterResponse): void {
     // Merge with everything collected so far.
     this.inFlight.merge(resp.data);
+
+    // Filter out any scrapes that are no longer to be shown.
+    let filter: FilterTimeSpec = this.timeSpecService.filter;
+    if (filter.active)
+      this.inFlight.retainIf((line) => filter.test(line.date));
 
     // Update request parameters for next request.
     this.params.set('begin', resp.newBegin.getTime().toString());

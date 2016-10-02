@@ -1,6 +1,7 @@
 import { Component, ViewChild }              from '@angular/core';
 import { ChartEditArgumentsService }         from './chart/chart-edit-arguments.service';
-import { ChartTimeSpecModalComponent }       from './chart/chart-time-spec-modal.component';
+import { TimeSpecModalComponent }            from './eval/time-spec-modal.component';
+import { TimeSpecService }                   from './eval/time-spec';
 
 
 @Component({
@@ -21,14 +22,14 @@ import { ChartTimeSpecModalComponent }       from './chart/chart-time-spec-modal
     <nav class="navbar navbar-default">
       <div class="container-fluid">
         <div class="navbar-header">
-          <a class="navbar-brand" [routerLink]="['/']">Mon-soon</a>
+          <a class="navbar-brand" [routerLink]="['/']" preserveQueryParams="true">Mon-soon</a>
         </div>
         <div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav">
-            <li><a [routerLink]="['/fe/chart-edit', chartEditArguments.value]">Edit Chart</a></li>
+            <li><a [routerLink]="['/fe/chart-edit', chartEditArguments.value]" preserveQueryParams="true">Edit Chart</a></li>
           </ul>
           <ul class="nav navbar-nav navbar-right">
-            <li><a href="#" (click)="_chartTimeSpecModal($event)">Change Time</a></li>
+            <li><a href="#" (click)="_timeSpecModal($event)">{{ timeSpecService.representationObservable | async }}</a></li>
           </ul>
         </div>
       </div>
@@ -36,18 +37,18 @@ import { ChartTimeSpecModalComponent }       from './chart/chart-time-spec-modal
     <div class="content-fill">
       <router-outlet></router-outlet>
     </div>
-    <chart-time-spec-modal #chartTimeSpecModal></chart-time-spec-modal>
+    <time-spec-modal #timeSpecModal></time-spec-modal>
     `
 })
 export class AppComponent {
-  @ViewChild('chartTimeSpecModal')
-  chartTimeSpecModal: ChartTimeSpecModalComponent;
+  @ViewChild('timeSpecModal')
+  timeSpecModal: TimeSpecModalComponent;
 
-  constructor(private chartEditArguments: ChartEditArgumentsService) {
+  constructor(private chartEditArguments: ChartEditArgumentsService, private timeSpecService: TimeSpecService) {
   }
 
-  _chartTimeSpecModal(event) {
+  _timeSpecModal(event) {
     event.preventDefault();
-    this.chartTimeSpecModal.open();
+    this.timeSpecModal.open();
   }
 }
