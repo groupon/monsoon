@@ -118,7 +118,7 @@ export class TimeSpecModalComponent {
     if (this.ts.end != null)      params['tse'] = this.ts.end.getTime().toString();
     if (this.ts.duration != null) params['tsd'] = durationToString(this.ts.duration);
     if (this.ts.stepsize != null) params['tss'] = durationToString(this.ts.stepsize);
-    this._router.navigate(this._route.pathFromRoot, { skipLocationChange: true, queryParams: params });
+    this._router.navigate([], { relativeTo: this._route, replaceUrl: true, queryParams: params });
 
     this.dialog.close();
   }
