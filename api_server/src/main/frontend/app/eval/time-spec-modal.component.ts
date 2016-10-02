@@ -1,14 +1,19 @@
-import { Component, ViewChild, Inject }     from '@angular/core'
+import { Component,
+         ViewChild,
+         OnInit,
+         Inject }                  from '@angular/core'
 import { FormBuilder,
          FormGroup,
-         FormControl }                      from '@angular/forms'
+         FormControl }             from '@angular/forms'
 import { TimeSpecService,
          durationToString,
          durationFromString,
-         validDurationString }              from './time-spec';
-import { ModalComponent }                   from 'ng2-bs3-modal/ng2-bs3-modal';
+         validDurationString }     from './time-spec';
+import { ModalComponent }          from 'ng2-bs3-modal/ng2-bs3-modal';
 import { Router,
-         ActivatedRoute }                   from '@angular/router';
+         ActivatedRoute }          from '@angular/router';
+import { Subscription }            from 'rxjs/Subscription';
+import                                  'rxjs/add/operator/take';
 
 
 function durationValidator(c: FormControl) {
@@ -42,7 +47,7 @@ function decodeDuration(s: string): number {
   selector: 'time-spec-modal',
   templateUrl: 'app/eval/time-spec-modal.html'
 })
-export class TimeSpecModalComponent {
+export class TimeSpecModalComponent implements OnInit {
   @ViewChild('dialog')
   dialog: ModalComponent;
 
@@ -51,6 +56,7 @@ export class TimeSpecModalComponent {
   private duration: FormControl;
   private stepsize: FormControl;
   private formModel: FormGroup;
+  private _routeSubscription: Subscription;
 
   constructor(private ts: TimeSpecService, fb: FormBuilder, private _router: Router, private _route: ActivatedRoute) {
     this.begin    = fb.control('', null);  // XXX date validators
@@ -63,14 +69,17 @@ export class TimeSpecModalComponent {
       duration: this.duration,
       stepsize: this.stepsize,
     });
+  }
 
-    this._route.queryParams
-        .toPromise()
-        .then((params) => {
+  ngOnInit(): void {
+    this._routeSubscription = this._route.queryParams
+        .subscribe((params) => {
           let p_tsb: string = params['tsb'];
           let p_tse: string = params['tse'];
           let p_tsd: string = params['tsd'];
           let p_tss: string = params['tss'];
+          console.log('query parameters: ' + JSON.stringify({ tsb: p_tsb, tse: p_tse, tsd: p_tsd, tss: p_tss }));
+
           if (!validDurationString(p_tsd)) p_tsd = null;  // Omit unparsable duration.
           if (!validDurationString(p_tss)) p_tss = null;  // Omit unparsable stepsize.
 
@@ -86,8 +95,14 @@ export class TimeSpecModalComponent {
           if (!Number.isFinite(tsb)) tsb = null;  // Omit unparsable number.
           if (!Number.isFinite(tse)) tse = null;  // Omit unparsable number.
 
-          this.ts.update((tsb != null ? new Date(tsb) : null), (tss != null ? new Date(tse) : null), tsd, tss);
+          console.log('query parameters time spec: ' + JSON.stringify({ tsb: tsb, tse: tse, tsd: tsd, tss: tss }));
+          if (tsb !== null || tse !== null || tsd !== null || tss !== null)
+            this.ts.update((tsb !== null ? new Date(tsb) : null), (tss !== null ? new Date(tse) : null), tsd, tss);
         });
+  }
+
+  ngOnDestroy(): void {
+    this._routeSubscription.unsubscribe();
   }
 
   public open(): void {
@@ -96,6 +111,9 @@ export class TimeSpecModalComponent {
     this.end.setValue(dateStr(this.ts.end));
     this.duration.setValue(durationStr(this.ts.duration));
     this.stepsize.setValue(durationStr(this.ts.stepsize));
+
+    // By this time, we don't need timespec to be updated via request parameters anymore.
+    this._routeSubscription.unsubscribe();
 
     this.dialog.open();
   }
