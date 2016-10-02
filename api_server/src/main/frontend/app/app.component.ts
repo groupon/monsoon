@@ -22,11 +22,11 @@ import { TimeSpecService }                   from './eval/time-spec';
     <nav class="navbar navbar-default">
       <div class="container-fluid">
         <div class="navbar-header">
-          <a class="navbar-brand" [routerLink]="['/']">Mon-soon</a>
+          <a class="navbar-brand" [routerLink]="['/']" preserveQueryParams="true">Mon-soon</a>
         </div>
         <div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav">
-            <li><a [routerLink]="['/fe/chart-edit', chartEditArguments.value]">Edit Chart</a></li>
+            <li><a [routerLink]="['/fe/chart-edit', chartEditArguments.value]" preserveQueryParams="true">Edit Chart</a></li>
           </ul>
           <ul class="nav navbar-nav navbar-right">
             <li><a href="#" (click)="_timeSpecModal($event)">{{ timeSpecService.representationObservable | async }}</a></li>
