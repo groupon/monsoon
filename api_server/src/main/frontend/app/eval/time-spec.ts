@@ -1,10 +1,7 @@
 import { Injectable,
-         OnInit,
          OnDestroy }       from '@angular/core';
 import { ApiQueryEncoder } from '../ApiQueryEncoder';
 import { URLSearchParams } from '@angular/http';
-import { Router,
-         ActivatedRoute }  from '@angular/router';
 import { Subject }         from 'rxjs/Subject';
 import { Subscription }    from 'rxjs/Subscription';
 import { Observable }      from 'rxjs/Observable';
@@ -102,7 +99,7 @@ export function durationFromString(s: string): number {
 }
 
 @Injectable()
-export class TimeSpecService implements OnInit, OnDestroy {
+export class TimeSpecService implements OnDestroy {
   private _begin: Date = null;
   private _end: Date = null;
   private _duration: number = 3600;  // Seconds
@@ -114,9 +111,8 @@ export class TimeSpecService implements OnInit, OnDestroy {
   private _requestOut: Observable<RequestTimeSpec>;
   private _filterOut: Observable<FilterTimeSpec>;
   private _representationOut: Observable<string>;
-  private _routeArgsSubscription: Subscription;
 
-  constructor(private _router: Router, private _route: ActivatedRoute) {
+  constructor() {
     this._requestOut = this._requestEv.asObservable()
         .distinctUntilChanged()
         .share();
@@ -131,49 +127,14 @@ export class TimeSpecService implements OnInit, OnDestroy {
         .share();
   }
 
-  ngOnInit(): void {
-    this._routeArgsSubscription = this._route
-        .queryParams
-        .subscribe((params) => {
-          let p_tsb: string = params['tsb'];
-          let p_tse: string = params['tse'];
-          let p_tsd: string = params['tsd'];
-          let p_tss: string = params['tss'];
-          if (!validDurationString(p_tsd)) p_tsd = null;  // Omit unparsable duration.
-          if (!validDurationString(p_tss)) p_tss = null;  // Omit unparsable stepsize.
-
-          // begin (tsb)
-          let tsb: number = (p_tsb !== null ? parseInt(p_tsb) : null);
-          // end (tse)
-          let tse: number = (p_tse !== null ? parseInt(p_tse) : null);
-          // duration (tsd)
-          let tsd: number = (p_tsd !== null ? durationFromString(p_tsd) : null);
-          // stepsize (tss)
-          let tss: number = (p_tss !== null ? durationFromString(p_tss) : null);
-
-          if (!Number.isFinite(tsb)) tsb = null;  // Omit unparsable number.
-          if (!Number.isFinite(tse)) tse = null;  // Omit unparsable number.
-
-          this._update(new Date(tsb), new Date(tse), tsd, tss);
-        });
-  }
-
   ngOnDestroy(): void {
-    this._routeArgsSubscription.unsubscribe();
-  }
-
-  public update(begin?: Date, end?: Date, duration_sec?: number, stepsize_sec?: number): void {
-    let params: Map<string, string> = new Map<string, string>();
-    if (begin != null)        params['tsb'] = begin.getTime().toString();
-    if (end != null)          params['tse'] = end.getTime().toString();
-    if (duration_sec != null) params['tsd'] = durationToString(duration_sec);
-    if (stepsize_sec != null) params['tss'] = durationToString(stepsize_sec);
-
-    this._router.navigate(this._route.pathFromRoot, { skipLocationChange: true, queryParams: params });
+    this._requestEv.complete();
+    this._filterEv.complete();
+    this._representationEv.complete();
   }
 
   // Change timespec.
-  private _update(begin?: Date, end?: Date, duration_sec?: number, stepsize_sec?: number): void {
+  public update(begin?: Date, end?: Date, duration_sec?: number, stepsize_sec?: number): void {
     this._begin = begin;
     this._end = end;
     this._duration = duration_sec;
