@@ -11,6 +11,7 @@ import static java.util.Collections.EMPTY_MAP;
 import java.util.Iterator;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
+import static java.util.Spliterator.DISTINCT;
 import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
@@ -110,14 +111,14 @@ public class HistoryContext implements Context {
     }
 
     public static Stream<Context> stream(Stream<TimeSeriesCollection> tsdata_stream, ExpressionLookBack lookback) {
-        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(asIterator(tsdata_stream, lookback), NONNULL | IMMUTABLE | ORDERED), false);
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(asIterator(tsdata_stream, lookback), NONNULL | IMMUTABLE | ORDERED | DISTINCT), false);
     }
 
     public static Stream<Context> stream(Iterable<TimeSeriesCollection> tsdata_stream, ExpressionLookBack lookback) {
-        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(asIterator(tsdata_stream, lookback), NONNULL | IMMUTABLE | ORDERED), false);
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(asIterator(tsdata_stream, lookback), NONNULL | IMMUTABLE | ORDERED | DISTINCT), false);
     }
 
     public static Stream<Context> stream(Iterator<TimeSeriesCollection> tsdata_stream, ExpressionLookBack lookback) {
-        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(asIterator(tsdata_stream, lookback), NONNULL | IMMUTABLE | ORDERED), false);
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(asIterator(tsdata_stream, lookback), NONNULL | IMMUTABLE | ORDERED | DISTINCT), false);
     }
 }
