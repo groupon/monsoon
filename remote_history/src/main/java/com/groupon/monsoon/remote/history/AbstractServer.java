@@ -53,7 +53,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -134,7 +133,7 @@ public abstract class AbstractServer extends rh_protoServerStub {
 
     /** Create a new evaluation iterator from the given stream. */
     private static evaluate_response newEvalStream(Stream<Collection<CollectHistory.NamedEvaluation>> tsc, int fetch) {
-        final BufferedIterator<Collection<CollectHistory.NamedEvaluation>> iter = new BufferedIterator(ForkJoinPool.commonPool(), tsc.iterator(), EVAL_QUEUE_SIZE);
+        final BufferedIterator<Collection<CollectHistory.NamedEvaluation>> iter = new BufferedIterator(tsc.iterator(), EVAL_QUEUE_SIZE);
         final long idx = EVAL_ITERS_ALLOC.getAndIncrement();
         final IteratorAndCookie<Collection<CollectHistory.NamedEvaluation>> iterAndCookie = new IteratorAndCookie<>(iter);
         EVAL_ITERS.put(idx, iterAndCookie);
