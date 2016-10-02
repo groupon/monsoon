@@ -11,7 +11,7 @@
                placeholder="Specify a timestamp..."
                class="form-control" />
         <div [hidden]="formModel.get(['begin']).valid || formModel.get(['begin']).pristine" class="alert alert-danger">
-          <p [hidden]="formModel.get(['begin']).hasError('required')">
+          <p [hidden]="!formModel.get(['begin']).hasError('required')">
             Timestamp is required
           </p>
         </div>
@@ -22,7 +22,7 @@
                placeholder="Specify a timestamp..."
                class="form-control" />
         <div [hidden]="formModel.get(['end']).valid || formModel.get(['end']).pristine" class="alert alert-danger">
-          <p [hidden]="formModel.get(['end']).hasError('required')">
+          <p [hidden]="!formModel.get(['end']).hasError('required')">
             Timestamp is required
           </p>
         </div>
@@ -33,10 +33,10 @@
                placeholder="Specify a duration..."
                class="form-control" />
         <div [hidden]="formModel.get(['duration']).valid || formModel.get(['duration']).pristine" class="alert alert-danger">
-          <p [hidden]="formModel.get(['duration']).hasError('required')">
+          <p [hidden]="!formModel.get(['duration']).hasError('required')">
             Duration is required
           </p>
-          <p [hidden]="formModel.get(['duration']).hasError('duration')">
+          <p [hidden]="!formModel.get(['duration']).hasError('duration')">
             Invalid duration
           </p>
         </div>
@@ -49,10 +49,10 @@
                placeholder="Specify a duration..."
                class="form-control" />
         <div [hidden]="formModel.get(['stepsize']).valid || formModel.get(['stepsize']).pristine" class="alert alert-danger">
-          <p [hidden]="formModel.get(['stepsize']).hasError('required')">
+          <p [hidden]="!formModel.get(['stepsize']).hasError('required')">
             Step size is required
           </p>
-          <p [hidden]="formModel.get(['stepsize']).hasError('duration')">
+          <p [hidden]="!formModel.get(['stepsize']).hasError('duration')">
             Invalid duration
           </p>
         </div>
