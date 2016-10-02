@@ -5,6 +5,10 @@ monsoon-2.2-SNAPSHOT
 ----
 
 Features:
+- Upgraded to angular 2.0.1. \o/
+- Frontend chart now loads data incrementally and update continuously.
+- Frontend timespec completely reworked.
+- Frontend evaluation logic moved into separate component.
 
 Bug fixes:
 
