@@ -9,6 +9,7 @@ import { ApiQueryEncoder }       from '../ApiQueryEncoder';
 import                                'rxjs/add/operator/concat';
 import                                'rxjs/add/operator/map';
 import                                'rxjs/add/operator/mergeMap';
+import                                'rxjs/add/operator/retry';
 import                                'rxjs/add/operator/switchMap';
 import                                'rxjs/add/observable/combineLatest';
 import                                'rxjs/add/observable/of';
@@ -140,6 +141,7 @@ class EvaluationStream {
   // Fetch 1 update from API iterator.
   private _onNext(inner: Subscriber<EvalDataSet>): void {
     this.http.get('/api/monsoon/eval', { search: this.params })
+        .retry(3)
         .map((response) => new EvalIterResponse(response.json()))
         .toPromise()  // Means we don't have to manage a subscription.
         .then(
