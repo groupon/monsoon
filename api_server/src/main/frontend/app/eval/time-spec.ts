@@ -58,12 +58,12 @@ export class InvalidDurationException {
 }
 
 /** Test if the string is a valid duration. */
-export function validDurationString(s: string) {
+export function validDurationString(s: string): boolean {
   return /^\s*(?:\d+[dhms])(?:\s+\d+[dhms])+\s*$/.test(s);
 }
 
 /** Convert a number (in seconds) to a duration string. */
-export function durationToString(n: number) {
+export function durationToString(n: number): string {
   n -= n % 1;  // Round down.
   let s: number = n % 60;
   n = (n - s) / 60;
@@ -85,7 +85,7 @@ export function durationToString(n: number) {
  * Parse a string into a duration (in seconds).
  * Throws InvalidDurationException if the string is not a valid duration.
  */
-export function durationFromString(s: string) {
+export function durationFromString(s: string): number {
   if (!validDurationString(s))
     throw new InvalidDurationException(s);
 
@@ -162,7 +162,7 @@ export class TimeSpecService implements OnInit, OnDestroy {
     this._routeArgsSubscription.unsubscribe();
   }
 
-  private update(begin?: Date, end?: Date, duration_sec?: number, stepsize_sec?: number) {
+  public update(begin?: Date, end?: Date, duration_sec?: number, stepsize_sec?: number): void {
     let params: Map<string, string> = new Map<string, string>();
     if (begin != null)        params['tsb'] = begin.getTime().toString();
     if (end != null)          params['tse'] = end.getTime().toString();
@@ -173,7 +173,7 @@ export class TimeSpecService implements OnInit, OnDestroy {
   }
 
   // Change timespec.
-  private _update(begin?: Date, end?: Date, duration_sec?: number, stepsize_sec?: number) {
+  private _update(begin?: Date, end?: Date, duration_sec?: number, stepsize_sec?: number): void {
     this._begin = begin;
     this._end = end;
     this._duration = duration_sec;
