@@ -16,3 +16,18 @@ export class ChartEditArgumentsService {
     return this._cur;
   }
 }
+
+/*
+ * Since angular parameters break in the face of round brackets,
+ * escape everything.
+ */
+export function encodeExpr(s: string): string {
+  return encodeURIComponent(s).replace(/\(/g, '%28').replace(/\)/g, '%29');
+}
+
+/*
+ * Counterpart of encodeExpr().
+ */
+export function decodeExpr(s: string): string {
+  return decodeURIComponent(s);
+}

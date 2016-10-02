@@ -4,6 +4,7 @@ import { ChartExpr }                                   from './chart-expr';
 import { Router, ActivatedRoute }                      from '@angular/router';
 import { Observable }                                  from 'rxjs/Observable';
 import                                                      'rxjs/add/operator/map';
+import { encodeExpr, decodeExpr }                      from './chart-edit-arguments.service';
 
 
 @Component({
@@ -31,7 +32,7 @@ export class ChartEditComponent {
   onRender(m: ChartExpr) {
     let args = {};
     Object.keys(m.expr).forEach((k) => {
-      args['expr:' + k] = m.expr[k];
+      args[encodeExpr('expr:' + k)] = encodeExpr(m.expr[k]);
     });
 
     this.router.navigate(['/fe/chart-view', args], {preserveQueryParams: true});
@@ -41,10 +42,10 @@ export class ChartEditComponent {
     let exprs = new Map<string, string>();
 
     Object.keys(params).forEach((enc_k) => {
-      let k: string = enc_k;
+      let k: string = decodeExpr(enc_k);
 
       if (k.startsWith("expr:")) {
-        let v: string = params[k];
+        let v: string = decodeExpr(params[enc_k]);
         exprs[k.substr(5)] = v;
       }
     });

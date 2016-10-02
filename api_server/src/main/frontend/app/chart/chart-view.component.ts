@@ -5,6 +5,7 @@ import { ChartEditArgumentsService }         from './chart-edit-arguments.servic
 import { Observable }                        from 'rxjs/Observable';
 import { Subscription }                      from 'rxjs/Subscription';
 import                                            'rxjs/add/operator/map';
+import { encodeExpr, decodeExpr }            from './chart-edit-arguments.service';
 
 
 @Component({
@@ -37,10 +38,10 @@ export class ChartViewComponent implements OnInit, OnDestroy {
     let exprs = new Map<string, string>();
 
     Object.keys(params).forEach((enc_k) => {
-      let k: string = enc_k;
+      let k: string = decodeExpr(enc_k);
 
       if (k.startsWith("expr:")) {
-        let v: string = params[k];
+        let v: string = decodeExpr(params[enc_k]);
         exprs[k.substr(5)] = v;
       }
     });
