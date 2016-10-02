@@ -7,7 +7,7 @@ import { Ng2Bs3ModalModule }           from 'ng2-bs3-modal/ng2-bs3-modal';
 import { AppComponent }                from './app.component';
 import { ChartEditComponent }          from './chart/chart-edit.component';
 import { ChartViewComponent }          from './chart/chart-view.component';
-import { ChartTimeSpecModalComponent } from './chart/chart-time-spec-modal.component';
+import { TimeSpecModalComponent }      from './eval/time-spec-modal.component';
 import { ChartExprFormComponent }      from './chart/chart-expr-form.component';
 import { ChartComponent }              from './chart/chart.component';
 import { DashboardComponent }          from './dashboard.component';
@@ -27,7 +27,7 @@ import { EvaluationService }           from './eval/evaluation.service';
     HttpModule,
   ],
   declarations: [
-    ChartTimeSpecModalComponent,
+    TimeSpecModalComponent,
     ChartExprFormComponent,
     ChartComponent,
     AppComponent,

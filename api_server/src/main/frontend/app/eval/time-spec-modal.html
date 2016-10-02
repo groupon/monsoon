@@ -1,0 +1,65 @@
+<modal #dialog>
+  <form (ngSubmit)="onSubmit()" [formGroup]="formModel" #chartExprForm="ngForm">
+    <modal-header [show-close]="true">
+      <h4 class="modal-title">Change Time Selection</h4>
+    </modal-header>
+    <modal-body>
+      <div class="form-group">
+        <label for="begin">Begin</label>
+        <input type="text"
+               formControlName="begin"
+               placeholder="Specify a timestamp..."
+               class="form-control" />
+        <div [hidden]="formModel.get(['begin']).valid || formModel.get(['begin']).pristine" class="alert alert-danger">
+          <p [hidden]="formModel.get(['begin']).hasError('required')">
+            Timestamp is required
+          </p>
+        </div>
+
+        <label for="end">End</label>
+        <input type="text"
+               formControlName="end"
+               placeholder="Specify a timestamp..."
+               class="form-control" />
+        <div [hidden]="formModel.get(['end']).valid || formModel.get(['end']).pristine" class="alert alert-danger">
+          <p [hidden]="formModel.get(['end']).hasError('required')">
+            Timestamp is required
+          </p>
+        </div>
+
+        <label for="duration">Duration interval</label>
+        <input type="text"
+               formControlName="duration"
+               placeholder="Specify a duration..."
+               class="form-control" />
+        <div [hidden]="formModel.get(['duration']).valid || formModel.get(['duration']).pristine" class="alert alert-danger">
+          <p [hidden]="formModel.get(['duration']).hasError('required')">
+            Duration is required
+          </p>
+          <p [hidden]="formModel.get(['duration']).hasError('duration')">
+            Invalid duration
+          </p>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="stepsize">Step size interval</label>
+        <input type="text"
+               formControlName="stepsize"
+               placeholder="Specify a duration..."
+               class="form-control" />
+        <div [hidden]="formModel.get(['stepsize']).valid || formModel.get(['stepsize']).pristine" class="alert alert-danger">
+          <p [hidden]="formModel.get(['stepsize']).hasError('required')">
+            Step size is required
+          </p>
+          <p [hidden]="formModel.get(['stepsize']).hasError('duration')">
+            Invalid duration
+          </p>
+        </div>
+      </div>
+    </modal-body>
+    <modal-footer>
+      <button type="submit" class="btn btn-default btn-success" [disabled]="!chartExprForm.form.valid">Update</button>
+    </modal-footer>
+  </form>
+</modal>
