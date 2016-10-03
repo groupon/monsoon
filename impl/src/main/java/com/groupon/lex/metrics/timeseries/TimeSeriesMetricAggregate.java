@@ -43,8 +43,9 @@ import com.groupon.lex.metrics.timeseries.expression.PreviousContextWrapper;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import static java.util.Collections.singletonList;
 import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.unmodifiableMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
@@ -98,52 +99,72 @@ public abstract class TimeSeriesMetricAggregate<T> implements TimeSeriesMetricEx
     protected abstract T reducer_(T x, T y);
     protected abstract MetricValue unmap_(T v);
 
-    @Override
-    public final TimeSeriesMetricDeltaSet apply(Context ctx) {
-        /* If a time delta is specified, create a context for each of the time deltas. */
-        List<Context> contextList = tDelta
-                .map(tdelta_val -> {
-                    return ctx.getTSData().getCollectionPairsSince(tdelta_val).stream()
-                            .map(tsdata -> new PreviousContextWrapper(ctx, tsdata))
-                            .collect(Collectors.<Context>toList());
-                })
-                .orElse(singletonList(ctx));
-
+    /**
+     * Create a reduction of the matchers and expressions for a given context.
+     * @param ctx The context on which to apply the reduction.
+     * @return A reduction.
+     */
+    private Map<Tags, T> mapAndReduce(Context ctx) {
         /* Fetch each metric wildcard and add it to the to-be-processed list. */
         final List<Map.Entry<Tags, MetricValue>> matcher_tsvs = matchers_.stream()
-                .flatMap(m -> contextList.stream().flatMap(t -> m.filter(t)))
+                .flatMap(m -> m.filter(ctx))
                 .map(named_entry -> SimpleMapEntry.create(named_entry.getKey().getTags(), named_entry.getValue()))
                 .collect(Collectors.toList());
-        /* Resolve each expression and resolve it. */
+        /* Resolve each expression. */
         final Map<Boolean, List<TimeSeriesMetricDeltaSet>> expr_tsvs_map = exprs_.stream()
-                .flatMap((expr) -> contextList.stream().map(t -> expr.apply(t)))
+                .map(expr -> expr.apply(ctx))
                 .collect(Collectors.partitioningBy(TimeSeriesMetricDeltaSet::isVector));
-        final List<TimeSeriesMetricDeltaSet> expr_tsvs = Optional.ofNullable(expr_tsvs_map.get(true)).orElse(Collections.emptyList());
-        final T scalar = Optional.ofNullable(expr_tsvs_map.get(false))
-                .map(Collection::stream)
-                .orElseGet(Stream::<TimeSeriesMetricDeltaSet>empty)
+        final List<TimeSeriesMetricDeltaSet> expr_tsvs = expr_tsvs_map.getOrDefault(true, Collections.emptyList());
+        final T scalar = expr_tsvs_map.getOrDefault(false, Collections.emptyList())
+                .stream()
                 .map(tsv_set -> map_(tsv_set.asScalar().get()))
-                .reduce(initial_(), (x, y) -> reducer_(x, y));
+                .reduce(initial_(), this::reducer_);
 
         /*
          * Reduce everything using the reducer (in the derived class).
          */
-        final Stream<Map.Entry<Tags, T>> map = aggregation_.apply(
+        return unmodifiableMap(aggregation_.apply(
                         matcher_tsvs.stream(), expr_tsvs.stream().flatMap(TimeSeriesMetricDeltaSet::streamAsMap),
                         Map.Entry::getKey, Map.Entry::getKey,
                         Map.Entry::getValue, Map.Entry::getValue)
                 .entrySet().stream()
-                .map(entry -> {
-                    final T aggregated_value = entry.getValue().stream().map(this::map_)
-                            .reduce(scalar, this::reducer_);
-                    return SimpleMapEntry.create(entry.getKey(), aggregated_value);
-                });
+                .collect(Collectors.toMap(
+                        entry -> entry.getKey(),
+                        entry -> {
+                            final T aggregated_value = entry.getValue().stream().map(this::map_)
+                                    .reduce(scalar, this::reducer_);
+                            return aggregated_value;
+                        },
+                        (u,v) -> { throw new IllegalStateException(String.format("Duplicate key %s", u)); },
+                        () -> new HashMap(3, 1))));
+    }
+
+    @Override
+    public final TimeSeriesMetricDeltaSet apply(Context ctx) {
+        /*
+         * If a time delta is specified, create a context for each of the time deltas.
+         * Reduce everything using the reducer (in the derived class).
+         * If a time delta is specified, try to utilize the cache on previous contexts.
+         */
+        Map<Tags, T> map = tDelta
+                .map(tdelta_val -> {
+                    return ctx.getTSData().getCollectionPairsSince(tdelta_val).stream()
+                            .map(tsdata -> new PreviousContextWrapper(ctx, tsdata))
+                            .flatMap(c -> mapAndReduce(c).entrySet().stream())
+                            .collect(Collectors.toMap(entry -> entry.getKey(), entry -> entry.getValue(), this::reducer_));
+                })
+                .orElseGet(() -> mapAndReduce(ctx));
 
         final TimeSeriesMetricDeltaSet result;
         if (aggregation_.isScalar()) {
-            result = new TimeSeriesMetricDeltaSet(map.map(Map.Entry::getValue).reduce(this::reducer_).map(this::unmap_).orElseGet(this::scalar_fallback_));
+            result = new TimeSeriesMetricDeltaSet(map.entrySet().stream()
+                    .map(Map.Entry::getValue)
+                    .reduce(this::reducer_)
+                    .map(this::unmap_)
+                    .orElseGet(this::scalar_fallback_));
         } else {
-            result = new TimeSeriesMetricDeltaSet(map.map(entry -> SimpleMapEntry.create(entry.getKey(), unmap_(entry.getValue()))));
+            result = new TimeSeriesMetricDeltaSet(map.entrySet().stream()
+                    .map(entry -> SimpleMapEntry.create(entry.getKey(), unmap_(entry.getValue()))));
         }
         LOG.log(Level.FINE, "{0} yields {1}", new Object[]{fn_name_, result});
         return result;
