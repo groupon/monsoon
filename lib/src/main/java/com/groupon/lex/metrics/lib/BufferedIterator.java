@@ -39,9 +39,9 @@ public final class BufferedIterator<T> {
         iter_ = requireNonNull(iter);
         queue_size_ = queue_size;
         queue_ = new LinkedList<>();
-        at_end_ = !iter_.hasNext();
+        at_end_ = false;
 
-        if (iter_.hasNext()) fire_();
+        fire_();
     }
 
     public BufferedIterator(Iterator<? extends T> iter, int queue_size) {
@@ -182,11 +182,12 @@ public final class BufferedIterator<T> {
     }
 
     private void add_next_iter_() {
+        final long deadline = System.currentTimeMillis() + 50;  // Don't hog the queue, requeue once deadline expires.
+
         try {
-            int count_down = queue_size_;
             boolean stop_loop = false;
-            while (!stop_loop && count_down-- > 0 && queue_.size() < queue_size_) {
-                {
+            while (!stop_loop && queue_.size() < queue_size_) {
+                if (iter_.hasNext()) {
                     final T next = iter_.next();
                     final Optional<Runnable> wakeup;
                     synchronized(this) {
@@ -194,10 +195,8 @@ public final class BufferedIterator<T> {
                         wakeup = wakeup_;
                         wakeup_ = Optional.empty();
                     }
-                    wakeup.ifPresent(Runnable::run);
-                }
-
-                if (!iter_.hasNext()) {
+                    wakeup.ifPresent(this.work_queue_::submit);
+                } else {
                     final Optional<Runnable> wakeup;
                     synchronized(this) {
                         at_end_ = true;
@@ -205,8 +204,11 @@ public final class BufferedIterator<T> {
                         wakeup = wakeup_;
                         wakeup_ = Optional.empty();
                     }
-                    wakeup.ifPresent(Runnable::run);
+                    wakeup.ifPresent(this.work_queue_::submit);
                 }
+
+                if (System.currentTimeMillis() >= deadline)
+                    stop_loop = true;
             }
 
             synchronized(this) {
