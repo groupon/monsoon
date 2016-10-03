@@ -11,6 +11,7 @@ Features:
 - Frontend evaluation logic moved into separate component.
 
 Bug fixes:
+- Fix RPC timeout caused by BufferedIterator reading underlying iterator in the constructor.  This caused RPC calls to time out if the underlying iterator required more than 30 seconds for its first element to be available.
 
 monsoon-2.1.1 (Sep 28, 2016)
 ----
