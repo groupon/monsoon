@@ -43,8 +43,9 @@ import com.groupon.lex.metrics.timeseries.expression.PreviousContextWrapper;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.unmodifiableMap;
 import java.util.List;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
@@ -53,6 +54,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.joda.time.Duration;
 
 /**
@@ -98,53 +102,65 @@ public abstract class TimeSeriesMetricAggregate<T> implements TimeSeriesMetricEx
     protected abstract T reducer_(T x, T y);
     protected abstract MetricValue unmap_(T v);
 
-    @Override
-    public final TimeSeriesMetricDeltaSet apply(Context ctx) {
-        /* If a time delta is specified, create a context for each of the time deltas. */
-        List<Context> contextList = tDelta
-                .map(tdelta_val -> {
-                    return ctx.getTSData().getCollectionPairsSince(tdelta_val).stream()
-                            .map(tsdata -> new PreviousContextWrapper(ctx, tsdata))
-                            .collect(Collectors.<Context>toList());
-                })
-                .orElse(singletonList(ctx));
-
+    /**
+     * Create a reduction of the matchers and expressions for a given context.
+     * @param ctx The context on which to apply the reduction.
+     * @return A reduction.
+     */
+    private Intermediate mapAndReduce(Context ctx) {
         /* Fetch each metric wildcard and add it to the to-be-processed list. */
         final List<Map.Entry<Tags, MetricValue>> matcher_tsvs = matchers_.stream()
-                .flatMap(m -> contextList.stream().flatMap(t -> m.filter(t)))
+                .flatMap(m -> m.filter(ctx))
                 .map(named_entry -> SimpleMapEntry.create(named_entry.getKey().getTags(), named_entry.getValue()))
                 .collect(Collectors.toList());
-        /* Resolve each expression and resolve it. */
+        /* Resolve each expression. */
         final Map<Boolean, List<TimeSeriesMetricDeltaSet>> expr_tsvs_map = exprs_.stream()
-                .flatMap((expr) -> contextList.stream().map(t -> expr.apply(t)))
+                .map(expr -> expr.apply(ctx))
                 .collect(Collectors.partitioningBy(TimeSeriesMetricDeltaSet::isVector));
-        final List<TimeSeriesMetricDeltaSet> expr_tsvs = Optional.ofNullable(expr_tsvs_map.get(true)).orElse(Collections.emptyList());
-        final T scalar = Optional.ofNullable(expr_tsvs_map.get(false))
-                .map(Collection::stream)
-                .orElseGet(Stream::<TimeSeriesMetricDeltaSet>empty)
+        final List<TimeSeriesMetricDeltaSet> expr_tsvs = expr_tsvs_map.getOrDefault(true, Collections.emptyList());
+        final Optional<T> scalar = expr_tsvs_map.getOrDefault(false, Collections.emptyList())
+                .stream()
                 .map(tsv_set -> map_(tsv_set.asScalar().get()))
-                .reduce(initial_(), (x, y) -> reducer_(x, y));
+                .reduce(this::reducer_);
 
         /*
          * Reduce everything using the reducer (in the derived class).
          */
-        final Stream<Map.Entry<Tags, T>> map = aggregation_.apply(
+        return new Intermediate(scalar, unmodifiableMap(aggregation_.apply(
                         matcher_tsvs.stream(), expr_tsvs.stream().flatMap(TimeSeriesMetricDeltaSet::streamAsMap),
                         Map.Entry::getKey, Map.Entry::getKey,
                         Map.Entry::getValue, Map.Entry::getValue)
                 .entrySet().stream()
                 .map(entry -> {
-                    final T aggregated_value = entry.getValue().stream().map(this::map_)
-                            .reduce(scalar, this::reducer_);
-                    return SimpleMapEntry.create(entry.getKey(), aggregated_value);
-                });
+                    return entry.getValue().stream().map(this::map_)
+                            .reduce(this::reducer_)
+                            .map(v -> SimpleMapEntry.create(entry.getKey(), v));
+                })
+                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
+                .collect(Collectors.toMap(entry -> entry.getKey(), entry -> entry.getValue()))));
+    }
+
+    @Override
+    public final TimeSeriesMetricDeltaSet apply(Context ctx) {
+        /*
+         * If a time delta is specified, create a context for each of the time deltas.
+         * Reduce everything using the reducer (in the derived class).
+         * If a time delta is specified, try to utilize the cache on previous contexts.
+         */
+        Intermediate map = tDelta
+                .map(tdelta_val -> {
+                    return ctx.getTSData().getCollectionPairsSince(tdelta_val).parallelStream()
+                            .map(tsdata -> new PreviousContextWrapper(ctx, tsdata))
+                            .map(c -> mapAndReduce(c))
+                            .reduce(new Intermediate(), this::reduceIntermediate_);
+                })
+                .orElseGet(() -> mapAndReduce(ctx));
 
         final TimeSeriesMetricDeltaSet result;
-        if (aggregation_.isScalar()) {
-            result = new TimeSeriesMetricDeltaSet(map.map(Map.Entry::getValue).reduce(this::reducer_).map(this::unmap_).orElseGet(this::scalar_fallback_));
-        } else {
-            result = new TimeSeriesMetricDeltaSet(map.map(entry -> SimpleMapEntry.create(entry.getKey(), unmap_(entry.getValue()))));
-        }
+        if (aggregation_.isScalar())
+            result = new TimeSeriesMetricDeltaSet(map.finalizeAsScalar());
+        else
+            result = new TimeSeriesMetricDeltaSet(map.finalizeAsVector());
         LOG.log(Level.FINE, "{0} yields {1}", new Object[]{fn_name_, result});
         return result;
     }
@@ -167,5 +183,59 @@ public abstract class TimeSeriesMetricAggregate<T> implements TimeSeriesMetricEx
         if (agg_cfg.length() > 0) rv.append(' ').append(agg_cfg);
 
         return rv;
+    }
+
+    @RequiredArgsConstructor
+    @Getter
+    private class Intermediate {
+        @NonNull
+        private final Optional<T> scalar;
+        @NonNull
+        private final Map<Tags, T> vectors;
+
+        public Intermediate() {
+            this(Optional.empty(), emptyMap());
+        }
+
+        public MetricValue finalizeAsScalar() {
+            return Stream.concat(scalar.map(Stream::of).orElseGet(Stream::empty), vectors.values().stream())
+                    .reduce(TimeSeriesMetricAggregate.this::reducer_)
+                    .map(TimeSeriesMetricAggregate.this::unmap_)
+                    .orElseGet(TimeSeriesMetricAggregate.this::scalar_fallback_);
+        }
+
+        public Stream<Map.Entry<Tags, MetricValue>> finalizeAsVector() {
+            final T init = initial_();
+            final T initScalar = scalar.map(x -> reducer_(init, x)).orElse(init);
+            return vectors.entrySet().stream()
+                    .map(entry -> SimpleMapEntry.create(entry.getKey(), unmap_(reducer_(initScalar, entry.getValue()))));
+        }
+    }
+
+    private Intermediate reduceIntermediate_(Intermediate x, Intermediate y) {
+        final Optional<T> scalar;
+        if (x.getScalar().isPresent() && y.getScalar().isPresent())
+            scalar = Optional.of(reducer_(x.getScalar().get(), y.getScalar().get()));
+        else if (x.getScalar().isPresent())
+            scalar = x.getScalar();
+        else if (y.getScalar().isPresent())
+            scalar = y.getScalar();
+        else
+            scalar = Optional.empty();
+
+        final Map<Tags, T> vectors = aggregation_.apply(
+                    x.getVectors().entrySet().stream(), y.getVectors().entrySet().stream(),
+                    Map.Entry::getKey, Map.Entry::getKey,
+                    Map.Entry::getValue, Map.Entry::getValue)
+                .entrySet().stream()
+                .map(entry -> {
+                    return entry.getValue().stream()
+                            .reduce(this::reducer_)
+                            .map(v -> SimpleMapEntry.create(entry.getKey(), v));
+                })
+                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        return new Intermediate(scalar, vectors);
     }
 }
