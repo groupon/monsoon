@@ -149,7 +149,7 @@ public abstract class TimeSeriesMetricAggregate<T> implements TimeSeriesMetricEx
          */
         Intermediate map = tDelta
                 .map(tdelta_val -> {
-                    return ctx.getTSData().getCollectionPairsSince(tdelta_val).stream()
+                    return ctx.getTSData().getCollectionPairsSince(tdelta_val).parallelStream()
                             .map(tsdata -> new PreviousContextWrapper(ctx, tsdata))
                             .map(c -> mapAndReduce(c))
                             .reduce(new Intermediate(), this::reduceIntermediate_);
