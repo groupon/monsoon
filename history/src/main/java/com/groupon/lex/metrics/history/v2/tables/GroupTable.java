@@ -1,0 +1,123 @@
+/*
+ * Copyright (c) 2016, Groupon, Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution.
+ *
+ * Neither the name of GROUPON nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without
+ * specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+package com.groupon.lex.metrics.history.v2.tables;
+
+import com.groupon.lex.metrics.MetricName;
+import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.history.v2.ExportMap;
+import com.groupon.lex.metrics.history.v2.xdr.group_table;
+import com.groupon.lex.metrics.history.v2.xdr.tables_metric;
+import com.groupon.lex.metrics.history.xdr.support.FilePos;
+import static gnu.trove.TCollections.unmodifiableMap;
+import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
+import org.acplt.oncrpc.OncRpcException;
+import org.joda.time.DateTime;
+import org.joda.time.Duration;
+
+@RequiredArgsConstructor
+public class GroupTable extends AbstractSegmentWriter {
+    @NonNull
+    private final DateTime begin;
+    @NonNull
+    private final ExportMap<List<String>> pathTable;
+    @NonNull
+    private final ExportMap<String> stringTable;
+    private final TIntSet timestamps = new TIntHashSet();
+    private final TIntObjectMap<FilePos> filePosTbl = new TIntObjectHashMap<>();
+    private final TIntObjectMap<MetricTable> metricTbl = new TIntObjectHashMap<>();
+
+    public void add(@NonNull DateTime ts, @NonNull Map<MetricName, MetricValue> metrics) {
+        final long time_offset_long = new Duration(begin, ts).getMillis();
+        if (time_offset_long < 0 || time_offset_long > Integer.MAX_VALUE)
+            throw new IllegalArgumentException("ts out of range");
+        final int time_offset = (int)time_offset_long;
+
+        timestamps.add(time_offset);
+        metrics.entrySet().forEach(entry -> {
+            final int mIdx = pathTable.getOrCreate(entry.getKey().getPath());
+            MetricTable mt = metricTbl.get(mIdx);
+            if (mt == null) {
+                mt = new MetricTable(begin, stringTable);
+                metricTbl.put(mIdx, mt);
+            }
+
+            mt.add(ts, entry.getValue());
+        });
+    }
+
+    public TIntObjectMap<MetricTable> getTables() {
+        return unmodifiableMap(metricTbl);
+    }
+
+    @Override
+    public group_table encode() {
+        group_table result = new group_table();
+
+        result.timestamp_delta = timestamps.toArray();
+        Arrays.sort(result.timestamp_delta);
+
+        result.metric_tbl = Arrays.stream(metricTbl.keys())
+                .mapToObj(mIdx -> {
+                    final tables_metric tm = new tables_metric();
+                    tm.metric_ref = mIdx;
+                    tm.pos = filePosTbl.get(mIdx).encode();
+                    return result;
+                })
+                .toArray(tables_metric[]::new);
+
+        return result;
+    }
+
+    @Override
+    public FilePos write(FileChannel out, long outPos, boolean compress) throws OncRpcException, IOException {
+        for (int mIdx : metricTbl.keys()) {
+            if (!filePosTbl.containsKey(mIdx)) {
+                final MetricTable tbl = metricTbl.get(mIdx);
+                final FilePos pos = tbl.write(out, outPos, compress);
+                filePosTbl.put(mIdx, pos);
+                outPos = pos.getEnd();
+            }
+        }
+
+        return super.write(out, outPos, compress);
+    }
+}
