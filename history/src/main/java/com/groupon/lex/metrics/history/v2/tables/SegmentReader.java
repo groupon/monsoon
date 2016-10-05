@@ -37,6 +37,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -48,6 +49,10 @@ public interface SegmentReader<T> {
 
     public default <U> SegmentReader<U> map(Function<? super T, ? extends U> fn) {
         return new MappedSegmentReader<>(this, fn);
+    }
+
+    public default SegmentReader<T> peek(Consumer<? super T> fn) {
+        return new PeekedSegmentReader<>(this, fn);
     }
 
     public default SegmentReader<T> share() {
@@ -75,6 +80,19 @@ class MappedSegmentReader<T, U> implements SegmentReader<U> {
     @Override
     public U decode() throws IOException, OncRpcException {
         return fn.apply(in.decode());
+    }
+}
+
+@RequiredArgsConstructor
+class PeekedSegmentReader<T> implements SegmentReader<T> {
+    private final SegmentReader<T> in;
+    private final Consumer<? super T> fn;
+
+    @Override
+    public T decode() throws IOException, OncRpcException {
+        T v = in.decode();
+        fn.accept(v);
+        return v;
     }
 }
 

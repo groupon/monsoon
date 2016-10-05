@@ -132,6 +132,7 @@ public class ReadonlyTableFile implements TSData {
 
         body = segmentFactory.get(file_data_tables::new, bodyPos)
                 .map(fdt -> new RTFFileDataTables(fdt, hdr.first.value, segmentFactory))
+                .peek(RTFFileDataTables::validate)
                 .cache();
     }
 }

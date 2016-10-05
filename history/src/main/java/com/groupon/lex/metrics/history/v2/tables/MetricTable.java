@@ -35,6 +35,8 @@ import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.history.v2.ExportMap;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
+import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.bitset;
+import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.createPresenceBitset;
 import com.groupon.lex.metrics.history.v2.xdr.histogram;
 import com.groupon.lex.metrics.history.v2.xdr.metric_table;
 import com.groupon.lex.metrics.history.v2.xdr.metric_value;
@@ -47,48 +49,44 @@ import com.groupon.lex.metrics.history.v2.xdr.mt_empty;
 import com.groupon.lex.metrics.history.v2.xdr.mt_hist;
 import com.groupon.lex.metrics.history.v2.xdr.mt_other;
 import com.groupon.lex.metrics.history.v2.xdr.mt_str;
-import gnu.trove.map.TIntByteMap;
-import gnu.trove.map.TIntDoubleMap;
-import gnu.trove.map.TIntIntMap;
-import gnu.trove.map.TIntLongMap;
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.TIntShortMap;
-import gnu.trove.map.hash.TIntByteHashMap;
-import gnu.trove.map.hash.TIntDoubleHashMap;
-import gnu.trove.map.hash.TIntIntHashMap;
-import gnu.trove.map.hash.TIntLongHashMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.map.hash.TIntShortHashMap;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
+import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter;
+import gnu.trove.map.TLongByteMap;
+import gnu.trove.map.TLongDoubleMap;
+import gnu.trove.map.TLongIntMap;
+import gnu.trove.map.TLongLongMap;
+import gnu.trove.map.TLongObjectMap;
+import gnu.trove.map.TLongShortMap;
+import gnu.trove.map.hash.TLongByteHashMap;
+import gnu.trove.map.hash.TLongDoubleHashMap;
+import gnu.trove.map.hash.TLongIntHashMap;
+import gnu.trove.map.hash.TLongLongHashMap;
+import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.map.hash.TLongShortHashMap;
+import gnu.trove.set.TLongSet;
+import gnu.trove.set.hash.TLongHashSet;
 import java.util.Arrays;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.joda.time.DateTime;
-import org.joda.time.Duration;
+import org.joda.time.DateTimeZone;
 
 @RequiredArgsConstructor
 public class MetricTable extends AbstractSegmentWriter {
     @NonNull
-    private final DateTime begin;
-    @NonNull
     private final ExportMap<String> stringTable;
 
-    private final TIntByteMap t_bool = new TIntByteHashMap();
-    private final TIntShortMap t_16bit = new TIntShortHashMap();
-    private final TIntIntMap t_32bit = new TIntIntHashMap();
-    private final TIntLongMap t_64bit = new TIntLongHashMap();
-    private final TIntDoubleMap t_dbl = new TIntDoubleHashMap();
-    private final TIntIntMap t_str = new TIntIntHashMap();
-    private final TIntObjectMap<Histogram> t_hist = new TIntObjectHashMap<>();
-    private final TIntSet t_empty = new TIntHashSet();
-    private final TIntObjectMap<MetricValue> t_other = new TIntObjectHashMap();
+    private final TLongByteMap t_bool = new TLongByteHashMap();
+    private final TLongShortMap t_16bit = new TLongShortHashMap();
+    private final TLongIntMap t_32bit = new TLongIntHashMap();
+    private final TLongLongMap t_64bit = new TLongLongHashMap();
+    private final TLongDoubleMap t_dbl = new TLongDoubleHashMap();
+    private final TLongIntMap t_str = new TLongIntHashMap();
+    private final TLongObjectMap<Histogram> t_hist = new TLongObjectHashMap<>();
+    private final TLongSet t_empty = new TLongHashSet();
+    private final TLongObjectMap<MetricValue> t_other = new TLongObjectHashMap<>();
 
     public void add(@NonNull DateTime ts, @NonNull MetricValue value) {
-        final long time_offset_long = new Duration(begin, ts).getMillis();
-        if (time_offset_long < 0 || time_offset_long > Integer.MAX_VALUE)
-            throw new IllegalArgumentException("ts out of range");
-        final int time_offset = (int)time_offset_long;
+        final long time_offset = ts.toDateTime(DateTimeZone.UTC).getMillis();
 
         if (value.getBoolValue() != null) {
             t_bool.put(time_offset, value.getBoolValue() ? (byte)1 : (byte)0);
@@ -114,119 +112,151 @@ public class MetricTable extends AbstractSegmentWriter {
     }
 
     @Override
-    public metric_table encode() {
+    public metric_table encode(long timestamps[]) {
         metric_table mt = new metric_table();
-        mt.metrics_bool = encodeBool(t_bool);
-        mt.metrics_16bit = encode16Bit(t_16bit);
-        mt.metrics_32bit = encode32Bit(t_32bit);
-        mt.metrics_64bit = encode64Bit(t_64bit);
-        mt.metrics_dbl = encodeDbl(t_dbl);
-        mt.metrics_str = encodeStr(t_str);
-        mt.metrics_hist = encodeHist(t_hist);
-        mt.metrics_empty = encodeEmpty(t_empty);
-        mt.metrics_other = encodeOther(t_other, stringTable);
+        mt.metrics_bool = encodeBool(t_bool, timestamps);
+        mt.metrics_16bit = encode16Bit(t_16bit, timestamps);
+        mt.metrics_32bit = encode32Bit(t_32bit, timestamps);
+        mt.metrics_64bit = encode64Bit(t_64bit, timestamps);
+        mt.metrics_dbl = encodeDbl(t_dbl, timestamps);
+        mt.metrics_str = encodeStr(t_str, timestamps);
+        mt.metrics_hist = encodeHist(t_hist, timestamps);
+        mt.metrics_empty = encodeEmpty(t_empty, timestamps);
+        mt.metrics_other = encodeOther(t_other, stringTable, timestamps);
         return mt;
     }
 
-    private static mt_bool encodeBool(TIntByteMap t_bool) {
+    private static mt_bool encodeBool(TLongByteMap t_bool, long timestamps[]) {
+        boolean values[] = new boolean[timestamps.length];
+        int values_len = 0;
+        for (int i = 0; i < values.length; ++i) {
+            final long ts = timestamps[i];
+            if (t_bool.containsKey(ts))
+                values[values_len++] = t_bool.get(ts) != 0;
+        }
+
         mt_bool result = new mt_bool();
-        result.timestamp_delta = t_bool.keys();
-        Arrays.sort(result.timestamp_delta);
-
-        result.values = new boolean[result.timestamp_delta.length];
-        for (int i = 0; i < result.timestamp_delta.length; ++i)
-            result.values[i] = (t_bool.get(result.timestamp_delta[i]) != 0);
+        result.presence = createPresenceBitset(t_bool.keySet(), timestamps);
+        result.values = bitset(Arrays.copyOf(values, values_len));
 
         return result;
     }
 
-    private static mt_16bit encode16Bit(TIntShortMap t_16bit) {
+    private static mt_16bit encode16Bit(TLongShortMap t_16bit, long timestamps[]) {
+        short[] values = new short[timestamps.length];
+        int values_len = 0;
+        for (int i = 0; i < values.length; ++i) {
+            final long ts = timestamps[i];
+            if (t_16bit.containsKey(ts))
+                values[values_len++] = t_16bit.get(ts);
+        }
+
         mt_16bit result = new mt_16bit();
-        result.timestamp_delta = t_16bit.keys();
-        Arrays.sort(result.timestamp_delta);
-
-        result.values = new short[result.timestamp_delta.length];
-        for (int i = 0; i < result.timestamp_delta.length; ++i)
-            result.values[i] = t_16bit.get(result.timestamp_delta[i]);
+        result.presence = createPresenceBitset(t_16bit.keySet(), timestamps);
+        result.values = Arrays.copyOf(values, values_len);
 
         return result;
     }
 
-    private static mt_32bit encode32Bit(TIntIntMap t_32bit) {
+    private static mt_32bit encode32Bit(TLongIntMap t_32bit, long timestamps[]) {
+        int[] values = new int[timestamps.length];
+        int values_len = 0;
+        for (int i = 0; i < values.length; ++i) {
+            final long ts = timestamps[i];
+            if (t_32bit.containsKey(ts))
+                values[values_len++] = t_32bit.get(ts);
+        }
+
         mt_32bit result = new mt_32bit();
-        result.timestamp_delta = t_32bit.keys();
-        Arrays.sort(result.timestamp_delta);
-
-        result.values = new int[result.timestamp_delta.length];
-        for (int i = 0; i < result.timestamp_delta.length; ++i)
-            result.values[i] = t_32bit.get(result.timestamp_delta[i]);
+        result.presence = createPresenceBitset(t_32bit.keySet(), timestamps);
+        result.values = Arrays.copyOf(values, values_len);
 
         return result;
     }
 
-    private static mt_64bit encode64Bit(TIntLongMap t_64bit) {
+    private static mt_64bit encode64Bit(TLongLongMap t_64bit, long timestamps[]) {
+        long[] values = new long[timestamps.length];
+        int values_len = 0;
+        for (int i = 0; i < values.length; ++i) {
+            final long ts = timestamps[i];
+            if (t_64bit.containsKey(ts))
+                values[values_len++] = t_64bit.get(ts);
+        }
+
         mt_64bit result = new mt_64bit();
-        result.timestamp_delta = t_64bit.keys();
-        Arrays.sort(result.timestamp_delta);
-
-        result.values = new long[result.timestamp_delta.length];
-        for (int i = 0; i < result.timestamp_delta.length; ++i)
-            result.values[i] = t_64bit.get(result.timestamp_delta[i]);
+        result.presence = createPresenceBitset(t_64bit.keySet(), timestamps);
+        result.values = Arrays.copyOf(values, values_len);
 
         return result;
     }
 
-    private static mt_dbl encodeDbl(TIntDoubleMap t_dbl) {
+    private static mt_dbl encodeDbl(TLongDoubleMap t_dbl, long timestamps[]) {
+        double[] values = new double[timestamps.length];
+        int values_len = 0;
+        for (int i = 0; i < values.length; ++i) {
+            final long ts = timestamps[i];
+            if (t_dbl.containsKey(ts))
+                values[values_len++] = t_dbl.get(ts);
+        }
+
         mt_dbl result = new mt_dbl();
-        result.timestamp_delta = t_dbl.keys();
-        Arrays.sort(result.timestamp_delta);
-
-        result.values = new double[result.timestamp_delta.length];
-        for (int i = 0; i < result.timestamp_delta.length; ++i)
-            result.values[i] = t_dbl.get(result.timestamp_delta[i]);
+        result.presence = createPresenceBitset(t_dbl.keySet(), timestamps);
+        result.values = Arrays.copyOf(values, values_len);
 
         return result;
     }
 
-    private static mt_str encodeStr(TIntIntMap t_str) {
+    private static mt_str encodeStr(TLongIntMap t_str, long timestamps[]) {
+        int[] values = new int[timestamps.length];
+        int values_len = 0;
+        for (int i = 0; i < values.length; ++i) {
+            final long ts = timestamps[i];
+            if (t_str.containsKey(ts))
+                values[values_len++] = t_str.get(ts);
+        }
+
         mt_str result = new mt_str();
-        result.timestamp_delta = t_str.keys();
-        Arrays.sort(result.timestamp_delta);
-
-        result.values = new int[result.timestamp_delta.length];
-        for (int i = 0; i < result.timestamp_delta.length; ++i)
-            result.values[i] = t_str.get(result.timestamp_delta[i]);
+        result.presence = createPresenceBitset(t_str.keySet(), timestamps);
+        result.values = Arrays.copyOf(values, values_len);
 
         return result;
     }
 
-    private static mt_hist encodeHist(TIntObjectMap<Histogram> t_hist) {
+    private static mt_hist encodeHist(TLongObjectMap<Histogram> t_hist, long timestamps[]) {
+        histogram values[] = new histogram[timestamps.length];
+        int values_len = 0;
+        for (int i = 0; i < values.length; ++i) {
+            final long ts = timestamps[i];
+            if (t_hist.containsKey(ts))
+                values[values_len++] = ToXdr.histogram(t_hist.get(ts));
+        }
+
         mt_hist result = new mt_hist();
-        result.timestamp_delta = t_hist.keys();
-        Arrays.sort(result.timestamp_delta);
-
-        result.values = new histogram[result.timestamp_delta.length];
-        for (int i = 0; i < result.timestamp_delta.length; ++i)
-            result.values[i] = ToXdr.histogram(t_hist.get(result.timestamp_delta[i]));
+        result.presence = createPresenceBitset(t_hist.keySet(), timestamps);
+        result.values = Arrays.copyOf(values, values_len);
 
         return result;
     }
 
-    private static mt_empty encodeEmpty(TIntSet t_empty) {
+    private static mt_empty encodeEmpty(TLongSet t_empty, long timestamps[]) {
         mt_empty result = new mt_empty();
-        result.timestamp_delta = t_empty.toArray();
-        Arrays.sort(result.timestamp_delta);
+        result.presence = createPresenceBitset(t_empty, timestamps);
         return result;
     }
 
-    private static mt_other encodeOther(TIntObjectMap<MetricValue> t_other, ExportMap<String> stringTable) {
-        mt_other result = new mt_other();
-        result.timestamp_delta = t_other.keys();
-        Arrays.sort(result.timestamp_delta);
+    private static mt_other encodeOther(TLongObjectMap<MetricValue> t_other, ExportMap<String> stringTable, long timestamps[]) {
+        metric_value[] values = new metric_value[timestamps.length];
+        int values_len = 0;
+        for (int i = 0; i < values.length; ++i) {
+            final long ts = timestamps[i];
+            MetricValue mv = t_other.get(ts);
+            if (mv != null)
+                values[values_len++] = ToXdr.metricValue(mv, stringTable::getOrCreate);
+        }
 
-        result.values = new metric_value[result.timestamp_delta.length];
-        for (int i = 0; i < result.timestamp_delta.length; ++i)
-            result.values[i] = ToXdr.metricValue(t_other.get(result.timestamp_delta[i]), stringTable::getOrCreate);
+        mt_other result = new mt_other();
+        result.presence = createPresenceBitset(t_other.keySet(), timestamps);
+        result.values = Arrays.copyOf(values, values_len);
 
         return result;
     }

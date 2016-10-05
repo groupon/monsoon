@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.history.v2.tables;
 
 import com.groupon.lex.metrics.MetricName;
+import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.group_table;
 import com.groupon.lex.metrics.history.v2.xdr.metric_table;
 import com.groupon.lex.metrics.history.v2.xdr.tables_metric;
@@ -41,65 +42,34 @@ import static java.util.Collections.unmodifiableMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.AccessLevel;
 import lombok.Getter;
 import org.acplt.oncrpc.XdrAble;
-import org.joda.time.DateTime;
-import org.joda.time.Duration;
 
 @Getter(AccessLevel.PACKAGE)
 public class RTFGroupTable {
-    private final DateTime begin;
-    private final int[] timestamp_delta;
+    private final boolean presence[];
     private final Map<MetricName, SegmentReader<RTFMetricTable>> metrics;
 
-    public RTFGroupTable(group_table input, DateTime begin, DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
-        this.begin = begin;
-        timestamp_delta = input.timestamp_delta;
-        metrics = unmodifiableMap(metricsMap(input.metric_tbl, begin, dictionary, segmentFactory));
+    public RTFGroupTable(group_table input, DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
+        presence = FromXdr.bitset(input.presence);
+        metrics = unmodifiableMap(metricsMap(input.metric_tbl, dictionary, segmentFactory));
     }
 
-    private static Map<MetricName, SegmentReader<RTFMetricTable>> metricsMap(tables_metric tmArray[], DateTime begin, DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
+    private static Map<MetricName, SegmentReader<RTFMetricTable>> metricsMap(tables_metric tmArray[], DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
         return Arrays.stream(tmArray)
                 .collect(Collectors.toMap(
                         tm -> MetricName.valueOf(dictionary.getPath(tm.metric_ref)),
                         tm -> segmentFactory.get(metric_table::new, new FilePos(tm.pos))
-                                .map(mt -> new RTFMetricTable(mt, begin, dictionary))
+                                .map(mt -> new RTFMetricTable(mt, dictionary))
+                                .peek(RTFMetricTable::validate)
                                 .share()));
     }
 
-    public boolean isPresent(long ts) {
-        if (ts < begin.getMillis()) return false;
-        final long tsOffset_long = ts - begin.getMillis();
-        if (tsOffset_long > Integer.MAX_VALUE) return false;
+    public void validate() {}
 
-        return Arrays.binarySearch(timestamp_delta, (int)tsOffset_long) >= 0;
-    }
-
-    public Stream<DateTime> getTimestamps() {
-        return Arrays.stream(timestamp_delta)
-                .mapToObj(Duration::new)
-                .map(begin::plus);
-    }
-
-    public boolean contains(DateTime ts) {
-        if (ts.isBefore(begin)) return false;
-        final long tsOffset_long = new Duration(begin, ts).getMillis();
-        if (tsOffset_long > Integer.MAX_VALUE) return false;
-
-        final int tsOffset = (int)tsOffset_long;
-        return Arrays.binarySearch(timestamp_delta, tsOffset) >= 0;
-    }
-
-    public DateTime minTimestamp() {
-        if (timestamp_delta.length == 0) return null;
-        return begin.plus(new Duration(timestamp_delta[0]));
-    }
-
-    public DateTime maxTimestamp() {
-        if (timestamp_delta.length == 0) return null;
-        return begin.plus(new Duration(timestamp_delta[timestamp_delta.length - 1]));
+    public boolean contains(int index) {
+        return index >= 0 && index < presence.length && presence[index];
     }
 
     public Set<MetricName> getMetricNames() {

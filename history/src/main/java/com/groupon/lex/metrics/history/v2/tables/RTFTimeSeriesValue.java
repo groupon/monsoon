@@ -34,6 +34,7 @@ package com.groupon.lex.metrics.history.v2.tables;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.AbstractTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
@@ -58,19 +59,19 @@ public class RTFTimeSeriesValue extends AbstractTimeSeriesValue {
     private final GroupName group;
     private final Map<MetricName, SegmentReader<Optional<MetricValue>>> metrics;
 
-    public RTFTimeSeriesValue(long ts, GroupName group, RTFGroupTable tbl) {
+    public RTFTimeSeriesValue(long ts, int index, GroupName group, RTFGroupTable tbl) {
         this.ts = ts;
         this.group = group;
-        this.metrics = unmodifiableMap(metrics(ts, tbl.getMetrics()));
+        this.metrics = unmodifiableMap(metrics(index, tbl.getMetrics()));
     }
 
-    private static Map<MetricName, SegmentReader<Optional<MetricValue>>> metrics(long ts, Map<MetricName, SegmentReader<RTFMetricTable>> input) {
+    private static Map<MetricName, SegmentReader<Optional<MetricValue>>> metrics(int index, Map<MetricName, SegmentReader<RTFMetricTable>> input) {
         return input.entrySet().stream()
                 .collect(Collectors.toMap(
                         entry -> entry.getKey(),
                         entry -> {
                             return entry.getValue()
-                                    .map(tbl -> tbl.find(ts))
+                                    .map(tbl -> tbl.get(index))
                                     .cache();
                         }));
     }
@@ -87,7 +88,7 @@ public class RTFTimeSeriesValue extends AbstractTimeSeriesValue {
                     try {
                         return entry.getValue().decode().map(mv -> SimpleMapEntry.create(entry.getKey(), mv));
                     } catch (IOException | OncRpcException ex) {
-                        throw new RuntimeException("decoding error", ex);
+                        throw new DecodingException("decoding error", ex);
                     }
                 })
                 .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
@@ -101,7 +102,7 @@ public class RTFTimeSeriesValue extends AbstractTimeSeriesValue {
                     try {
                         return segment.decode();
                     } catch (IOException | OncRpcException ex) {
-                        throw new RuntimeException("decoding error", ex);
+                        throw new DecodingException("decoding error", ex);
                     }
                 });
     }

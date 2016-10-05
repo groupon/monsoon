@@ -41,6 +41,7 @@ import static com.groupon.lex.metrics.history.xdr.support.ByteCountingXdrEncodin
 import com.groupon.lex.metrics.history.xdr.support.FileChannelXdrEncodingStream;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import com.groupon.lex.metrics.history.xdr.support.FilePosXdrEncodingStream;
+import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.io.IOException;

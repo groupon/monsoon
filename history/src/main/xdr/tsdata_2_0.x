@@ -122,11 +122,25 @@ struct file_data_list {
 };
 
 struct file_data_tables {
-    dictionary_delta dictionary;  /* complete dictionary */
     timestamp_delta tsd;
+    dictionary_delta dictionary;  /* complete dictionary */
     tables tables_data;
 };
 
+/*
+ * Pointer to file segment.
+ *
+ * A file segment is a block in the file.
+ * It starts at the given 'offset' (bytes from begin for file).
+ * The file segment contains 'len' bytes of data.
+ * If the compress bit is specified, this data will be the length after compression.
+ *
+ * Following the data, between 0 and 3 padding bytes will exist, such that:
+ *   (padlen + 'len') % 4 == 0
+ *
+ * After the padding, a 4 byte CRC32 is written in BIG ENDIAN (xdr int).
+ * The CRC32 is calculated over the data and the padding bytes.
+ */
 struct file_segment {
     hyper offset;  /* file data offset */
     hyper len;  /* file data length */
@@ -149,45 +163,45 @@ struct tables_metric {
     file_segment pos;  /* reference to metric table */
 };
 struct group_table {
-    int timestamp_delta<>;  /* msec since begin of file, sufficient for encoding ~24 days */
+    bitset presence;  /* bitset indices correspond to indices in main timestamp array. */
     tables_metric metric_tbl<>;
 };
 
 struct mt_bool {
-    int timestamp_delta<>;  /* msec since begin of file, sufficient for encoding ~24 days */
-    bool values<>;
+    bitset presence;  /* bitset indices correspond to indices in main timestamp array. */
+    bitset values;  /* values, only emitted for presence is true. */
 };
 struct mt_16bit {
-    int timestamp_delta<>;  /* msec since begin of file, sufficient for encoding ~24 days */
-    short values<>;
+    bitset presence;  /* bitset indices correspond to indices in main timestamp array. */
+    short values<>;  /* values are only emitted for presence is true. */
 };
 struct mt_32bit {
-    int timestamp_delta<>;  /* msec since begin of file, sufficient for encoding ~24 days */
-    int values<>;
+    bitset presence;  /* bitset indices correspond to indices in main timestamp array. */
+    int values<>;  /* values are only emitted for presence is true. */
 };
 struct mt_64bit {
-    int timestamp_delta<>;  /* msec since begin of file, sufficient for encoding ~24 days */
-    hyper values<>;
+    bitset presence;  /* bitset indices correspond to indices in main timestamp array. */
+    hyper values<>;  /* values are only emitted for presence is true. */
 };
 struct mt_dbl {
-    int timestamp_delta<>;  /* msec since begin of file, sufficient for encoding ~24 days */
-    double values<>;
+    bitset presence;  /* bitset indices correspond to indices in main timestamp array. */
+    double values<>;  /* values are only emitted for presence is true. */
 };
 struct mt_str {
-    int timestamp_delta<>;  /* msec since begin of file, sufficient for encoding ~24 days */
-    int values<>;  /* reference to string table */
+    bitset presence;  /* bitset indices correspond to indices in main timestamp array. */
+    int values<>;  /* reference to string table, only emitted for presence is true. */
 };
 struct mt_hist {
-    int timestamp_delta<>;  /* msec since begin of file, sufficient for encoding ~24 days */
-    histogram values<>;
+    bitset presence;  /* bitset indices correspond to indices in main timestamp array. */
+    histogram values<>;  /* values are only emitted for presence is true. */
 };
 struct mt_empty {
-    int timestamp_delta<>;  /* msec since begin of file, sufficient for encoding ~24 days */
+    bitset presence;  /* bitset indices correspond to indices in main timestamp array. */
     /* no values */
 };
 struct mt_other {
-    int timestamp_delta<>;  /* msec since begin of file, sufficient for encoding ~24 days */
-    metric_value values<>;
+    bitset presence;  /* bitset indices correspond to indices in main timestamp array. */
+    metric_value values<>;  /* values are only emitted for presence is true. */
 };
 /* encode all metric values in a set */
 struct metric_table {

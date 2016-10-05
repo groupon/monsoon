@@ -34,14 +34,16 @@ package com.groupon.lex.metrics.history.v2.tables;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.history.v2.ExportMap;
+import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.createPresenceBitset;
 import com.groupon.lex.metrics.history.v2.xdr.group_table;
 import com.groupon.lex.metrics.history.v2.xdr.tables_metric;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
+import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter;
 import static gnu.trove.TCollections.unmodifiableMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
+import gnu.trove.set.TLongSet;
+import gnu.trove.set.hash.TLongHashSet;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
@@ -51,32 +53,25 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
-import org.joda.time.Duration;
+import org.joda.time.DateTimeZone;
 
 @RequiredArgsConstructor
 public class GroupTable extends AbstractSegmentWriter {
     @NonNull
-    private final DateTime begin;
-    @NonNull
     private final ExportMap<List<String>> pathTable;
     @NonNull
     private final ExportMap<String> stringTable;
-    private final TIntSet timestamps = new TIntHashSet();
+    private final TLongSet timestamps = new TLongHashSet();
     private final TIntObjectMap<FilePos> filePosTbl = new TIntObjectHashMap<>();
     private final TIntObjectMap<MetricTable> metricTbl = new TIntObjectHashMap<>();
 
     public void add(@NonNull DateTime ts, @NonNull Map<MetricName, MetricValue> metrics) {
-        final long time_offset_long = new Duration(begin, ts).getMillis();
-        if (time_offset_long < 0 || time_offset_long > Integer.MAX_VALUE)
-            throw new IllegalArgumentException("ts out of range");
-        final int time_offset = (int)time_offset_long;
-
-        timestamps.add(time_offset);
+        timestamps.add(ts.toDateTime(DateTimeZone.UTC).getMillis());
         metrics.entrySet().forEach(entry -> {
             final int mIdx = pathTable.getOrCreate(entry.getKey().getPath());
             MetricTable mt = metricTbl.get(mIdx);
             if (mt == null) {
-                mt = new MetricTable(begin, stringTable);
+                mt = new MetricTable(stringTable);
                 metricTbl.put(mIdx, mt);
             }
 
@@ -89,12 +84,9 @@ public class GroupTable extends AbstractSegmentWriter {
     }
 
     @Override
-    public group_table encode() {
+    public group_table encode(long timestamps[]) {
         group_table result = new group_table();
-
-        result.timestamp_delta = timestamps.toArray();
-        Arrays.sort(result.timestamp_delta);
-
+        result.presence = createPresenceBitset(this.timestamps, timestamps);
         result.metric_tbl = Arrays.stream(metricTbl.keys())
                 .mapToObj(mIdx -> {
                     final tables_metric tm = new tables_metric();

@@ -59,41 +59,33 @@ public final class RTFFileDataTables {
     private final Map<SimpleGroupPath, Map<Tags, SegmentReader<RTFGroupTable>>> groups;
 
     public RTFFileDataTables(file_data_tables input, long begin, SegmentReader.Factory segmentFactory) {
-        final DictionaryDelta dictionary = new DictionaryDelta(input.dictionary);
         this.timestamps = FromXdr.timestamp_delta(begin, input.tsd);
-        this.groups = unmodifiableMap(outerMap(input.tables_data.value, begin, dictionary, segmentFactory));
+        this.groups = unmodifiableMap(outerMap(input.tables_data.value, new DictionaryDelta(input.dictionary), segmentFactory));
     }
 
-    private static long[] timestamps(int[] ts_delta, DateTime begin) {
-        long ts = begin.getMillis();
-        final long result[] = new long[ts_delta.length];
-        for (int i = 0; i < ts_delta.length; ++i) {
-            ts = ts += ts_delta[i];
-            result[i] = ts;
-        }
-        return result;
-    }
-
-    private static Map<SimpleGroupPath, Map<Tags, SegmentReader<RTFGroupTable>>> outerMap(tables_group tgArray[], DateTime begin, DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
+    private static Map<SimpleGroupPath, Map<Tags, SegmentReader<RTFGroupTable>>> outerMap(tables_group tgArray[], DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
         return Arrays.stream(tgArray)
                 .collect(Collectors.toMap(
                         tg -> SimpleGroupPath.valueOf(dictionary.getPath(tg.group_ref)),
-                        tg -> unmodifiableMap(innerMap(tg, begin, dictionary, segmentFactory))));
+                        tg -> unmodifiableMap(innerMap(tg, dictionary, segmentFactory))));
     }
 
-    private static Map<Tags, SegmentReader<RTFGroupTable>> innerMap(tables_group tg, DateTime begin, DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
+    private static Map<Tags, SegmentReader<RTFGroupTable>> innerMap(tables_group tg, DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
         return Arrays.stream(tg.tag_tbl)
                 .collect(Collectors.toMap(
                         tt -> dictionary.getTags(tt.tag_ref),
-                        tt -> segmentFromFilePos(new FilePos(tt.pos), begin, dictionary, segmentFactory)
+                        tt -> segmentFromFilePos(new FilePos(tt.pos), dictionary, segmentFactory)
                 ));
     }
 
-    private static SegmentReader<RTFGroupTable> segmentFromFilePos(FilePos fp, DateTime begin, DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
+    private static SegmentReader<RTFGroupTable> segmentFromFilePos(FilePos fp, DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
         return segmentFactory.get(group_table::new, fp)
-                .map(gt -> new RTFGroupTable(gt, begin, dictionary, segmentFactory))
+                .map(gt -> new RTFGroupTable(gt, dictionary, segmentFactory))
+                .peek(RTFGroupTable::validate)
                 .share();
     }
+
+    public void validate() {}
 
     public int size() { return timestamps.length; }
 

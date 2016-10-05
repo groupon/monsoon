@@ -33,214 +33,321 @@ package com.groupon.lex.metrics.history.v2.tables;
 
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
+import com.groupon.lex.metrics.history.v2.xdr.bitset;
+import com.groupon.lex.metrics.history.v2.xdr.histogram;
 import com.groupon.lex.metrics.history.v2.xdr.metric_table;
+import com.groupon.lex.metrics.history.v2.xdr.metric_value;
 import com.groupon.lex.metrics.history.v2.xdr.mt_16bit;
 import com.groupon.lex.metrics.history.v2.xdr.mt_32bit;
 import com.groupon.lex.metrics.history.v2.xdr.mt_64bit;
 import com.groupon.lex.metrics.history.v2.xdr.mt_bool;
 import com.groupon.lex.metrics.history.v2.xdr.mt_dbl;
-import com.groupon.lex.metrics.history.v2.xdr.mt_empty;
 import com.groupon.lex.metrics.history.v2.xdr.mt_hist;
 import com.groupon.lex.metrics.history.v2.xdr.mt_other;
 import com.groupon.lex.metrics.history.v2.xdr.mt_str;
-import java.util.Arrays;
+import com.groupon.lex.metrics.history.xdr.support.IntegrityException;
 import java.util.Optional;
-import java.util.OptionalInt;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
-import org.joda.time.DateTime;
-import org.joda.time.Duration;
 
 public class RTFMetricTable {
-    private final metric_table input;
-    private final DateTime begin;
-    private final DictionaryDelta dictionary;
+    private final MtBoolValues m_bool;
+    private final Mt16BitValues m_16bit;
+    private final Mt32BitValues m_32bit;
+    private final Mt64BitValues m_64bit;
+    private final MtDblValues m_dbl;
+    private final MtStrValues m_str;
+    private final MtHistValues m_hist;
+    private final MtEmptyValues m_empty;
+    private final MtOtherValues m_other;
 
-    public RTFMetricTable(metric_table input, DateTime begin, DictionaryDelta dictionary) {
-        this.begin = begin;
-        this.dictionary = dictionary;
-        this.input = input;
+    public RTFMetricTable(metric_table input, DictionaryDelta dictionary) {
+        m_bool = new MtBoolValues(input.metrics_bool);
+        m_16bit = new Mt16BitValues(input.metrics_16bit);
+        m_32bit = new Mt32BitValues(input.metrics_32bit);
+        m_64bit = new Mt64BitValues(input.metrics_64bit);
+        m_dbl = new MtDblValues(input.metrics_dbl);
+        m_str = new MtStrValues(input.metrics_str, dictionary);
+        m_hist = new MtHistValues(input.metrics_hist);
+        m_empty = new MtEmptyValues(input.metrics_hist);
+        m_other = new MtOtherValues(input.metrics_other, dictionary);
     }
 
-    public Stream<DateTime> getTimestamps() {
-        return Stream.of(input.metrics_bool.timestamp_delta,
-                         input.metrics_16bit.timestamp_delta,
-                         input.metrics_32bit.timestamp_delta,
-                         input.metrics_64bit.timestamp_delta,
-                         input.metrics_dbl.timestamp_delta,
-                         input.metrics_str.timestamp_delta,
-                         input.metrics_hist.timestamp_delta,
-                         input.metrics_empty.timestamp_delta,
-                         input.metrics_other.timestamp_delta)
-                .flatMapToInt(Arrays::stream)
-                .mapToObj(Duration::new)
-                .map(begin::plus);
+    public boolean contains(int index) {
+        return m_bool.contains(index) ||
+                m_16bit.contains(index) ||
+                m_32bit.contains(index) ||
+                m_64bit.contains(index) ||
+                m_dbl.contains(index) ||
+                m_str.contains(index) ||
+                m_hist.contains(index) ||
+                m_empty.contains(index) ||
+                m_other.contains(index);
     }
 
-    public DateTime minTimestamp() {
-        final OptionalInt v = Stream.of(input.metrics_bool.timestamp_delta,
-                                        input.metrics_16bit.timestamp_delta,
-                                        input.metrics_32bit.timestamp_delta,
-                                        input.metrics_64bit.timestamp_delta,
-                                        input.metrics_dbl.timestamp_delta,
-                                        input.metrics_str.timestamp_delta,
-                                        input.metrics_hist.timestamp_delta,
-                                        input.metrics_empty.timestamp_delta,
-                                        input.metrics_other.timestamp_delta)
-                .flatMapToInt(arr -> {
-                    return arr.length == 0 ? IntStream.empty() : IntStream.of(arr[0]);
-                })
-                .min();
-        if (!v.isPresent()) return null;
-        return begin.plus(new Duration(v));
-    }
-
-    public DateTime maxTimestamp() {
-        final OptionalInt v = Stream.of(input.metrics_bool.timestamp_delta,
-                                        input.metrics_16bit.timestamp_delta,
-                                        input.metrics_32bit.timestamp_delta,
-                                        input.metrics_64bit.timestamp_delta,
-                                        input.metrics_dbl.timestamp_delta,
-                                        input.metrics_str.timestamp_delta,
-                                        input.metrics_hist.timestamp_delta,
-                                        input.metrics_empty.timestamp_delta,
-                                        input.metrics_other.timestamp_delta)
-                .flatMapToInt(arr -> {
-                    return arr.length == 0 ? IntStream.empty() : IntStream.of(arr[arr.length - 1]);
-                })
-                .max();
-        if (!v.isPresent()) return null;
-        return begin.plus(new Duration(v));
-    }
-
-    public MetricValue find(DateTime ts) {
-        if (ts.isBefore(begin)) return null;
-        final long tsOffset_long = new Duration(begin, ts).getMillis();
-        if (tsOffset_long > Integer.MAX_VALUE) return null;
-
-        return find((int)tsOffset_long);
-    }
-
-    public Optional<MetricValue> find(long ts) {
-        if (ts < begin.getMillis()) return Optional.empty();
-        final long tsOffset_long = ts - begin.getMillis();
-        if (tsOffset_long > Integer.MAX_VALUE) return Optional.empty();
-
-        return Optional.ofNullable(find((int)tsOffset_long));
-    }
-
-    public boolean isPresent(long ts) {
-        if (ts < begin.getMillis()) return false;
-        final long tsOffset_long = ts - begin.getMillis();
-        if (tsOffset_long > Integer.MAX_VALUE) return false;
-
-        return contains((int)tsOffset_long);
-    }
-
-    public boolean contains(DateTime ts) {
-        if (ts.isBefore(begin)) return false;
-        final long tsOffset_long = new Duration(begin, ts).getMillis();
-        if (tsOffset_long > Integer.MAX_VALUE) return false;
-
-        return contains((int)tsOffset_long);
-    }
-
-    private boolean contains(int tsOffset) {
-        return  Arrays.binarySearch(input.metrics_bool.timestamp_delta, tsOffset) >= 0 ||
-                Arrays.binarySearch(input.metrics_16bit.timestamp_delta, tsOffset) >= 0 ||
-                Arrays.binarySearch(input.metrics_32bit.timestamp_delta, tsOffset) >= 0 ||
-                Arrays.binarySearch(input.metrics_64bit.timestamp_delta, tsOffset) >= 0 ||
-                Arrays.binarySearch(input.metrics_dbl.timestamp_delta, tsOffset) >= 0 ||
-                Arrays.binarySearch(input.metrics_str.timestamp_delta, tsOffset) >= 0 ||
-                Arrays.binarySearch(input.metrics_hist.timestamp_delta, tsOffset) >= 0 ||
-                Arrays.binarySearch(input.metrics_empty.timestamp_delta, tsOffset) >= 0 ||
-                Arrays.binarySearch(input.metrics_other.timestamp_delta, tsOffset) >= 0;
-    }
-
-    private MetricValue find(int tsOffset) {
+    public Optional<MetricValue> get(int index) {
         MetricValue mv;
 
-        mv = find(input.metrics_bool, tsOffset);
-        if (mv != null) return mv;
+        mv = m_bool.get(index);
+        if (mv != null) return Optional.of(mv);
 
-        mv = find(input.metrics_16bit, tsOffset);
-        if (mv != null) return mv;
+        mv = m_16bit.get(index);
+        if (mv != null) return Optional.of(mv);
 
-        mv = find(input.metrics_32bit, tsOffset);
-        if (mv != null) return mv;
+        mv = m_32bit.get(index);
+        if (mv != null) return Optional.of(mv);
 
-        mv = find(input.metrics_64bit, tsOffset);
-        if (mv != null) return mv;
+        mv = m_64bit.get(index);
+        if (mv != null) return Optional.of(mv);
 
-        mv = find(input.metrics_dbl, tsOffset);
-        if (mv != null) return mv;
+        mv = m_dbl.get(index);
+        if (mv != null) return Optional.of(mv);
 
-        mv = find(input.metrics_str, tsOffset, dictionary);
-        if (mv != null) return mv;
+        mv = m_str.get(index);
+        if (mv != null) return Optional.of(mv);
 
-        mv = find(input.metrics_hist, tsOffset);
-        if (mv != null) return mv;
+        mv = m_hist.get(index);
+        if (mv != null) return Optional.of(mv);
 
-        mv = find(input.metrics_empty, tsOffset);
-        if (mv != null) return mv;
+        mv = m_empty.get(index);
+        if (mv != null) return Optional.of(mv);
 
-        mv = find(input.metrics_other, tsOffset, dictionary);
-        if (mv != null) return mv;
+        mv = m_other.get(index);
+        if (mv != null) return Optional.of(mv);
 
-        return null;
+        return Optional.empty();
     }
 
-    private static MetricValue find(mt_bool entries, int tsOffset) {
-        final int idx = Arrays.binarySearch(entries.timestamp_delta, tsOffset);
-        if (idx >= 0) return MetricValue.fromBoolean(entries.values[idx]);
-        return null;
+    public void validate() {
+        m_bool.validate();
+        m_16bit.validate();
+        m_32bit.validate();
+        m_64bit.validate();
+        m_dbl.validate();
+        m_str.validate();
+        m_hist.validate();
+        m_empty.validate();
+        m_other.validate();
     }
 
-    private static MetricValue find(mt_16bit entries, int tsOffset) {
-        final int idx = Arrays.binarySearch(entries.timestamp_delta, tsOffset);
-        if (idx >= 0) return MetricValue.fromIntValue(entries.values[idx]);
-        return null;
+    private static abstract class MtTable {
+        private final int[] map;
+
+        protected MtTable(bitset input) {
+            boolean[] presence = FromXdr.bitset(input);
+            int len = 0;
+            for (int i = 0; i < presence.length; ++i)
+                if (presence[i]) ++len;
+
+            int buildIdx = 0;
+            map = new int[len];
+            for (int i = 0; i < presence.length; ++i) {
+                if (presence[i])
+                    map[i] = buildIdx;
+                else
+                    map[i] = -1;
+            }
+            assert(buildIdx == len);
+        }
+
+        public final boolean contains(int index) {
+            return index >= 0 && index < map.length && map.length >= 0;
+        }
+
+        public final MetricValue get(int index) {
+            if (index < 0 || index >= map.length) return null;
+            final int innerIdx = map[index];
+            if (innerIdx < 0) return null;
+            return doGet(innerIdx);
+        }
+
+        public void validate() {
+            validateInner();
+        }
+
+        protected void validateInner() {
+            int expectedCount = 0;
+            for (int i = 0; i < map.length; ++i)
+                if (map[i] >= 0) ++expectedCount;
+
+            if (innerSize() != expectedCount)
+                throw new IntegrityException("mismatch in metric table encoding");
+        }
+
+        protected abstract MetricValue doGet(int innerIdx);
+        protected abstract int innerSize();
     }
 
-    private static MetricValue find(mt_32bit entries, int tsOffset) {
-        final int idx = Arrays.binarySearch(entries.timestamp_delta, tsOffset);
-        if (idx >= 0) return MetricValue.fromIntValue(entries.values[idx]);
-        return null;
+    private static class MtBoolValues extends MtTable {
+        private final boolean values[];
+
+        public MtBoolValues(mt_bool input) {
+            super(input.presence);
+            values = FromXdr.bitset(input.values);
+        }
+
+        @Override
+        protected MetricValue doGet(int idx) {
+            return MetricValue.fromBoolean(values[idx]);
+        }
+
+        @Override
+        protected int innerSize() {
+            return values.length;
+        }
     }
 
-    private static MetricValue find(mt_64bit entries, int tsOffset) {
-        final int idx = Arrays.binarySearch(entries.timestamp_delta, tsOffset);
-        if (idx >= 0) return MetricValue.fromIntValue(entries.values[idx]);
-        return null;
+    private static class Mt16BitValues extends MtTable {
+        private final short values[];
+
+        public Mt16BitValues(mt_16bit input) {
+            super(input.presence);
+            values = input.values;
+        }
+
+        @Override
+        protected MetricValue doGet(int idx) {
+            return MetricValue.fromIntValue(values[idx]);
+        }
+
+        @Override
+        protected int innerSize() {
+            return values.length;
+        }
     }
 
-    private static MetricValue find(mt_dbl entries, int tsOffset) {
-        final int idx = Arrays.binarySearch(entries.timestamp_delta, tsOffset);
-        if (idx >= 0) return MetricValue.fromDblValue(entries.values[idx]);
-        return null;
+    private static class Mt32BitValues extends MtTable {
+        private final int values[];
+
+        public Mt32BitValues(mt_32bit input) {
+            super(input.presence);
+            values = input.values;
+        }
+
+        @Override
+        protected MetricValue doGet(int idx) {
+            return MetricValue.fromIntValue(values[idx]);
+        }
+
+        @Override
+        protected int innerSize() {
+            return values.length;
+        }
     }
 
-    private static MetricValue find(mt_str entries, int tsOffset, DictionaryDelta dictionary) {
-        final int idx = Arrays.binarySearch(entries.timestamp_delta, tsOffset);
-        if (idx >= 0) return MetricValue.fromStrValue(dictionary.getString(entries.values[idx]));
-        return null;
+    private static class Mt64BitValues extends MtTable {
+        private final long values[];
+
+        public Mt64BitValues(mt_64bit input) {
+            super(input.presence);
+            values = input.values;
+        }
+
+        @Override
+        protected MetricValue doGet(int idx) {
+            return MetricValue.fromIntValue(values[idx]);
+        }
+
+        @Override
+        protected int innerSize() {
+            return values.length;
+        }
     }
 
-    private static MetricValue find(mt_hist entries, int tsOffset) {
-        final int idx = Arrays.binarySearch(entries.timestamp_delta, tsOffset);
-        if (idx >= 0) return MetricValue.fromHistValue(FromXdr.histogram(entries.values[idx]));
-        return null;
+    private static class MtDblValues extends MtTable {
+        private final double values[];
+
+        public MtDblValues(mt_dbl input) {
+            super(input.presence);
+            values = input.values;
+        }
+
+        @Override
+        protected MetricValue doGet(int idx) {
+            return MetricValue.fromDblValue(values[idx]);
+        }
+
+        @Override
+        protected int innerSize() {
+            return values.length;
+        }
     }
 
-    private static MetricValue find(mt_empty entries, int tsOffset) {
-        final int idx = Arrays.binarySearch(entries.timestamp_delta, tsOffset);
-        if (idx >= 0) return MetricValue.EMPTY;
-        return null;
+    private static class MtStrValues extends MtTable {
+        private final DictionaryDelta dictionary;
+        private final int values[];
+
+        public MtStrValues(mt_str input, DictionaryDelta dictionary) {
+            super(input.presence);
+            this.dictionary = dictionary;
+            values = input.values;
+        }
+
+        @Override
+        protected MetricValue doGet(int idx) {
+            return MetricValue.fromStrValue(dictionary.getString(values[idx]));
+        }
+
+        @Override
+        protected int innerSize() {
+            return values.length;
+        }
     }
 
-    private static MetricValue find(mt_other entries, int tsOffset, DictionaryDelta dictionary) {
-        final int idx = Arrays.binarySearch(entries.timestamp_delta, tsOffset);
-        if (idx >= 0) return FromXdr.metricValue(entries.values[idx], dictionary::getString);
-        return null;
+    private static class MtHistValues extends MtTable {
+        private final histogram values[];
+
+        public MtHistValues(mt_hist input) {
+            super(input.presence);
+            values = input.values;
+        }
+
+        @Override
+        public MetricValue doGet(int idx) {
+            return MetricValue.fromHistValue(FromXdr.histogram(values[idx]));
+        }
+
+        @Override
+        protected int innerSize() {
+            return values.length;
+        }
+    }
+
+    private static class MtEmptyValues extends MtTable {
+        public MtEmptyValues(mt_hist input) {
+            super(input.presence);
+        }
+
+        @Override
+        public MetricValue doGet(int idx) {
+            return MetricValue.EMPTY;
+        }
+
+        @Override
+        public void validateInner() {}
+
+        @Override
+        protected int innerSize() {
+            return 0;
+        }
+    }
+
+    private static class MtOtherValues extends MtTable {
+        private final DictionaryDelta dictionary;
+        private final metric_value values[];
+
+        public MtOtherValues(mt_other input, DictionaryDelta dictionary) {
+            super(input.presence);
+            this.dictionary = dictionary;
+            values = input.values;
+        }
+
+        @Override
+        public MetricValue doGet(int idx) {
+            return FromXdr.metricValue(values[idx], dictionary::getString);
+        }
+
+        @Override
+        protected int innerSize() {
+            return values.length;
+        }
     }
 }

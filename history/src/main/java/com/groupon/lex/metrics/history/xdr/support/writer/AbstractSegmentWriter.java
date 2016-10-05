@@ -29,22 +29,16 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.history.v2.tables;
+package com.groupon.lex.metrics.history.xdr.support.writer;
 
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.writer.CloseInhibitingWriter;
-import com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter;
-import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
-import com.groupon.lex.metrics.history.xdr.support.writer.FileWriter;
-import com.groupon.lex.metrics.history.xdr.support.writer.GzipWriter;
-import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrAble;
 
 public abstract class AbstractSegmentWriter {
-    public abstract XdrAble encode();
+    public abstract XdrAble encode(long timestamps[]);
 
     public FilePos write(FileChannel out, long outPos, boolean compress) throws OncRpcException, IOException {
         outPos = (outPos + 7) / 8;  // Align start of segment to 8 bytes.

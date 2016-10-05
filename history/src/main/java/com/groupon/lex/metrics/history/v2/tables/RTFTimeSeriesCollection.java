@@ -60,27 +60,27 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
 
     public RTFTimeSeriesCollection(int index, RTFFileDataTables data) {
         this.ts = data.getTimestamps()[index];
-        this.groups = applyGroups(ts, data.getGroups());
+        this.groups = applyGroups(ts, index, data.getGroups());
     }
 
-    private static Map<SimpleGroupPath, Map<Tags, SegmentReader<Optional<RTFTimeSeriesValue>>>> applyGroups(long ts, Map<SimpleGroupPath, Map<Tags, SegmentReader<RTFGroupTable>>> groups) {
+    private static Map<SimpleGroupPath, Map<Tags, SegmentReader<Optional<RTFTimeSeriesValue>>>> applyGroups(long ts, int index, Map<SimpleGroupPath, Map<Tags, SegmentReader<RTFGroupTable>>> groups) {
         return unmodifiableMap(groups.entrySet().stream()
                 .collect(Collectors.toMap(
                         tagEntry -> tagEntry.getKey(),
-                        tagEntry -> applyGroupsInner(ts, tagEntry.getKey(), tagEntry.getValue()))));
+                        tagEntry -> applyGroupsInner(ts, index, tagEntry.getKey(), tagEntry.getValue()))));
     }
 
-    private static Map<Tags, SegmentReader<Optional<RTFTimeSeriesValue>>> applyGroupsInner(long ts, SimpleGroupPath path, Map<Tags, SegmentReader<RTFGroupTable>> tags) {
+    private static Map<Tags, SegmentReader<Optional<RTFTimeSeriesValue>>> applyGroupsInner(long ts, int index, SimpleGroupPath path, Map<Tags, SegmentReader<RTFGroupTable>> tags) {
         return unmodifiableMap(tags.entrySet().stream()
                 .collect(Collectors.toMap(
                         tagEntry -> tagEntry.getKey(),
-                        tagEntry -> applyGroupsFactory(ts, path, tagEntry.getKey(), tagEntry.getValue()))));
+                        tagEntry -> applyGroupsFactory(ts, index, path, tagEntry.getKey(), tagEntry.getValue()))));
     }
 
-    private static SegmentReader<Optional<RTFTimeSeriesValue>> applyGroupsFactory(long ts, SimpleGroupPath path, Tags tags, SegmentReader<RTFGroupTable> segment) {
+    private static SegmentReader<Optional<RTFTimeSeriesValue>> applyGroupsFactory(long ts, int index, SimpleGroupPath path, Tags tags, SegmentReader<RTFGroupTable> segment) {
         return segment
-                .filter((gt -> gt.isPresent(ts)))
-                .map(optGt -> optGt.map(gt -> new RTFTimeSeriesValue(ts, GroupName.valueOf(path, tags), gt)))
+                .filter((gt -> gt.contains(index)))
+                .map(optGt -> optGt.map(gt -> new RTFTimeSeriesValue(ts, index, GroupName.valueOf(path, tags), gt)))
                 .cache();
     }
 

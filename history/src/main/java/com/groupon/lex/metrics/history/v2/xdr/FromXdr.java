@@ -76,7 +76,7 @@ public class FromXdr {
         return result;
     }
 
-    public boolean[] bitset(bitset b) {
+    public static boolean[] bitset(bitset b) {
         int len = 0;
         for (int i = 0; i < b.value.length; ++i)
             len += (int)b.value[i] & 0xffff;

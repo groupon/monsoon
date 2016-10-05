@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricValue;
 import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TShortArrayList;
+import gnu.trove.set.TLongSet;
 import java.util.Arrays;
 import java.util.function.Function;
 import org.joda.time.DateTime;
@@ -132,5 +133,13 @@ public class ToXdr {
         }
 
         return new bitset(resultList.toArray());
+    }
+
+    public static bitset createPresenceBitset(TLongSet have, long[] want) {
+        boolean bits[] = new boolean[want.length];
+
+        for (int i = 0; i < want.length; ++i)
+            bits[i] = have.contains(want[i]);
+        return bitset(bits);
     }
 }
