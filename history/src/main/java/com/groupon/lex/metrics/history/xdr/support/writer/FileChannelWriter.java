@@ -29,60 +29,52 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.history.xdr.support;
+package com.groupon.lex.metrics.history.xdr.support.writer;
 
-import com.groupon.lex.metrics.history.xdr.BufferSupplier;
-import com.groupon.lex.metrics.lib.GCCloseable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.ForkJoinPool;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 @AllArgsConstructor
-public class SegmentBufferSupplier implements BufferSupplier {
-    private final GCCloseable<FileChannel> file;
-    private long pos;
-    private final long end;
+public class FileChannelWriter implements FileWriter {
+    private final FileChannel fd;
+    @Getter
+    private long offset;
 
-    public SegmentBufferSupplier(GCCloseable<FileChannel> file, FilePos range) {
-        this(file, range.getOffset(), range.getEnd());
+    @Override
+    public int write(ByteBuffer data) throws IOException {
+        final int wlen = fjpWrite(data);
+        offset += wlen;
+        return wlen;
     }
 
     @Override
-    public void load(ByteBuffer buf) throws IOException {
-        final int remaining = (int)Long.min(end - pos, Integer.MAX_VALUE);
-        if (remaining == 0) return;
-
-        if (buf.remaining() <= remaining) {
-            doFJPRead(buf);
-        } else {
-            final ByteBuffer tmp = buf.duplicate();
-            tmp.limit(tmp.position() + remaining);
-            doFJPRead(tmp);
-            buf.position(tmp.position());
-        }
-    }
+    public void close() {}
 
     @Override
-    public boolean atEof() throws IOException {
-        return pos == end;
+    public ByteBuffer allocateByteBuffer(int size) {
+        return ByteBuffer.allocateDirect(size);
     }
 
     @RequiredArgsConstructor
-    private class FJPRead implements ForkJoinPool.ManagedBlocker {
+    private class FJPWriter implements ForkJoinPool.ManagedBlocker {
+        private int written = 0;
         private final ByteBuffer buf;
         private IOException ex;
 
-        public void done() throws IOException {
+        public int get() throws IOException {
             if (ex != null) throw ex;
+            return written;
         }
 
         @Override
-        public boolean block() {
+        public boolean block() throws InterruptedException {
             try {
-                pos += file.get().read(buf, pos);
+                written += fd.write(buf, offset);
             } catch (IOException ex) {
                 this.ex = ex;
             }
@@ -95,13 +87,13 @@ public class SegmentBufferSupplier implements BufferSupplier {
         }
     }
 
-    void doFJPRead(ByteBuffer buf) throws IOException {
-        final FJPRead op = new FJPRead(buf);
+    private int fjpWrite(ByteBuffer buf) throws IOException {
+        final FJPWriter writer = new FJPWriter(buf);
         try {
-            ForkJoinPool.managedBlock(op);
+            ForkJoinPool.managedBlock(writer);
         } catch (InterruptedException ex) {
-            throw new IOException("interrupted read", ex);
+            throw new IOException("interrupted write", ex);
         }
-        op.done();
+        return writer.get();
     }
 }

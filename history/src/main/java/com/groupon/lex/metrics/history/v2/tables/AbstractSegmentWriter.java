@@ -31,10 +31,13 @@
  */
 package com.groupon.lex.metrics.history.v2.tables;
 
-import com.groupon.lex.metrics.history.xdr.support.FileChannelXdrEncodingStream;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.FilePosXdrEncodingStream;
-import com.groupon.lex.metrics.history.xdr.support.GzipXdrEncodingStream;
+import com.groupon.lex.metrics.history.xdr.support.writer.CloseInhibitingWriter;
+import com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter;
+import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
+import com.groupon.lex.metrics.history.xdr.support.writer.FileWriter;
+import com.groupon.lex.metrics.history.xdr.support.writer.GzipWriter;
+import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import org.acplt.oncrpc.OncRpcException;
@@ -44,15 +47,22 @@ public abstract class AbstractSegmentWriter {
     public abstract XdrAble encode();
 
     public FilePos write(FileChannel out, long outPos, boolean compress) throws OncRpcException, IOException {
-        final FilePosXdrEncodingStream writer;
-        if (compress)
-            writer = new GzipXdrEncodingStream(out, outPos);
-        else
-            writer = new FileChannelXdrEncodingStream(out, outPos);
+        outPos = (outPos + 7) / 8;  // Align start of segment to 8 bytes.
 
-        writer.beginEncoding();
-        encode().xdrEncode(writer);
-        writer.endEncoding();
-        return writer.getFilePos();
+        try (Crc32AppendingFileWriter outerWriter = new Crc32AppendingFileWriter(new FileChannelWriter(out, outPos), 4)) {
+            try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(wrapWriter(new CloseInhibitingWriter(outerWriter), compress))) {
+                writer.beginEncoding();
+                encode().xdrEncode(writer);
+                writer.endEncoding();
+            }
+
+            return new FilePos(outPos, outerWriter.getWritten());
+        }
+    }
+
+    private static FileWriter wrapWriter(FileWriter underlying, boolean compress) throws IOException {
+        FileWriter result = underlying;
+        if (compress) result = new GzipWriter(result);
+        return result;
     }
 }

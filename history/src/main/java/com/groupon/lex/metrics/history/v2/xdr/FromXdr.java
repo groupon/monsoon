@@ -66,4 +66,33 @@ public class FromXdr {
         return new Histogram(Arrays.stream(h.value)
                 .map(he -> new Histogram.RangeWithCount(he.floor, he.ceil, he.events)));
     }
+
+    public static long[] timestamp_delta(long begin, timestamp_delta tsd) {
+        long[] result = new long[tsd.value.length];
+        for (int i = 0; i < tsd.value.length; ++i) {
+            begin += tsd.value[i];
+            result[i] = begin;
+        }
+        return result;
+    }
+
+    public boolean[] bitset(bitset b) {
+        int len = 0;
+        for (int i = 0; i < b.value.length; ++i)
+            len += (int)b.value[i] & 0xffff;
+        final boolean result[] = new boolean[len];
+
+        boolean resultVal = true;
+        int resultIdx = 0;
+        for (int i = 0; i < b.value.length; ++i) {
+            int count = (int)b.value[i] & 0xffff;
+            Arrays.fill(result, resultIdx, count, resultVal);
+
+            resultIdx += count;
+            resultVal = !resultVal;
+        }
+
+        assert(resultIdx == result.length);
+        return result;
+    }
 }

@@ -1,5 +1,32 @@
 typedef hyper timestamp_msec;
 typedef string string_val<>;  /* makes working with lists of strings easier */
+typedef int timestamp_delta<>;  /* delta encoding: each value is difference (msec) since predecessor. */
+
+/*
+ * Bitset.
+ *
+ * Each index *i* encodes the number of booleans that follow after the previous one.
+ * The value of the booleans described by index *i* is the inverse of the previous.
+ * Index 0 uses a boolean value of *true*.
+ *
+ * Example decoder:
+ *     bool[] decode(bitset values) {
+ *       int len = sum(values);
+ *       bool decoded[] = new bool[len];
+ *
+ *       int di = 0;  // Write index into decoded[].
+ *       bool dv = true;  // Next to-be-written boolean value.
+ *       for (int i = 0; i < values.length; ++i) {
+ *         int dlen = values[i];
+ *         for (int j = 0; j < dlen; ++j)
+ *           decoded[di++] = dv;
+ *
+ *         di = !di;  // Flip for next value.
+ *       }
+ *       return decoded;
+ *     }
+ */
+typedef unsigned short bitset<>;  /* bitset encoding */
 
 enum metrickind {
     BOOL = 0,
@@ -96,6 +123,7 @@ struct file_data_list {
 
 struct file_data_tables {
     dictionary_delta dictionary;  /* complete dictionary */
+    timestamp_delta tsd;
     tables tables_data;
 };
 

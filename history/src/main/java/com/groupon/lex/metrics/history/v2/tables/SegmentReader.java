@@ -36,7 +36,9 @@ import java.io.IOException;
 import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
+import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
@@ -45,7 +47,7 @@ public interface SegmentReader<T> {
     public abstract T decode() throws IOException, OncRpcException;
 
     public default <U> SegmentReader<U> map(Function<? super T, ? extends U> fn) {
-        return new MappedSegmentReader<T, U>(this, fn);
+        return new MappedSegmentReader<>(this, fn);
     }
 
     public default SegmentReader<T> share() {
@@ -54,6 +56,10 @@ public interface SegmentReader<T> {
 
     public default SegmentReader<T> cache() {
         return new SoftSharedSegmentReader<>(this);
+    }
+
+    public default SegmentReader<Optional<T>> filter(Predicate<? super T> pred) {
+        return new FilterSegmentReader<>(this, pred);
     }
 
     public static interface Factory<BaseType> {
@@ -101,5 +107,17 @@ class SoftSharedSegmentReader<T> implements SegmentReader<T> {
         v = in.decode();
         ref = new SoftReference<>(v);
         return v;
+    }
+}
+
+@RequiredArgsConstructor
+class FilterSegmentReader<T> implements SegmentReader<Optional<T>> {
+    private final SegmentReader<T> in;
+    private final Predicate<? super T> pred;
+
+    @Override
+    public Optional<T> decode() throws IOException, OncRpcException {
+        return Optional.of(in.decode())
+                .filter(pred);
     }
 }
