@@ -36,7 +36,7 @@ import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.group_table;
 import com.groupon.lex.metrics.history.v2.xdr.metric_table;
 import com.groupon.lex.metrics.history.v2.xdr.tables_metric;
-import com.groupon.lex.metrics.history.xdr.support.FilePos;
+import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import java.util.Arrays;
 import static java.util.Collections.unmodifiableMap;
 import java.util.Map;
@@ -60,7 +60,7 @@ public class RTFGroupTable {
         return Arrays.stream(tmArray)
                 .collect(Collectors.toMap(
                         tm -> MetricName.valueOf(dictionary.getPath(tm.metric_ref)),
-                        tm -> segmentFactory.get(metric_table::new, new FilePos(tm.pos))
+                        tm -> segmentFactory.get(metric_table::new, FromXdr.filePos(tm.pos))
                                 .map(mt -> new RTFMetricTable(mt, dictionary))
                                 .peek(RTFMetricTable::validate)
                                 .share()));

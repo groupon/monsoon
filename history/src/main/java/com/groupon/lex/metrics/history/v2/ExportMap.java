@@ -31,20 +31,25 @@
  */
 package com.groupon.lex.metrics.history.v2;
 
-import gnu.trove.iterator.TObjectIntIterator;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ExportMap<T> {
+public class ExportMap<T> implements Cloneable {
     private static final int NO_ENTRY = -1;
     private final TObjectIntMap<T> table = new TObjectIntHashMap<>(10, 0.5f, NO_ENTRY);
-    private final int initSeq;
+    private int initSeq;
     private int nextSeq;
 
     public ExportMap(int nextSeq) { this.initSeq = this.nextSeq = nextSeq; }
     public ExportMap() { this(0); }
+
+    private ExportMap(ExportMap<T> original) {
+        table.putAll(original.table);
+        initSeq = original.initSeq;
+        nextSeq = original.nextSeq;
+    }
 
     public int getOrCreate(T value) {
         int idx = table.putIfAbsent(value, nextSeq);
@@ -53,16 +58,42 @@ public class ExportMap<T> {
     }
 
     public int getOffset() { return initSeq; }
+    public boolean isEmpty() { return table.isEmpty(); }
+
+    public ArrayList<T> invert() {
+        final ArrayList<T> data = new ArrayList<>(nextSeq);
+        for (int i = 0; i < nextSeq; ++i) data.add(null);  // Make all elements accessable by data.set().
+
+        table.forEachEntry((key, value) -> {
+            data.set(value - initSeq, key);
+            return true;
+        });
+        return data;
+    }
+
+    /**
+     * Reset for the next write cycle.
+     *
+     * The next write cycle will exclude any data present in the dictionary, during serialization.
+     */
+    public void reset() {
+        initSeq = nextSeq;
+    }
 
     public List<T> createMap() {
-        final List<T> data = new ArrayList<>(nextSeq);
-        for (int i = 0; i < nextSeq; ++i) data.add(null);  // Make all elements accessable by dada.set().
+        final List<T> data = new ArrayList<>(nextSeq - initSeq);
+        for (int i = initSeq; i < nextSeq; ++i) data.add(null);  // Make all elements accessable by data.set().
 
-        final TObjectIntIterator<T> iter = table.iterator();
-        while (iter.hasNext()) {
-            iter.advance();
-            data.set(iter.value(), iter.key());
-        }
+        table.forEachEntry((key, value) -> {
+            if (value >= initSeq)
+                data.set(value - initSeq, key);
+            return true;
+        });
         return data;
+    }
+
+    @Override
+    public ExportMap<T> clone() {
+        return new ExportMap<>(this);
     }
 }

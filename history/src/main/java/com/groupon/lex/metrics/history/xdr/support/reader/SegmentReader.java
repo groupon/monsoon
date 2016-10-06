@@ -29,7 +29,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.history.v2.tables;
+package com.groupon.lex.metrics.history.xdr.support.reader;
 
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import java.io.IOException;
@@ -37,6 +37,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -47,8 +48,24 @@ import org.acplt.oncrpc.OncRpcException;
 public interface SegmentReader<T> {
     public abstract T decode() throws IOException, OncRpcException;
 
+    public static <T> SegmentReader<T> of(T v) {
+        return () -> v;
+    }
+
+    public static <T> SegmentReader<T> ofSupplier(Supplier<T> v) {
+        return () -> v.get();
+    }
+
     public default <U> SegmentReader<U> map(Function<? super T, ? extends U> fn) {
         return new MappedSegmentReader<>(this, fn);
+    }
+
+    public default <U> SegmentReader<U> flatMap(Function<? super T, ? extends SegmentReader<? extends U>> fn) {
+        return () -> fn.apply(this.decode()).decode();
+    }
+
+    public default <U, R> SegmentReader<R> combine(SegmentReader<U> other, BiFunction<? super T, ? super U, ? extends R> fn) {
+        return () -> fn.apply(this.decode(), other.decode());
     }
 
     public default SegmentReader<T> peek(Consumer<? super T> fn) {
@@ -61,6 +78,10 @@ public interface SegmentReader<T> {
 
     public default SegmentReader<T> cache() {
         return new SoftSharedSegmentReader<>(this);
+    }
+
+    public default SegmentReader<T> cache(T current) {
+        return new SoftSharedSegmentReader<>(this, current);
     }
 
     public default SegmentReader<Optional<T>> filter(Predicate<? super T> pred) {
@@ -116,6 +137,11 @@ class WeakSharedSegmentReader<T> implements SegmentReader<T> {
 class SoftSharedSegmentReader<T> implements SegmentReader<T> {
     private final SegmentReader<T> in;
     private Reference<T> ref = new SoftReference<>(null);
+
+    public SoftSharedSegmentReader(SegmentReader<T> in, T current) {
+        this(in);
+        ref = new SoftReference(current);
+    }
 
     @Override
     public synchronized T decode() throws IOException, OncRpcException {

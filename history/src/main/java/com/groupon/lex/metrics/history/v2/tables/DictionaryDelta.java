@@ -31,87 +31,149 @@
  */
 package com.groupon.lex.metrics.history.v2.tables;
 
-import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.dictionary_delta;
+import com.groupon.lex.metrics.history.v2.xdr.metric_value;
 import com.groupon.lex.metrics.history.v2.xdr.path_dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.strval_dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.tag_dictionary_delta;
-import com.groupon.lex.metrics.history.v2.xdr.tags;
+import com.groupon.lex.metrics.history.xdr.support.DecodingException;
+import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
-import static gnu.trove.TCollections.unmodifiableMap;
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
-import java.util.Map;
 import static java.util.Objects.requireNonNull;
-
+import java.util.function.IntFunction;
+import java.util.stream.Collectors;
+import lombok.Getter;
+import lombok.NonNull;
 
 public class DictionaryDelta {
-    private final TIntObjectMap<String> stringTable;
-    private final TIntObjectMap<List<String>> pathTable;
-    private final TIntObjectMap<Tags> tagsTable;
+    private final List<String> stringTable;
+    private final List<List<String>> pathTable;
+    private final List<Tags> tagsTable;
+    @Getter
+    private final int stringRefOffset;
+    @Getter
+    private final int pathRefOffset;
+    @Getter
+    private final int tagsRefOffset;
+
+    public DictionaryDelta() {
+        stringTable = EMPTY_LIST;
+        pathTable = EMPTY_LIST;
+        tagsTable = EMPTY_LIST;
+        stringRefOffset = 0;
+        pathRefOffset = 0;
+        tagsRefOffset = 0;
+    }
 
     public DictionaryDelta(dictionary_delta input) {
         this(input, null);
     }
 
-    public DictionaryDelta(dictionary_delta input, DictionaryDelta parent) {
-        stringTable = unmodifiableMap(decode(input.sdd, (parent == null ? null : parent.stringTable)));
-        pathTable = unmodifiableMap(decode(input.pdd, (parent == null ? null : parent.pathTable), stringTable));
-        tagsTable = unmodifiableMap(decode(input.tdd, (parent == null ? null : parent.tagsTable), stringTable));
+    public DictionaryDelta(ArrayList<String> stringTable, ArrayList<List<String>> pathTable, ArrayList<Tags> tagsTable) {
+        this.stringTable = stringTable;
+        this.pathTable = pathTable;
+        this.tagsTable = tagsTable;
+        this.stringRefOffset = 0;
+        this.pathRefOffset = 0;
+        this.tagsRefOffset = 0;
     }
 
-    private static TIntObjectMap<String> decode(strval_dictionary_delta sdd, TIntObjectMap<String> parent) {
-        final TIntObjectMap<String> stringTable = new TIntObjectHashMap<>(sdd.values.length, 1f);
-        if (parent != null) stringTable.putAll(parent);
-        for (int i = 0; i < sdd.values.length; ++i)
-            stringTable.put(sdd.offset + i, sdd.values[i].value);
+    public DictionaryDelta(@NonNull dictionary_delta input, DictionaryDelta parent) {
+        if (parent == null) {
+            stringRefOffset = input.sdd.offset;
+            pathRefOffset = input.pdd.offset;
+            tagsRefOffset = input.tdd.offset;
+        } else {
+            stringRefOffset = parent.stringRefOffset;
+            pathRefOffset = parent.pathRefOffset;
+            tagsRefOffset = parent.tagsRefOffset;
+        }
+
+        stringTable = unmodifiableList(decode(stringRefOffset, input.sdd, (parent == null ? null : parent.stringTable)));
+        pathTable = unmodifiableList(decode(pathRefOffset, input.pdd, (parent == null ? null : parent.pathTable), this::getString));
+        tagsTable = unmodifiableList(decode(tagsRefOffset, input.tdd, (parent == null ? null : parent.tagsTable), this::getString));
+    }
+
+    public int getStringRefEnd() { return stringRefOffset + stringTable.size(); }
+    public int getPathRefEnd() { return pathRefOffset + pathTable.size(); }
+    public int getTagsRefEnd() { return tagsRefOffset + tagsTable.size(); }
+
+    private static List<String> decode(int offset, strval_dictionary_delta sdd, List<String> parent) {
+        final ArrayList<String> stringTable = new ArrayList<>();
+        if (parent != null) stringTable.addAll(parent);
+        if (offset + stringTable.size() != sdd.offset)
+            throw new DecodingException("dictionary delta increments do not line up");
+
+        Arrays.stream(sdd.values)
+                .map(v -> v.value)
+                .forEachOrdered(stringTable::add);
+        stringTable.trimToSize();
         return stringTable;
     }
 
-    private static TIntObjectMap<List<String>> decode(path_dictionary_delta pdd, TIntObjectMap<List<String>> parent, TIntObjectMap<String> stringTable) {
-        final TIntObjectMap<List<String>> pathTable = new TIntObjectHashMap<>(pdd.values.length, 1f);
-        if (parent != null) pathTable.putAll(parent);
-        for (int i = 0; i < pdd.values.length; ++i) {
-            final List<String> value = unmodifiableList(Arrays.asList(Arrays.stream(pdd.values[i].value)
-                    .mapToObj(str_ref -> requireNonNull(stringTable.get(str_ref), "Invalid string reference"))
-                    .toArray(String[]::new)));
-            pathTable.put(pdd.offset + i, value);
-        }
+    private static List<List<String>> decode(int offset, path_dictionary_delta pdd, List<List<String>> parent, IntFunction<String> stringLookup) {
+        final ArrayList<List<String>> pathTable = new ArrayList<>();
+        if (parent != null) pathTable.addAll(parent);
+        if (offset + pathTable.size() != pdd.offset)
+            throw new DecodingException("dictionary delta increments do not line up");
+
+        Arrays.stream(pdd.values)
+                .map(v -> v.value)
+                .map(vArr -> {
+                    return Arrays.stream(vArr)
+                            .mapToObj(str_ref -> stringLookup.apply(str_ref))
+                            .collect(Collectors.toCollection(ArrayList::new));
+                })
+                .peek(ArrayList::trimToSize)
+                .map(Collections::unmodifiableList)
+                .forEachOrdered(pathTable::add);
+        pathTable.trimToSize();
         return pathTable;
     }
 
-    private static TIntObjectMap<Tags> decode(tag_dictionary_delta tdd, TIntObjectMap<Tags> parent, TIntObjectMap<String> stringTable) {
-        final TIntObjectMap<Tags> tagsTable = new TIntObjectHashMap<>(tdd.values.length, 1f);
-        if (parent != null) tagsTable.putAll(parent);
-        for (int i = 0; i < tdd.values.length; ++i) {
-            final tags current = tdd.values[i];
-            final List<Map.Entry<String, MetricValue>> tagEntries = new ArrayList<>(current.str_ref.length);
+    private static List<Tags> decode(int offset, tag_dictionary_delta tdd, List<Tags> parent, IntFunction<String> stringLookup) {
+        final ArrayList<Tags> tagsTable = new ArrayList<>();
+        if (parent != null) tagsTable.addAll(parent);
+        if (offset + tagsTable.size() != tdd.offset)
+            throw new DecodingException("dictionary delta increments do not line up");
 
-            for (int tagIdx = 0; tagIdx < current.str_ref.length; ++i) {
-                final String key = requireNonNull(stringTable.get(current.str_ref[tagIdx]), "Invalid string reference");
-                final MetricValue val = FromXdr.metricValue(current.value[tagIdx], (sref) -> requireNonNull(stringTable.get(sref), "Invalid string reference"));
-                tagEntries.add(SimpleMapEntry.create(key, val));
-            }
-            tagsTable.put(tdd.offset + i, Tags.valueOf(tagEntries.stream()));
-        }
+        Arrays.stream(tdd.values)
+                .map(current -> {
+                    return Tags.valueOf(new ForwardSequence(0, current.str_ref.length).stream()
+                            .mapToObj(idx -> {
+                                final int str_ref = current.str_ref[idx];
+                                final metric_value value = current.value[idx];
+                                return SimpleMapEntry.create(stringLookup.apply(str_ref), FromXdr.metricValue(value, stringLookup));
+                            }));
+                })
+                .forEachOrdered(tagsTable::add);
+        tagsTable.trimToSize();
         return tagsTable;
     }
 
     public String getString(int ref) {
-        return requireNonNull(stringTable.get(ref), "Invalid string reference");
+        if (ref < stringRefOffset || ref - stringRefOffset >= stringTable.size())
+            throw new IllegalArgumentException("Invalid string reference");
+        return requireNonNull(stringTable.get(ref - stringRefOffset), "Programmer error: elements in dictionary should not be null");
     }
 
     public Tags getTags(int ref) {
-        return requireNonNull(tagsTable.get(ref), "Invalid tags reference");
+        if (ref < tagsRefOffset || ref - tagsRefOffset >= tagsTable.size())
+            throw new IllegalArgumentException("Invalid tags reference");
+        return requireNonNull(tagsTable.get(ref - tagsRefOffset), "Programmer error: elements in dictionary should not be null");
     }
 
     public List<String> getPath(int ref) {
-        return requireNonNull(pathTable.get(ref), "Invalid path reference");
+        if (ref < pathRefOffset || ref - pathRefOffset >= pathTable.size())
+            throw new IllegalArgumentException("Invalid path reference");
+        return requireNonNull(pathTable.get(ref - pathRefOffset), "Programmer error: elements in dictionary should not be null");
     }
 }

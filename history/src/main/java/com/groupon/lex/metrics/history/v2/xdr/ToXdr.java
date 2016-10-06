@@ -32,12 +32,22 @@
 package com.groupon.lex.metrics.history.v2.xdr;
 
 import com.groupon.lex.metrics.Histogram;
+import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.SimpleGroupPath;
+import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
+import com.groupon.lex.metrics.history.xdr.support.FilePos;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TShortArrayList;
 import gnu.trove.set.TLongSet;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -47,8 +57,17 @@ import org.joda.time.DateTimeZone;
  */
 public class ToXdr {
     public static timestamp_msec timestamp(DateTime ts) {
-        timestamp_msec result = new timestamp_msec();
-        result.value = ts.toDateTime(DateTimeZone.UTC).getMillis();
+        return timestamp(ts.toDateTime(DateTimeZone.UTC).getMillis());
+    }
+
+    public static timestamp_msec timestamp(long ts) {
+        return new timestamp_msec(ts);
+    }
+
+    public static file_segment filePos(FilePos pos) {
+        final file_segment result = new file_segment();
+        result.offset = pos.getOffset();
+        result.len = pos.getLen();
         return result;
     }
 
@@ -141,5 +160,48 @@ public class ToXdr {
         for (int i = 0; i < want.length; ++i)
             bits[i] = have.contains(want[i]);
         return bitset(bits);
+    }
+
+    public static record_array timeSeriesCollection(TimeSeriesCollection tsc, DictionaryForWrite dictionary) {
+        return new TSC_Helper(dictionary).mapTSC(tsc);
+    }
+
+    @RequiredArgsConstructor
+    private static class TSC_Helper {
+        @NonNull
+        private final DictionaryForWrite dictionary;
+
+        public record_array mapTSC(TimeSeriesCollection tsc) {
+            return new record_array(tsc.getTSValues().stream()
+                    .collect(Collectors.groupingBy(tsv -> tsv.getGroup().getPath())).entrySet()
+                    .stream()
+                    .map(entry -> mapRecord(entry.getKey(), entry.getValue()))
+                    .toArray(record[]::new));
+        }
+
+        private record mapRecord(SimpleGroupPath path, Collection<TimeSeriesValue> tsvList) {
+            record r = new record();
+            r.path_ref = dictionary.getPathTable().getOrCreate(path.getPath());
+            r.tags = tsvList.stream()
+                    .map(this::mapTags)
+                    .toArray(record_tags[]::new);
+            return r;
+        }
+
+        private record_tags mapTags(TimeSeriesValue tsv) {
+            record_tags rt = new record_tags();
+            rt.tag_ref = dictionary.getTagsTable().getOrCreate(tsv.getTags());
+            rt.metrics = tsv.getMetrics().entrySet().stream()
+                    .map(entry -> mapMetric(entry.getKey(), entry.getValue()))
+                    .toArray(record_metrics[]::new);
+            return rt;
+        }
+
+        private record_metrics mapMetric(MetricName name, MetricValue value) {
+            record_metrics rm = new record_metrics();
+            rm.path_ref = dictionary.getPathTable().getOrCreate(name.getPath());
+            rm.v = metricValue(value, dictionary.getStringTable()::getOrCreate);
+            return rm;
+        }
     }
 }

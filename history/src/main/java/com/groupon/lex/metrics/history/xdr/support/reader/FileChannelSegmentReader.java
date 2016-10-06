@@ -29,13 +29,9 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.history.v2.tables;
+package com.groupon.lex.metrics.history.xdr.support.reader;
 
-import com.groupon.lex.metrics.history.xdr.BufferSupplier;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.GzipDecodingBufferSupplier;
-import com.groupon.lex.metrics.history.xdr.support.SegmentBufferSupplier;
-import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -46,7 +42,6 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrAble;
-import org.acplt.oncrpc.XdrDecodingStream;
 
 @AllArgsConstructor
 public class FileChannelSegmentReader<T extends XdrAble> implements SegmentReader<T> {
@@ -61,17 +56,18 @@ public class FileChannelSegmentReader<T extends XdrAble> implements SegmentReade
 
     @Override
     public T decode() throws IOException, OncRpcException {
-        BufferSupplier supplier = new SegmentBufferSupplier(file, pos);
-        if (isCompressed())
-            supplier = new GzipDecodingBufferSupplier(supplier);
+        try (XdrDecodingFileReader reader = new XdrDecodingFileReader(wrapReader(new Crc32VerifyingFileReader(new FileChannelReader(file.get(), pos.getOffset()), pos.getLen(), 4)))) {
+            reader.beginDecoding();
+            T instance = type.get();
+            instance.xdrDecode(reader);
+            reader.endDecoding();
+            return instance;
+        }
+    }
 
-        T instance = type.get();
-        final XdrDecodingStream xdr = new XdrBufferDecodingStream(supplier);
-        xdr.beginDecoding();
-        instance.xdrDecode(xdr);
-        xdr.endDecoding();
-
-        return instance;
+    private FileReader wrapReader(FileReader reader) throws IOException {
+        if (compressed) reader = new GzipReader(reader);
+        return reader;
     }
 
     @RequiredArgsConstructor

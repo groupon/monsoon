@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.history.v2;
 
 import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.history.v2.tables.DictionaryDelta;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import com.groupon.lex.metrics.history.v2.xdr.dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.metric_value;
@@ -45,24 +46,46 @@ import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
-public class Dictionary {
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+public final class DictionaryForWrite implements Cloneable {
     private final ExportMap<String> stringTable;
     private final ExportMap<List<String>> pathTable;
     private final ExportMap<Tags> tagsTable;
 
-    public Dictionary() {
+    public DictionaryForWrite() {
         stringTable = new ExportMap<>();
         pathTable = new ExportMap<>();
         tagsTable = new ExportMap<>();
     }
 
-    public Dictionary(int pathInit, int tagsInit, int strInit) {
+    public DictionaryForWrite(int pathInit, int tagsInit, int strInit) {
         stringTable = new ExportMap<>(strInit);
         pathTable = new ExportMap<>(pathInit);
         tagsTable = new ExportMap<>(tagsInit);
+    }
+
+    public boolean isEmpty() {
+        return stringTable.isEmpty() && pathTable.isEmpty() && tagsTable.isEmpty();
+    }
+
+    public DictionaryDelta asDictionaryDelta() {
+        return new DictionaryDelta(stringTable.invert(), pathTable.invert(), tagsTable.invert());
+    }
+
+    /**
+     * Reset for the next write cycle.
+     *
+     * The next write cycle will exclude any data present in the dictionary, during serialization.
+     */
+    public void reset() {
+        stringTable.reset();
+        pathTable.reset();
+        tagsTable.reset();
     }
 
     public dictionary_delta encode() {
@@ -119,5 +142,10 @@ public class Dictionary {
                 .map(string_val::new)
                 .toArray(string_val[]::new);
         return sdd;
+    }
+
+    @Override
+    public DictionaryForWrite clone() {
+        return new DictionaryForWrite(stringTable.clone(), pathTable.clone(), tagsTable.clone());
     }
 }

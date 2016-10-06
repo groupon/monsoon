@@ -43,14 +43,14 @@ enum header_flags {
     KIND_LIST = 0x0,
     KIND_TABLES = 0x1,
 
-    /* indicate if opaque data is compressed (gzip) */
+    /* indicate if opaque segments are compressed (gzip) */
     GZIP = 0x20000000,
 
-    /* indicate if the file contains sorted records */
+    /* indicate if all records are sorted by timestamp */
     SORTED = 0x40000000,
 
-    /* indicate if the file contains duplicate records */
-    DUP_TS = 0x80000000
+    /* indicate if all records have distinct timestamps */
+    DISTINCT = 0x80000000
 };
 
 struct histogram_entry {
@@ -112,13 +112,17 @@ struct dictionary_delta {
     tag_dictionary_delta tdd;  /* tags */
 };
 
-struct records {
+/*
+ * Followed by:
+ * - crc32 (4 bytes, validates this record)
+ * - dictionary delta (segment, dd_len bytes, omitted if dd_len=0)
+ * - record_array (segment, r_len bytes)
+ */
+struct tsdata {
     timestamp_msec ts;
-    opaque dictionary_delta<>;  /* XDR encoded: dictionary delta, size = 0 indicates no dictionary update */
-    opaque record_array<>;  /* XDR encoded: record_array */
-};
-struct file_data_list {
-    records list_data<>;
+    hyper dd_len;
+    hyper r_len;
+    int reserved;  // Pads to multiple of 8 bytes, once CRC following this is considered.
 };
 
 struct file_data_tables {
@@ -221,5 +225,6 @@ struct tsfile_header {
     timestamp_msec last;
     int flags;
     int reserved;  /* reserved for future use */
+    hyper file_size;  /* file size */
     file_segment fdt;  /* file data tables (only if tables file) */
 };

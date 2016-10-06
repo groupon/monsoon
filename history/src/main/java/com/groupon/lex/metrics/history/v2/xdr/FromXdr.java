@@ -33,8 +33,9 @@ package com.groupon.lex.metrics.history.v2.xdr;
 
 import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import java.util.Arrays;
-import java.util.function.Function;
+import java.util.function.IntFunction;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -43,7 +44,11 @@ public class FromXdr {
         return new DateTime(ts.value, DateTimeZone.UTC);
     }
 
-    public static MetricValue metricValue(metric_value mv, Function<Integer, String> strGet) {
+    public static FilePos filePos(file_segment fs) {
+        return new FilePos(fs.offset, fs.len);
+    }
+
+    public static MetricValue metricValue(metric_value mv, IntFunction<String> strGet) {
         switch (mv.kind) {
             default:
                 throw new IllegalStateException("unrecognized metric kind: " + mv.kind);

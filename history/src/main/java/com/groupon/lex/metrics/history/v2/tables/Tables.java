@@ -35,65 +35,52 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
-import com.groupon.lex.metrics.history.v2.ExportMap;
+import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
+import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import com.groupon.lex.metrics.history.v2.xdr.tables;
 import com.groupon.lex.metrics.history.v2.xdr.tables_group;
 import com.groupon.lex.metrics.history.v2.xdr.tables_tag;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter;
+import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter.Writer;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
-import java.util.stream.Stream;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
-import org.joda.time.DateTime;
 
 @RequiredArgsConstructor
-public class Tables {
+public class Tables extends AbstractSegmentWriter {
     @NonNull
-    private final DateTime begin;
-    @NonNull
-    private final ExportMap<List<String>> pathTable;
-    @NonNull
-    private final ExportMap<Tags> tagsTable;
-    @NonNull
-    private final ExportMap<String> stringTable;
+    private final DictionaryForWrite dictionary;
     private final TIntObjectMap<GroupTbl> groups = new TIntObjectHashMap<>();
 
-    public void add(TimeSeriesCollection tsdata) {
-        add(tsdata.getTimestamp(), tsdata.getTSValues().stream());
-    }
-
-    public void add(DateTime ts, Stream<TimeSeriesValue> tsdata) {
+    public void add(long ts, Collection<TimeSeriesValue> tsdata) {
         tsdata.forEach((tsv) -> add(ts, tsv));
     }
 
-    public void add(DateTime ts, TimeSeriesValue tsv) {
+    public void add(long ts, TimeSeriesValue tsv) {
         add(ts, tsv.getGroup().getPath(), tsv.getGroup().getTags(), tsv.getMetrics());
     }
 
-    private void add(DateTime ts, SimpleGroupPath grpPath, Tags grpTags, Map<MetricName, MetricValue> metrics) {
-        if (ts.isBefore(begin))
-            throw new IllegalArgumentException("begin time violation");
-
-        final int pathIdx = pathTable.getOrCreate(grpPath.getPath());
+    private void add(long ts, SimpleGroupPath grpPath, Tags grpTags, Map<MetricName, MetricValue> metrics) {
+        final int pathIdx = dictionary.getPathTable().getOrCreate(grpPath.getPath());
         GroupTbl dest = groups.get(pathIdx);
         if (dest == null) {
-            dest = new GroupTbl(begin, pathTable, tagsTable, stringTable);
+            dest = new GroupTbl(dictionary);
             groups.put(pathIdx, dest);
         }
 
         dest.add(ts, grpTags, metrics);
     }
 
-    public tables encode() {
+    @Override
+    public tables encode(long timestamps[]) {
         return new tables(Arrays.stream(groups.keys())
                 .mapToObj(pathIdx -> {
                     tables_group tg = new tables_group();
@@ -104,31 +91,26 @@ public class Tables {
                 .toArray(tables_group[]::new));
     }
 
-    public long write(FileChannel out, long outPos, boolean compress) throws OncRpcException, IOException {
+    @Override
+    public FilePos write(Writer writer, long timestamps[]) throws OncRpcException, IOException {
         for (GroupTbl group : groups.valueCollection())
-            outPos = group.write(out, outPos, compress);
+            group.write(writer, timestamps);
 
-        return outPos;
+        return super.write(writer, timestamps);
     }
 
     @RequiredArgsConstructor
     private static class GroupTbl {
         @NonNull
-        DateTime begin;
-        @NonNull
-        private final ExportMap<List<String>> pathTable;
-        @NonNull
-        private final ExportMap<Tags> tagsTable;
-        @NonNull
-        private final ExportMap<String> stringTable;
+        private final DictionaryForWrite dictionary;
         private final TIntObjectMap<GroupTable> t_group = new TIntObjectHashMap<>();
         private final TIntObjectMap<FilePos> filePosTbl = new TIntObjectHashMap<>();
 
-        public void add(DateTime ts, Tags grpTags, Map<MetricName, MetricValue> metrics) {
-            final int tagIdx = tagsTable.getOrCreate(grpTags);
+        public void add(long ts, Tags grpTags, Map<MetricName, MetricValue> metrics) {
+            final int tagIdx = dictionary.getTagsTable().getOrCreate(grpTags);
             GroupTable dest = t_group.get(tagIdx);
             if (dest == null) {
-                dest = new GroupTable(begin, pathTable, stringTable);
+                dest = new GroupTable(dictionary);
                 t_group.put(tagIdx, dest);
             }
 
@@ -140,21 +122,19 @@ public class Tables {
                     .mapToObj(tagIdx -> {
                         tables_tag tt = new tables_tag();
                         tt.tag_ref = tagIdx;
-                        tt.pos = filePosTbl.get(tagIdx).encode();
+                        tt.pos = ToXdr.filePos(filePosTbl.get(tagIdx));
                         return tt;
                     })
                     .toArray(tables_tag[]::new);
         }
 
-        public long write(FileChannel out, long outPos, boolean compress) throws OncRpcException, IOException {
+        public void write(Writer writer, long timestamps[]) throws OncRpcException, IOException {
             for (int tagIdx : t_group.keys()) {
                 if (!filePosTbl.containsKey(tagIdx)) {
-                    final FilePos pos = t_group.get(tagIdx).write(out, outPos, compress);
+                    final FilePos pos = t_group.get(tagIdx).write(writer, timestamps);
                     filePosTbl.put(tagIdx, pos);
-                    outPos = pos.getEnd();
                 }
             }
-            return outPos;
         }
     }
 }

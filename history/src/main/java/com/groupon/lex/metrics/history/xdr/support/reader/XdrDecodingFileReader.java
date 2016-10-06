@@ -31,25 +31,29 @@
  */
 package com.groupon.lex.metrics.history.xdr.support.reader;
 
+import java.io.Closeable;
 import java.io.IOException;
 import static java.lang.Math.min;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrDecodingStream;
 
-@RequiredArgsConstructor
-public class XdrDecodingFileReader extends XdrDecodingStream {
+public class XdrDecodingFileReader extends XdrDecodingStream implements Closeable {
     private final FileReader in;
     private final ByteBuffer buf;
 
-    public XdrDecodingFileReader(@NonNull FileReader in) {
+    public XdrDecodingFileReader(@NonNull FileReader in, int bufSiz) {
+        if (bufSiz < 4) bufSiz = 4;
         this.in = in;
-        buf = in.allocateByteBuffer(64 * 1024);
+        buf = in.allocateByteBuffer(bufSiz);
         buf.order(ByteOrder.BIG_ENDIAN);
+    }
+
+    public XdrDecodingFileReader(@NonNull FileReader in) {
+        this(in, 64 * 1024);
     }
 
     @Override

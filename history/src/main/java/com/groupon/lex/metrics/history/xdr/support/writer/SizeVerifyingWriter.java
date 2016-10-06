@@ -31,32 +31,30 @@
  */
 package com.groupon.lex.metrics.history.xdr.support.writer;
 
+import com.groupon.lex.metrics.history.xdr.support.IOLengthVerificationFailed;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.zip.CRC32;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
-public class Crc32Writer implements FileWriter {
-    public static final int CRC_LEN = 4;  // CRC32 is 4 bytes.
+public class SizeVerifyingWriter implements FileWriter {
     private final FileWriter out;
-    private final CRC32 crc32 = new CRC32();
-
-    public int getCrc32() {
-        return (int)crc32.getValue();
-    }
+    private final long expected;
+    private long written = 0;
 
     @Override
     public int write(ByteBuffer data) throws IOException {
-        final ByteBuffer copy = data.asReadOnlyBuffer();
+        if (data.remaining() > expected - written)
+            throw new IOLengthVerificationFailed(expected, written + data.remaining());
+
         final int wlen = out.write(data);
-        copy.limit(copy.position() + wlen);
-        crc32.update(copy);
+        written += wlen;
         return wlen;
     }
 
     @Override
     public void close() throws IOException {
+        if (written != expected) throw new IOLengthVerificationFailed(expected, written);
         out.close();
     }
 

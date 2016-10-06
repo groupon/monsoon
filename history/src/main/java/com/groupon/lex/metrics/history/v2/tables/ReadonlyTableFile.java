@@ -33,29 +33,37 @@ package com.groupon.lex.metrics.history.v2.tables;
 
 import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
+import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
 import com.groupon.lex.metrics.history.xdr.Const;
+import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.validateHeaderOrThrow;
+import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.SegmentBufferSupplier;
-import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
+import com.groupon.lex.metrics.history.xdr.support.reader.Crc32VerifyingFileReader;
+import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelReader;
+import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelSegmentReader;
+import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
+import com.groupon.lex.metrics.history.xdr.support.reader.XdrDecodingFileReader;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
+import java.util.Optional;
+import java.util.Spliterator;
 import java.util.stream.Stream;
 import lombok.Getter;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrAble;
-import org.acplt.oncrpc.XdrDecodingStream;
 import org.joda.time.DateTime;
 
 public class ReadonlyTableFile implements TSData {
     private static final short FILE_VERSION = 3;  // Only file version that uses Table format.
     private final SegmentReader<RTFFileDataTables> body;
+    private final GCCloseable<FileChannel> fd;
     @Getter
     private final DateTime begin, end;
     @Getter
@@ -72,7 +80,29 @@ public class ReadonlyTableFile implements TSData {
 
     @Override
     public Iterator<TimeSeriesCollection> iterator() {
-        return stream().iterator();
+        try {
+            return body.decode().iterator();
+        } catch (IOException | OncRpcException ex) {
+            throw new DecodingException("decoding failed", ex);
+        }
+    }
+
+    @Override
+    public Spliterator<TimeSeriesCollection> spliterator() {
+        try {
+            return body.decode().spliterator();
+        } catch (IOException | OncRpcException ex) {
+            throw new DecodingException("decoding failed", ex);
+        }
+    }
+
+    @Override
+    public Stream<TimeSeriesCollection> streamReversed() {
+        try {
+            return body.decode().streamReversed();
+        } catch (IOException | OncRpcException ex) {
+            throw new DecodingException("decoding failed", ex);
+        }
     }
 
     @Override
@@ -80,7 +110,7 @@ public class ReadonlyTableFile implements TSData {
         try {
             return body.decode().stream();
         } catch (IOException | OncRpcException ex) {
-            throw new RuntimeException("decoding failed", ex);
+            throw new DecodingException("decoding failed", ex);
         }
     }
 
@@ -89,7 +119,7 @@ public class ReadonlyTableFile implements TSData {
         try {
             return body.decode().stream(begin);
         } catch (IOException | OncRpcException ex) {
-            throw new RuntimeException("decoding failed", ex);
+            throw new DecodingException("decoding failed", ex);
         }
     }
 
@@ -98,7 +128,21 @@ public class ReadonlyTableFile implements TSData {
         try {
             return body.decode().stream(begin, end);
         } catch (IOException | OncRpcException ex) {
-            throw new RuntimeException("decoding failed", ex);
+            throw new DecodingException("decoding failed", ex);
+        }
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return size() == 0;
+    }
+
+    @Override
+    public int size() {
+        try {
+            return body.decode().size();
+        } catch (IOException | OncRpcException ex) {
+            throw new DecodingException("decoding failed", ex);
         }
     }
 
@@ -107,28 +151,47 @@ public class ReadonlyTableFile implements TSData {
     @Override
     public short getMinor() { return Const.version_minor(version); }
 
+    @Override
+    public Optional<GCCloseable<FileChannel>> getFileChannel() {
+        return Optional.of(fd);
+    }
+
     public ReadonlyTableFile(GCCloseable<FileChannel> file) throws IOException, OncRpcException {
         fileSize = file.get().size();
+        fd = file;
+        final tsfile_header hdr;
 
-        XdrDecodingStream reader = new XdrBufferDecodingStream(new SegmentBufferSupplier(file, 0, fileSize));
-        version = validateHeaderOrThrow(reader);
-        if (Const.version_major(version) != FILE_VERSION)
-            throw new IllegalArgumentException("TableFile is version 3 only");
+        /* Nest readers to handle CRC verification of the header. */
+        try (XdrDecodingFileReader reader = new XdrDecodingFileReader(new Crc32VerifyingFileReader(new FileChannelReader(file.get(), 0), MIME_HEADER_LEN + HDR_3_LEN, 0))) {
+            reader.beginDecoding();
 
-        tsfile_header hdr = new tsfile_header(reader);
+            /* Check the mime header and version number first. */
+            version = validateHeaderOrThrow(reader);
+            if (Const.version_major(version) != FILE_VERSION)
+                throw new IllegalArgumentException("TableFile is version 3 only");
+
+            /* Read the header; we don't actually process its information until
+             * the CRC validation completes (it's in the close part of try-with-resources). */
+            hdr = new tsfile_header(reader);
+
+            reader.endDecoding();
+        } // CRC is validated here.
+
+        if (hdr.file_size > fileSize)
+            throw new IOException("file truncated");
         if ((hdr.flags & header_flags.KIND_MASK) != header_flags.KIND_TABLES)
             throw new IllegalArgumentException("Not a file in table encoding");
-        gzipped = ((hdr.flags & header_flags.GZIP) == header_flags.GZIP);
 
-        if ((hdr.flags & header_flags.DUP_TS) == header_flags.DUP_TS)
+        gzipped = ((hdr.flags & header_flags.GZIP) == header_flags.GZIP);
+        if ((hdr.flags & header_flags.DISTINCT) != header_flags.DISTINCT)
             throw new IllegalArgumentException("Bad TableFile: marked as containing duplicate timestamps");
         if ((hdr.flags & header_flags.SORTED) != header_flags.SORTED)
             throw new IllegalArgumentException("Bad TableFile: marked as unsorted");
-
-        segmentFactory = new FileChannelSegmentReader.Factory(file, gzipped);
         begin = FromXdr.timestamp(hdr.first);
         end = FromXdr.timestamp(hdr.last);
-        final FilePos bodyPos = new FilePos(hdr.fdt);
+
+        segmentFactory = new FileChannelSegmentReader.Factory(file, gzipped);
+        final FilePos bodyPos = FromXdr.filePos(hdr.fdt);
 
         body = segmentFactory.get(file_data_tables::new, bodyPos)
                 .map(fdt -> new RTFFileDataTables(fdt, hdr.first.value, segmentFactory))

@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.history.xdr.support.reader;
 
+import com.groupon.lex.metrics.history.xdr.support.writer.Crc32Writer;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.zip.CRC32;
@@ -40,6 +41,7 @@ import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 public class Crc32Reader implements FileReader {
+    public static final int CRC_LEN = Crc32Writer.CRC_LEN;  // CRC32 is 4 bytes.
     @NonNull
     private final FileReader in;
     private final CRC32 crc32 = new CRC32();

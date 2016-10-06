@@ -29,39 +29,18 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.history.xdr.support.writer;
+package com.groupon.lex.metrics.history.xdr.support;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.zip.CRC32;
-import lombok.RequiredArgsConstructor;
+import lombok.Getter;
 
-@RequiredArgsConstructor
-public class Crc32Writer implements FileWriter {
-    public static final int CRC_LEN = 4;  // CRC32 is 4 bytes.
-    private final FileWriter out;
-    private final CRC32 crc32 = new CRC32();
+public class IOLengthVerificationFailed extends IOException {
+    @Getter
+    private final long expected, read;
 
-    public int getCrc32() {
-        return (int)crc32.getValue();
-    }
-
-    @Override
-    public int write(ByteBuffer data) throws IOException {
-        final ByteBuffer copy = data.asReadOnlyBuffer();
-        final int wlen = out.write(data);
-        copy.limit(copy.position() + wlen);
-        crc32.update(copy);
-        return wlen;
-    }
-
-    @Override
-    public void close() throws IOException {
-        out.close();
-    }
-
-    @Override
-    public ByteBuffer allocateByteBuffer(int size) {
-        return out.allocateByteBuffer(size);
+    public IOLengthVerificationFailed(long expected, long read) {
+        super("length verification failed");
+        this.expected = expected;
+        this.read = read;
     }
 }

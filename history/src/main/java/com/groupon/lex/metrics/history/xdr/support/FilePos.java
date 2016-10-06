@@ -31,7 +31,6 @@
  */
 package com.groupon.lex.metrics.history.xdr.support;
 
-import com.groupon.lex.metrics.history.v2.xdr.file_segment;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 
@@ -41,18 +40,7 @@ public class FilePos {
     long offset;
     long len;
 
-    public FilePos(file_segment fs) {
-        this(fs.offset, fs.len);
-    }
-
     public long getEnd() {
         return offset + len;
-    }
-
-    public file_segment encode() {
-        final file_segment result = new file_segment();
-        result.offset = offset;
-        result.len = len;
-        return result;
     }
 }

@@ -33,7 +33,7 @@ package com.groupon.lex.metrics.history.v2.tables;
 
 import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.history.v2.ExportMap;
+import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.bitset;
 import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.createPresenceBitset;
@@ -67,13 +67,11 @@ import gnu.trove.set.hash.TLongHashSet;
 import java.util.Arrays;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
 @RequiredArgsConstructor
 public class MetricTable extends AbstractSegmentWriter {
     @NonNull
-    private final ExportMap<String> stringTable;
+    private final DictionaryForWrite dictionary;
 
     private final TLongByteMap t_bool = new TLongByteHashMap();
     private final TLongShortMap t_16bit = new TLongShortHashMap();
@@ -85,29 +83,27 @@ public class MetricTable extends AbstractSegmentWriter {
     private final TLongSet t_empty = new TLongHashSet();
     private final TLongObjectMap<MetricValue> t_other = new TLongObjectHashMap<>();
 
-    public void add(@NonNull DateTime ts, @NonNull MetricValue value) {
-        final long time_offset = ts.toDateTime(DateTimeZone.UTC).getMillis();
-
+    public void add(long ts, @NonNull MetricValue value) {
         if (value.getBoolValue() != null) {
-            t_bool.put(time_offset, value.getBoolValue() ? (byte)1 : (byte)0);
+            t_bool.put(ts, value.getBoolValue() ? (byte)1 : (byte)0);
         } else if (value.getIntValue() != null) {
             final long v = value.getIntValue();
             if (v >= Short.MIN_VALUE && v <= Short.MAX_VALUE)
-                t_16bit.put(time_offset, (short)v);
+                t_16bit.put(ts, (short)v);
             else if (v >= Integer.MIN_VALUE && v <= Integer.MAX_VALUE)
-                t_32bit.put(time_offset, (int)v);
+                t_32bit.put(ts, (int)v);
             else
-                t_64bit.put(time_offset, v);
+                t_64bit.put(ts, v);
         } else if (value.getFltValue() != null) {
-            t_dbl.put(time_offset, value.getFltValue());
+            t_dbl.put(ts, value.getFltValue());
         } else if (value.getStrValue() != null) {
-            t_str.put(time_offset, stringTable.getOrCreate(value.getStrValue()));
+            t_str.put(ts, dictionary.getStringTable().getOrCreate(value.getStrValue()));
         } else if (value.getHistValue() != null) {
-            t_hist.put(time_offset, value.getHistValue());
+            t_hist.put(ts, value.getHistValue());
         } else if (value.isPresent()) {
-            t_other.put(time_offset, value);
+            t_other.put(ts, value);
         } else {
-            t_empty.add(time_offset);
+            t_empty.add(ts);
         }
     }
 
@@ -122,7 +118,7 @@ public class MetricTable extends AbstractSegmentWriter {
         mt.metrics_str = encodeStr(t_str, timestamps);
         mt.metrics_hist = encodeHist(t_hist, timestamps);
         mt.metrics_empty = encodeEmpty(t_empty, timestamps);
-        mt.metrics_other = encodeOther(t_other, stringTable, timestamps);
+        mt.metrics_other = encodeOther(t_other, dictionary, timestamps);
         return mt;
     }
 
@@ -244,14 +240,14 @@ public class MetricTable extends AbstractSegmentWriter {
         return result;
     }
 
-    private static mt_other encodeOther(TLongObjectMap<MetricValue> t_other, ExportMap<String> stringTable, long timestamps[]) {
+    private static mt_other encodeOther(TLongObjectMap<MetricValue> t_other, DictionaryForWrite dictionary, long timestamps[]) {
         metric_value[] values = new metric_value[timestamps.length];
         int values_len = 0;
         for (int i = 0; i < values.length; ++i) {
             final long ts = timestamps[i];
             MetricValue mv = t_other.get(ts);
             if (mv != null)
-                values[values_len++] = ToXdr.metricValue(mv, stringTable::getOrCreate);
+                values[values_len++] = ToXdr.metricValue(mv, dictionary.getStringTable()::getOrCreate);
         }
 
         mt_other result = new mt_other();

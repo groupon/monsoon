@@ -31,99 +31,29 @@
  */
 package com.groupon.lex.metrics.history.xdr.support;
 
-import java.util.Comparator;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
 import java.util.Spliterator;
-import java.util.function.IntConsumer;
+import java.util.function.IntFunction;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
-import java.util.stream.StreamSupport;
-import lombok.AllArgsConstructor;
-import lombok.Value;
 
-/**
- * A bounded sequence.
- */
-@Value
-public class Sequence {
-    private final int begin, end;
+public interface Sequence {
+    public Spliterator.OfInt spliterator();
+    public Iterator<Integer> iterator();
+    public IntStream stream();
+    public IntStream parallelStream();
+    public Sequence reverse();
+    public int size();
 
-    public Spliterator.OfInt spliterator() {
-        return new SpliteratorImpl(begin, end);
+    public default boolean isEmpty() {
+        return size() == 0;
     }
 
-    public Iterator<Integer> iterator() {
-        return new IteratorImpl(begin, end);
+    public default <T> ObjectSequence<T> map(IntFunction<? extends T> fn, boolean sorted, boolean nonnull, boolean distinct) {
+        return new ObjectSequence<>(this, () -> fn, sorted, nonnull, distinct);
     }
 
-    public IntStream stream() {
-        return StreamSupport.intStream(spliterator(), false);
+    public default <T> ObjectSequence<T> mapSupplied(Supplier<? extends IntFunction<? extends T>> fn, boolean sorted, boolean nonnull, boolean distinct) {
+        return new ObjectSequence<>(this, fn, sorted, nonnull, distinct);
     }
-
-    public IntStream parallelStream() {
-        return StreamSupport.intStream(spliterator(), true);
-    }
-
-    @AllArgsConstructor
-    private static class IteratorImpl implements Iterator<Integer> {
-        private int begin;
-        private final int end;
-
-        @Override
-        public boolean hasNext() { return begin < end; }
-        @Override
-        public Integer next() {
-            if (begin >= end) throw new NoSuchElementException();
-            return begin++;
-        }
-    }
-
-    @AllArgsConstructor
-    private static class SpliteratorImpl implements Spliterator.OfInt {
-        private int begin;
-        private final int end;
-
-        @Override
-        public boolean tryAdvance(IntConsumer action) {
-            if (begin >= end) return false;
-            action.accept(begin++);
-            return true;
-        }
-
-        @Override
-        public void forEachRemaining(IntConsumer action) {
-            for (int i = begin; i < end; ++i) action.accept(i);
-            begin = end;
-        }
-
-        @Override
-        public Spliterator.OfInt trySplit() {
-            if (begin >= end || end - begin < 2) return null;
-
-            final int split = begin + (end - begin) / 2;
-            final int rvBegin = begin;
-            begin = split;
-            return new SpliteratorImpl(rvBegin, split);
-        }
-
-        @Override
-        public long estimateSize() {
-            return Integer.max(0, end - begin);
-        }
-
-        @Override
-        public int characteristics() {
-            return Spliterator.ORDERED |
-                    Spliterator.SORTED |
-                    Spliterator.SIZED |
-                    Spliterator.SUBSIZED |
-                    Spliterator.DISTINCT |
-                    Spliterator.IMMUTABLE |
-                    Spliterator.NONNULL |
-                    Spliterator.SORTED;
-        }
-
-        @Override
-        public Comparator<Integer> getComparator() { return null; }
-    };
 }

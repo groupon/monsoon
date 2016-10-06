@@ -21,8 +21,9 @@ public class Const {
     public static byte[] MAGIC = new byte[]{  17,  19,  23,  29,
                                              'M', 'O', 'N', '-',
                                              's', 'o', 'o', 'n' };  // 12 chars
-    public static short MAJOR = 1;
-    public static short MINOR = 0;
+    public static final int MIME_HEADER_LEN = 16;  // Mime header is 16 bytes.
+    public static final short MAJOR = 1;
+    public static final short MINOR = 0;
 
     public static int version_from_majmin(short maj, short min) {
         if (maj < 0 || min < 0) throw new IllegalArgumentException("Java needs unsigned data types!");
@@ -113,10 +114,14 @@ public class Const {
         return validateHeaderOrThrowForWrite(new tsfile_mimeheader(decoder));
     }
 
-    public static void writeMimeHeader(XdrEncodingStream encoder) throws IOException, OncRpcException {
+    public static void writeMimeHeader(XdrEncodingStream encoder, short major, short minor) throws IOException, OncRpcException {
         tsfile_mimeheader hdr = new tsfile_mimeheader();
         hdr.magic = MAGIC;
-        hdr.version_number = version_from_majmin(MAJOR, MINOR);
+        hdr.version_number = version_from_majmin(major, minor);
         hdr.xdrEncode(encoder);
+    }
+
+    public static void writeMimeHeader(XdrEncodingStream encoder) throws IOException, OncRpcException {
+        writeMimeHeader(encoder, MAJOR, MINOR);
     }
 }

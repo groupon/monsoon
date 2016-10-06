@@ -31,10 +31,9 @@
  */
 package com.groupon.lex.metrics.history.xdr.support.reader;
 
-import java.io.EOFException;
+import com.groupon.lex.metrics.history.xdr.support.IOLengthVerificationFailed;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
@@ -46,7 +45,7 @@ public class SizeVerifyingReader implements FileReader {
     @Override
     public int read(ByteBuffer data) throws IOException {
         if (read == expected)
-            throw new EOFException("no more data (segment limit)");
+            throw new IOLengthVerificationFailed(expected, read + data.remaining());
         if (data.remaining() > expected - read)
             data.limit(data.position() + (int)(expected - read));
 
@@ -64,16 +63,5 @@ public class SizeVerifyingReader implements FileReader {
     @Override
     public ByteBuffer allocateByteBuffer(int size) {
         return in.allocateByteBuffer(size);
-    }
-
-    public static class IOLengthVerificationFailed extends IOException {
-        @Getter
-        private final long expected, read;
-
-        public IOLengthVerificationFailed(long expected, long read) {
-            super("length verification failed");
-            this.expected = expected;
-            this.read = read;
-        }
     }
 }

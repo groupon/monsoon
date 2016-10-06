@@ -39,13 +39,18 @@ import com.groupon.lex.metrics.history.v2.xdr.file_data_tables;
 import com.groupon.lex.metrics.history.v2.xdr.group_table;
 import com.groupon.lex.metrics.history.v2.xdr.tables_group;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.Sequence;
+import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
+import com.groupon.lex.metrics.history.xdr.support.ReverseSequence;
+import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.util.Arrays;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.unmodifiableMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.Spliterator;
+import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.AccessLevel;
@@ -74,7 +79,7 @@ public final class RTFFileDataTables {
         return Arrays.stream(tg.tag_tbl)
                 .collect(Collectors.toMap(
                         tt -> dictionary.getTags(tt.tag_ref),
-                        tt -> segmentFromFilePos(new FilePos(tt.pos), dictionary, segmentFactory)
+                        tt -> segmentFromFilePos(FromXdr.filePos(tt.pos), dictionary, segmentFactory)
                 ));
     }
 
@@ -89,16 +94,42 @@ public final class RTFFileDataTables {
 
     public int size() { return timestamps.length; }
 
+    public Iterator<TimeSeriesCollection> iterator() {
+        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
+        return new ForwardSequence(0, timestamps.length)
+                .map(fn, true, true, true)
+                .iterator();
+    }
+
+    public Spliterator<TimeSeriesCollection> spliterator() {
+        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
+        return new ForwardSequence(0, timestamps.length)
+                .map(fn, true, true, true)
+                .spliterator();
+    }
+
+    public Stream<TimeSeriesCollection> streamReversed() {
+        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
+        return new ReverseSequence(0, timestamps.length)
+                .map(fn, true, true, true)
+                .stream();
+    }
+
     public Stream<TimeSeriesCollection> stream() {
-        return new Sequence(0, timestamps.length).stream()
-                .mapToObj(index -> new RTFTimeSeriesCollection(index, this));
+        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
+        return new ForwardSequence(0, timestamps.length)
+                .map(fn, true, true, true)
+                .stream();
     }
 
     public Stream<TimeSeriesCollection> stream(DateTime begin) {
         int start = Arrays.binarySearch(timestamps, begin.getMillis());
         if (start < 0) start = -(start + 1);
-        return new Sequence(start, timestamps.length).stream()
-                .mapToObj(index -> new RTFTimeSeriesCollection(index, this));
+
+        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
+        return new ForwardSequence(start, timestamps.length)
+                .map(fn, true, true, true)
+                .stream();
     }
 
     public Stream<TimeSeriesCollection> stream(DateTime begin, DateTime end) {
@@ -111,8 +142,10 @@ public final class RTFFileDataTables {
         else
             stop++;  // stream should include exact match
 
-        return new Sequence(start, stop).stream()
-                .mapToObj(index -> new RTFTimeSeriesCollection(index, this));
+        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
+        return new ForwardSequence(start, stop)
+                .map(fn, true, true, true)
+                .stream();
     }
 
     public Set<SimpleGroupPath> getAllPaths() { return groups.keySet(); }

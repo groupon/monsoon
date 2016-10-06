@@ -33,7 +33,8 @@ package com.groupon.lex.metrics.history.v2.tables;
 
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.history.v2.ExportMap;
+import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
+import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.createPresenceBitset;
 import com.groupon.lex.metrics.history.v2.xdr.group_table;
 import com.groupon.lex.metrics.history.v2.xdr.tables_metric;
@@ -45,33 +46,28 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
+import static gnu.trove.TCollections.unmodifiableMap;
 
 @RequiredArgsConstructor
 public class GroupTable extends AbstractSegmentWriter {
     @NonNull
-    private final ExportMap<List<String>> pathTable;
-    @NonNull
-    private final ExportMap<String> stringTable;
+    private final DictionaryForWrite dictionary;
     private final TLongSet timestamps = new TLongHashSet();
     private final TIntObjectMap<FilePos> filePosTbl = new TIntObjectHashMap<>();
     private final TIntObjectMap<MetricTable> metricTbl = new TIntObjectHashMap<>();
 
-    public void add(@NonNull DateTime ts, @NonNull Map<MetricName, MetricValue> metrics) {
-        timestamps.add(ts.toDateTime(DateTimeZone.UTC).getMillis());
+    public void add(long ts, @NonNull Map<MetricName, MetricValue> metrics) {
+        timestamps.add(ts);
         metrics.entrySet().forEach(entry -> {
-            final int mIdx = pathTable.getOrCreate(entry.getKey().getPath());
+            final int mIdx = dictionary.getPathTable().getOrCreate(entry.getKey().getPath());
             MetricTable mt = metricTbl.get(mIdx);
             if (mt == null) {
-                mt = new MetricTable(stringTable);
+                mt = new MetricTable(dictionary);
                 metricTbl.put(mIdx, mt);
             }
 
@@ -91,7 +87,7 @@ public class GroupTable extends AbstractSegmentWriter {
                 .mapToObj(mIdx -> {
                     final tables_metric tm = new tables_metric();
                     tm.metric_ref = mIdx;
-                    tm.pos = filePosTbl.get(mIdx).encode();
+                    tm.pos = ToXdr.filePos(filePosTbl.get(mIdx));
                     return result;
                 })
                 .toArray(tables_metric[]::new);
@@ -100,16 +96,15 @@ public class GroupTable extends AbstractSegmentWriter {
     }
 
     @Override
-    public FilePos write(FileChannel out, long outPos, boolean compress) throws OncRpcException, IOException {
+    public FilePos write(Writer writer, long timestamps[]) throws OncRpcException, IOException {
         for (int mIdx : metricTbl.keys()) {
             if (!filePosTbl.containsKey(mIdx)) {
                 final MetricTable tbl = metricTbl.get(mIdx);
-                final FilePos pos = tbl.write(out, outPos, compress);
+                final FilePos pos = tbl.write(writer, timestamps);
                 filePosTbl.put(mIdx, pos);
-                outPos = pos.getEnd();
             }
         }
 
-        return super.write(out, outPos, compress);
+        return super.write(writer, timestamps);
     }
 }

@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.history.xdr.support.DecodingException;
+import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.AbstractTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;

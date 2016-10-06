@@ -34,29 +34,50 @@ package com.groupon.lex.metrics.history.xdr.support.writer;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import lombok.AllArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrAble;
 
 public abstract class AbstractSegmentWriter {
     public abstract XdrAble encode(long timestamps[]);
 
-    public FilePos write(FileChannel out, long outPos, boolean compress) throws OncRpcException, IOException {
-        outPos = (outPos + 7) / 8;  // Align start of segment to 8 bytes.
-
-        try (Crc32AppendingFileWriter outerWriter = new Crc32AppendingFileWriter(new FileChannelWriter(out, outPos), 4)) {
-            try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(wrapWriter(new CloseInhibitingWriter(outerWriter), compress))) {
-                writer.beginEncoding();
-                encode().xdrEncode(writer);
-                writer.endEncoding();
-            }
-
-            return new FilePos(outPos, outerWriter.getWritten());
-        }
+    public FilePos write(Writer writer, long timestamps[]) throws OncRpcException, IOException {
+        return writer.write(encode(timestamps));
     }
 
-    private static FileWriter wrapWriter(FileWriter underlying, boolean compress) throws IOException {
-        FileWriter result = underlying;
-        if (compress) result = new GzipWriter(result);
-        return result;
+    @AllArgsConstructor
+    public static class Writer {
+        private final FileChannelWriter out;
+        private final boolean compress;
+
+        public Writer(FileChannel out, long offset, boolean compress) {
+            this.out = new FileChannelWriter(out, offset);
+            this.compress = compress;
+        }
+
+        public FilePos write(XdrAble object) throws IOException, OncRpcException {
+            final long initPos;
+            if (compress)
+                initPos = (out.getOffset() + 3) & ~3l;
+            else
+                initPos = (out.getOffset() + 7) & ~7l;
+            out.setOffset(initPos);
+
+            try (Crc32AppendingFileWriter outerWriter = new Crc32AppendingFileWriter(new CloseInhibitingWriter(out), 4)) {
+                try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(wrapWriter(new CloseInhibitingWriter(outerWriter), compress))) {
+                    writer.beginEncoding();
+                    object.xdrEncode(writer);
+                    writer.endEncoding();
+                }
+
+                return new FilePos(initPos, outerWriter.getWritten());
+            }
+        }
+
+        private static FileWriter wrapWriter(FileWriter underlying, boolean compress) throws IOException {
+            FileWriter result = underlying;
+            if (compress) result = new GzipWriter(result);
+            return result;
+        }
     }
 }

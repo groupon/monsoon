@@ -31,26 +31,35 @@
  */
 package com.groupon.lex.metrics.history.v2.tables;
 
-import com.groupon.lex.metrics.history.v2.Dictionary;
+import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
+import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
+import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.writeMimeHeader;
-import static com.groupon.lex.metrics.history.xdr.support.ByteCountingXdrEncodingStream.xdrSize;
-import com.groupon.lex.metrics.history.xdr.support.FileChannelXdrEncodingStream;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.FilePosXdrEncodingStream;
-import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter;
+import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter.Writer;
+import com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter;
+import static com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter.CRC_LEN;
+import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
+import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
+import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
+import gnu.trove.set.TLongSet;
+import gnu.trove.set.hash.TLongHashSet;
 import java.io.IOException;
+import static java.lang.Long.max;
+import static java.lang.Long.min;
 import java.nio.channels.FileChannel;
-import java.util.stream.Stream;
+import java.util.Arrays;
+import java.util.Collection;
 import lombok.NonNull;
 import org.acplt.oncrpc.OncRpcException;
-import org.acplt.oncrpc.XdrAble;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 /**
  * Stateful writer for table-based file.
@@ -60,78 +69,87 @@ import org.joda.time.DateTime;
  * @author ariane
  */
 public class ToXdrTables {
-    private final DateTime begin;
-    private DateTime end;
-    private final Dictionary dictionary = new Dictionary();
+    private long begin, end;
+    private final TLongSet timestamps = new TLongHashSet();
+    private final DictionaryForWrite dictionary = new DictionaryForWrite();
     private final Tables tables;
 
-    public ToXdrTables(@NonNull DateTime begin, @NonNull DateTime end) {
-        this.begin = begin;
-        this.end = this.begin;
-        tables = new Tables(begin, dictionary.getPathTable(), dictionary.getTagsTable(), dictionary.getStringTable());
+    public ToXdrTables() {
+        tables = new Tables(dictionary);
     }
 
     public void add(TimeSeriesCollection tsdata) {
-        final DateTime ts = tsdata.getTimestamp();
-        if (ts.isAfter(end)) end = ts;
-        tables.add(tsdata);
+        add(tsdata.getTimestamp(), tsdata.getTSValues());
     }
 
-    public void add(DateTime ts, Stream<TimeSeriesValue> tsdata) {
-        if (ts.isAfter(end)) end = ts;
-        tables.add(ts, tsdata);
+    public void add(DateTime ts, Collection<TimeSeriesValue> tsdata) {
+        tables.add(updateTimestamps(ts), tsdata);
     }
 
     public void add(DateTime ts, TimeSeriesValue tsv) {
-        if (ts.isAfter(end)) end = ts;
-        tables.add(ts, tsv);
+        tables.add(updateTimestamps(ts), tsv);
+    }
+
+    private long updateTimestamps(DateTime timestamp) {
+        final long ts = timestamp.toDateTime(DateTimeZone.UTC).getMillis();
+        if (timestamps.isEmpty()) {
+            begin = end = ts;
+        } else {
+            begin = min(begin, ts);
+            end = max(end, ts);
+        }
+        timestamps.add(ts);
+        return ts;
     }
 
     public void write(@NonNull FileChannel out, boolean compress) throws OncRpcException, IOException {
-        /* Write mime header */
-        FilePosXdrEncodingStream mimeWriter = new FileChannelXdrEncodingStream(out, 0);
-        mimeWriter.beginEncoding();
-        writeMimeHeader(mimeWriter);
-        mimeWriter.endEncoding();
-        final long outPos = mimeWriter.getFilePos().getEnd();
+        /** Space for headers. */
+        final long hdrSpace = MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN;
+        final long hdrBegin = 0;
 
-        /** Space for header. */
-        final long skip = xdrSize(encodeHeader(compress, new FilePos(0, 0)));
+        /** Create writer. */
+        final FileChannelWriter fd = new FileChannelWriter(out, hdrBegin + hdrSpace);
 
-        /* Write required data for tables (fills in file positions). */
-        final long tablesEnd = tables.write(out, outPos + skip, compress);
-        /* Write tables. */
-        final FilePos bodyPos = new AbstractSegmentWriter() {
-            @Override
-            public XdrAble encode() {
-                return encodeBody();
-            }
-        }.write(out, tablesEnd, compress);
+        /** Write all tables. */
+        final FilePos bodyPos = writeTables(fd, compress);
 
-        /* Write header with (now known) body position. */
-        FilePosXdrEncodingStream hdrWriter = new FileChannelXdrEncodingStream(out, outPos);
-        hdrWriter.beginEncoding();
-        encodeHeader(compress, bodyPos).xdrEncode(hdrWriter);
-        hdrWriter.endEncoding();
-        if (hdrWriter.getFilePos().getLen() != skip)
-            throw new IllegalStateException("header changed size between encodings");
+        /** Write the headers. */
+        fd.setOffset(hdrBegin);
+        try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(fd, hdrSpace), 0))) {
+            writer.beginEncoding();
+            writeMimeHeader(writer);
+            encodeHeader(compress, bodyPos, out.size()).xdrEncode(writer);
+            writer.endEncoding();
+        }
     }
 
-    private tsfile_header encodeHeader(boolean compress, FilePos pos) {
+    private FilePos writeTables(FileChannelWriter out, boolean compress) throws IOException, OncRpcException {
+        long[] timestamps = this.timestamps.toArray();
+        Arrays.sort(timestamps);
+
+        final Writer writer = new Writer(out, compress);
+        tables.write(writer, timestamps);
+        return writer.write(encodeBody(timestamps));
+    }
+
+    private tsfile_header encodeHeader(boolean compress, FilePos pos, long fileSize) {
         tsfile_header hdr = new tsfile_header();
         hdr.first = ToXdr.timestamp(begin);
         hdr.last = ToXdr.timestamp(end);
         hdr.flags = (compress ? header_flags.GZIP : 0) |
+                header_flags.DISTINCT |
                 header_flags.SORTED |
                 header_flags.KIND_TABLES;
         hdr.reserved = 0;
-        hdr.fdt = pos.encode();
+        hdr.file_size = fileSize;
+        hdr.fdt = ToXdr.filePos(pos);
         return hdr;
     }
 
-    private file_data_tables encodeBody() {
+    private file_data_tables encodeBody(long timestamps[]) {
         file_data_tables result = new file_data_tables();
-        result.tables_data = tables.encode();
+        result.tsd = ToXdr.timestamp_delta(begin, timestamps);
+        result.tables_data = tables.encode(timestamps);
         result.dictionary = dictionary.encode();
         return result;
     }

@@ -38,11 +38,14 @@ import lombok.Getter;
 import lombok.NonNull;
 
 public class Crc32VerifyingFileReader implements FileReader {
+    public static final int CRC_LEN = Crc32Reader.CRC_LEN;  // CRC32 is 4 bytes.
     private final Crc32Reader in;
     private final FileReader underlying;
     private final int padLen;
 
     public Crc32VerifyingFileReader(@NonNull FileReader in, long len, int roundUp) {
+        if (roundUp < 0) throw new IllegalArgumentException("cannot round up to negative values");
+        if (roundUp == 0) roundUp = 1;
         this.underlying = in;
         this.in = new Crc32Reader(new SizeVerifyingReader(new CloseInhibitingReader(in), len));
         if (len % roundUp == 0)
@@ -62,7 +65,7 @@ public class Crc32VerifyingFileReader implements FileReader {
         in.close();
         final int readCRC = in.getCrc32();
 
-        final ByteBuffer tmp = underlying.allocateByteBuffer(4);
+        final ByteBuffer tmp = underlying.allocateByteBuffer(CRC_LEN);
         tmp.order(ByteOrder.BIG_ENDIAN);
         while (tmp.hasRemaining()) underlying.read(tmp);
         tmp.flip();

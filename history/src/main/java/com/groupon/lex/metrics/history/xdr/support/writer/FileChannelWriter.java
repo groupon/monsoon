@@ -38,11 +38,13 @@ import java.util.concurrent.ForkJoinPool;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 
 @AllArgsConstructor
 public class FileChannelWriter implements FileWriter {
     private final FileChannel fd;
     @Getter
+    @Setter
     private long offset;
 
     @Override

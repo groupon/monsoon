@@ -39,6 +39,7 @@ import lombok.Getter;
 import lombok.NonNull;
 
 public class Crc32AppendingFileWriter implements FileWriter {
+    public static final int CRC_LEN = Crc32Writer.CRC_LEN;  // CRC32 is 4 bytes.
     private final Crc32Writer out;
     @Getter
     private long written;
@@ -61,7 +62,7 @@ public class Crc32AppendingFileWriter implements FileWriter {
 
     @Override
     public void close() throws IOException {
-        final ByteBuffer buf = allocateByteBuffer(max(4, roundUp));
+        final ByteBuffer buf = allocateByteBuffer(max(CRC_LEN, roundUp - 1));
         buf.order(ByteOrder.BIG_ENDIAN);
 
         if (written % roundUp != 0) {
