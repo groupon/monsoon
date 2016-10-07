@@ -54,7 +54,10 @@ import org.acplt.oncrpc.OncRpcException;
  */
 public class TSDataFactory2 implements TSDataVersionDispatch.Factory {
     @Override
-    public TSData open(TSDataVersionDispatch.Releaseable<FileChannel> fd) throws IOException {
+    public TSData open(TSDataVersionDispatch.Releaseable<FileChannel> fd, boolean completeGzipped) throws IOException {
+        if (completeGzipped)
+            throw new IOException("version 2.x files may not be gzipped");
+
         final tsfile_header hdr;
         try (XdrDecodingFileReader reader = new XdrDecodingFileReader(new FileChannelReader(fd.get(), MIME_HEADER_LEN), HDR_3_LEN)) {
             reader.beginDecoding();

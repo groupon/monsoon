@@ -38,11 +38,16 @@ import static com.groupon.lex.metrics.history.xdr.Const.version_major;
 import static com.groupon.lex.metrics.history.xdr.Const.version_minor;
 import com.groupon.lex.metrics.history.xdr.MmapReadonlyTSDataFile;
 import com.groupon.lex.metrics.history.xdr.UnmappedReadonlyTSDataFile;
+import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID1_EXPECT;
+import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID2_EXPECT;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelReader;
+import com.groupon.lex.metrics.history.xdr.support.reader.FileReader;
+import com.groupon.lex.metrics.history.xdr.support.reader.GzipReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.XdrDecodingFileReader;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -64,13 +69,24 @@ public class TSDataVersionDispatch {
     ));
 
     public static interface Factory {
-        public TSData open(Releaseable<FileChannel> file) throws IOException;
+        public TSData open(Releaseable<FileChannel> file, boolean completeGzipped) throws IOException;
     }
 
     public static TSData open(Path file) throws IOException {
         try (Releaseable<FileChannel> fd = new Releaseable<>(FileChannel.open(file, StandardOpenOption.READ))) {
+            final boolean completeGzipped;
+            try (FileReader reader = new FileChannelReader(fd.get(), 2)) {
+                final byte id1, id2;
+                ByteBuffer tmp_buf = ByteBuffer.allocate(2);
+                reader.read(tmp_buf);
+                tmp_buf.flip();
+                id1 = tmp_buf.get();
+                id2 = tmp_buf.get();
+                completeGzipped = (id1 == ID1_EXPECT && id2 == ID2_EXPECT);
+            }
+
             final int version;
-            try (XdrDecodingFileReader reader = new XdrDecodingFileReader(new FileChannelReader(fd.get(), 0), MIME_HEADER_LEN)) {
+            try (XdrDecodingFileReader reader = new XdrDecodingFileReader(wrapGzip(new FileChannelReader(fd.get(), 0), completeGzipped), MIME_HEADER_LEN)) {
                 reader.beginDecoding();
                 version = validateHeaderOrThrow(reader);
                 reader.endDecoding();
@@ -87,7 +103,7 @@ public class TSDataVersionDispatch {
                 throw new IOException("missing implementation for version " + majorVersion + "." + version_minor(version));
             }
 
-            return factory.open(fd);
+            return factory.open(fd, completeGzipped);
         }
     }
 
@@ -116,11 +132,16 @@ public class TSDataVersionDispatch {
         private static final int MAX_MMAP_SIZE = 32 * 1024 * 1024;
 
         @Override
-        public TSData open(Releaseable<FileChannel> fd) throws IOException {
+        public TSData open(Releaseable<FileChannel> fd, boolean completeGzipped) throws IOException {
             if (fd.get().size() >= MIN_MMAP_SIZE && fd.get().size() <= MAX_MMAP_SIZE)
                 return new MmapReadonlyTSDataFile(fd.get().map(FileChannel.MapMode.READ_ONLY, 0, fd.get().size()));
             else
                 return new UnmappedReadonlyTSDataFile(new GCCloseable<>(fd.release()));
         }
+    }
+
+    private static FileReader wrapGzip(FileReader in, boolean gzipped) throws IOException {
+        if (gzipped) in = new GzipReader(in);
+        return in;
     }
 }
