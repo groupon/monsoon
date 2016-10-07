@@ -7,8 +7,6 @@ package com.groupon.lex.metrics.history.xdr;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrDecodingStream;
 import org.acplt.oncrpc.XdrEncodingStream;
@@ -18,7 +16,6 @@ import org.acplt.oncrpc.XdrEncodingStream;
  * @author ariane
  */
 public class Const {
-    private static final Logger LOG = Logger.getLogger(Const.class.getName());
     private Const() {}
 
     public static byte[] MAGIC = new byte[]{  17,  19,  23,  29,
@@ -90,7 +87,6 @@ public class Const {
     }
 
     public static Validation validateHeader(tsfile_mimeheader hdr) {
-        LOG.log(Level.INFO, "mimeheader: {0}", mimeHexdump(hdr.magic));
         if (!Arrays.equals(MAGIC, hdr.magic)) return Validation.INVALID_MAGIC;
         if (hdr.version_number < 0) return Validation.INVALID_NEG_VERSION;
         int maj_cmp = Short.compare(version_major(hdr.version_number), MAJOR);
