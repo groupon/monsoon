@@ -48,12 +48,7 @@ public class FileChannelReader implements FileReader {
 
     @Override
     public int read(ByteBuffer data) throws IOException {
-        if (offset >= fd.size())
-            throw new EOFException("no more data (file end)");
-
-        final int rlen = fjpRead(data);
-        offset += rlen;
-        return rlen;
+        return fjpRead(data);
     }
 
     @Override
@@ -68,7 +63,7 @@ public class FileChannelReader implements FileReader {
     private class FJPReader implements ForkJoinPool.ManagedBlocker {
         private int read = 0;
         private final ByteBuffer buf;
-        private IOException ex;
+        private IOException ex = null;
 
         public int get() throws IOException {
             if (ex != null) throw ex;
@@ -77,8 +72,13 @@ public class FileChannelReader implements FileReader {
 
         @Override
         public boolean block() throws InterruptedException {
+            if (ex != null) return true;
             try {
-                read += fd.read(buf, offset);
+                int rlen = fd.read(buf, offset);
+                if (rlen == -1)
+                    throw new EOFException("no more data (file end)");
+                read += rlen;
+                offset += rlen;
             } catch (IOException ex) {
                 this.ex = ex;
             }
@@ -87,7 +87,7 @@ public class FileChannelReader implements FileReader {
 
         @Override
         public boolean isReleasable() {
-            return false;
+            return read != 0 || ex != null;
         }
     }
 
