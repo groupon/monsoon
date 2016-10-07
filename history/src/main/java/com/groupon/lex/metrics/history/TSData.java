@@ -1,14 +1,10 @@
 package com.groupon.lex.metrics.history;
 
-import com.groupon.lex.metrics.history.xdr.MmapReadonlyTSDataFile;
-import com.groupon.lex.metrics.history.xdr.UnmappedReadonlyTSDataFile;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Collection;
 import static java.util.Collections.reverse;
 import java.util.HashSet;
@@ -154,14 +150,7 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
         final Logger LOG = Logger.getLogger(TSData.class.getName());
         LOG.log(Level.INFO, "opening {0}", file);
 
-        final long fd_siz = Files.size(file);
-        if (fd_siz >= MIN_MMAP_FILESIZE && fd_siz <= MAX_MMAP_FILESIZE) {
-            try (FileChannel fd = FileChannel.open(file, StandardOpenOption.READ)) {
-                return new MmapReadonlyTSDataFile(fd.map(FileChannel.MapMode.READ_ONLY, 0, fd_siz));
-            }
-        } else {
-            return UnmappedReadonlyTSDataFile.open(file);
-        }
+        return TSDataVersionDispatch.open(file);
     }
 
     /** Return the file channel used to read this file, if it is available. */

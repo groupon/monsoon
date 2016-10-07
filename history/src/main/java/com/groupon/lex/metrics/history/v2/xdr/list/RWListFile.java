@@ -61,6 +61,7 @@ import java.nio.channels.FileChannel;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Optional;
+import java.util.Spliterator;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import lombok.NonNull;
@@ -167,6 +168,11 @@ public class RWListFile implements TSData {
                 () -> fixSequence(state.decodedSequence()).spliterator(),
                 ForwardSequence.SPLITERATOR_CHARACTERISTICS,
                 false);
+    }
+
+    @Override
+    public Spliterator<TimeSeriesCollection> spliterator() {
+        return fixSequence(state.decodedSequence()).spliterator();
     }
 
     @Override
