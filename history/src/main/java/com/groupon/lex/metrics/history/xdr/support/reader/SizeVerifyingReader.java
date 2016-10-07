@@ -49,6 +49,7 @@ public class SizeVerifyingReader implements FileReader {
         if (data.remaining() > expected - read)
             data.limit(data.position() + (int)(expected - read));
 
+        assert(data.remaining() <= expected - read);
         final int rlen = in.read(data);
         read += rlen;
         return rlen;

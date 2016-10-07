@@ -39,52 +39,58 @@ import lombok.NonNull;
 
 public class Crc32VerifyingFileReader implements FileReader {
     public static final int CRC_LEN = Crc32Reader.CRC_LEN;  // CRC32 is 4 bytes.
-    private final Crc32Reader in;
-    private final FileReader underlying;
+    private final Crc32Reader check;  // Used to get CRC.
+    private final FileReader forRead;  // Enforces size of caller to read and prevents accidentally handing out padding bytes.
+    private final FileReader underlying;  // Underlying reader.
     private final int padLen;
 
     public Crc32VerifyingFileReader(@NonNull FileReader in, long len, int roundUp) {
         if (roundUp < 0) throw new IllegalArgumentException("cannot round up to negative values");
         if (roundUp == 0) roundUp = 1;
         this.underlying = in;
-        this.in = new Crc32Reader(new SizeVerifyingReader(new CloseInhibitingReader(in), len));
         if (len % roundUp == 0)
             this.padLen = 0;
         else
             this.padLen = roundUp - (int)(len % roundUp);
+        assert((len + padLen) % roundUp == 0);
+        this.check = new Crc32Reader(new SizeVerifyingReader(new CloseInhibitingReader(this.underlying), len + padLen));
+        this.forRead = new SizeVerifyingReader(new CloseInhibitingReader(this.check), len);
     }
 
     @Override
     public int read(ByteBuffer data) throws IOException {
-        return in.read(data);
+        return forRead.read(data);
     }
 
     @Override
     public void close() throws IOException {
+        forRead.close();  // Verify caller of read() consumed all data.
         consumePadding();
-        in.close();
-        final int readCRC = in.getCrc32();
+        check.close();  // Close check after consuming data, verifies we used up len+padLen that we said we would.
+        final int readCRC = check.getCrc32();
 
+        // Read CRC from underlying reader.
         final ByteBuffer tmp = underlying.allocateByteBuffer(CRC_LEN);
         tmp.order(ByteOrder.BIG_ENDIAN);
         while (tmp.hasRemaining()) underlying.read(tmp);
         tmp.flip();
 
+        // Verify actual CRC equals expected CRC.
         final int expectedCRC = tmp.getInt();
         if (expectedCRC != readCRC) throw new IOCrcMismatchException(readCRC, expectedCRC);
 
-        underlying.close();
+        underlying.close();  // Finally close underlying reader.
     }
 
     @Override
     public ByteBuffer allocateByteBuffer(int size) {
-        return in.allocateByteBuffer(size);
+        return check.allocateByteBuffer(size);
     }
 
     private void consumePadding() throws IOException {
-        final ByteBuffer buf = in.allocateByteBuffer(padLen);
+        final ByteBuffer buf = check.allocateByteBuffer(padLen);
         buf.order(ByteOrder.BIG_ENDIAN);
-        while (buf.hasRemaining()) in.read(buf);
+        while (buf.hasRemaining()) check.read(buf);
         buf.flip();
 
         for (int i = 0; i < padLen; ++i) {
