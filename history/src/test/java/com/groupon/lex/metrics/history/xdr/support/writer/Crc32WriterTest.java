@@ -32,73 +32,51 @@
 package com.groupon.lex.metrics.history.xdr.support.writer;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.zip.GZIPOutputStream;
-import lombok.NonNull;
-import static java.lang.Math.min;
+import java.util.zip.CRC32;
+import static org.junit.Assert.assertEquals;
+import org.junit.Before;
+import org.junit.Test;
 
-public class GzipWriter implements FileWriter {
-    private final GZIPOutputStream gzip;
-
-    public GzipWriter(@NonNull FileWriter out) throws IOException {
-        gzip = new GZIPOutputStream(new GzAdapter(out));
-    }
-
-    @Override
-    public int write(ByteBuffer data) throws IOException {
-        if (data.hasArray()) {
-            final int wlen = data.remaining();
-            gzip.write(data.array(), data.arrayOffset() + data.position(), wlen);
+public class Crc32WriterTest {
+    private FileWriter fileWriter = new FileWriter() {
+        @Override
+        public int write(ByteBuffer data) throws IOException {
+            int wlen = data.remaining();
             data.position(data.limit());
             return wlen;
-        } else {
-            int written = 0;
-            byte buf[] = new byte[512];
-            while (data.hasRemaining()) {
-                final int buflen = min(data.remaining(), buf.length);
-                data.get(buf, 0, buflen);
-                gzip.write(buf, 0, buflen);
-                written += buflen;
-            }
-            return written;
-        }
-    }
-
-    @Override
-    public void close() throws IOException {
-        gzip.close();
-    }
-
-    @Override
-    public ByteBuffer allocateByteBuffer(int size) {
-        return ByteBuffer.allocate(size);
-    }
-
-    private static class GzAdapter extends OutputStream {
-        private final FileWriter out;
-
-        public GzAdapter(@NonNull FileWriter out) {
-            this.out = out;
         }
 
         @Override
-        public void write(int b) throws IOException {
-            byte tmp[] = new byte[1];
-            tmp[0] = (byte)(b & 0xff);
-            write(tmp);
+        public ByteBuffer allocateByteBuffer(int size) {
+            return ByteBuffer.allocate(size);
         }
-
         @Override
-        public void write(byte[] b, int off, int len) throws IOException {
-            ByteBuffer buf = ByteBuffer.wrap(b, off, len);
+        public void close() throws IOException {}
+    };
+
+    private byte data[];
+    private int expectedCrc;
+
+    @Before
+    public void setup() {
+        data = new byte[1024];
+        for (int i = 0; i < data.length; ++i)
+            data[i] = (byte)(i ^ (i % 97));
+
+        CRC32 crc = new CRC32();
+        crc.update(data);
+        expectedCrc = (int)crc.getValue();
+    }
+
+    @Test
+    public void write() throws Exception {
+        try (Crc32Writer writer = new Crc32Writer(fileWriter)) {
+            ByteBuffer buf = ByteBuffer.wrap(data);
             while (buf.hasRemaining())
-                out.write(buf);
-        }
+                writer.write(buf);
 
-        @Override
-        public void close() throws IOException {
-            out.close();
+            assertEquals(expectedCrc, writer.getCrc32());
         }
     }
 }

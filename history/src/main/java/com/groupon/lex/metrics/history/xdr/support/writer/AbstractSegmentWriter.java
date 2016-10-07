@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import lombok.AllArgsConstructor;
+import lombok.NonNull;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrAble;
 
@@ -47,10 +48,11 @@ public abstract class AbstractSegmentWriter {
 
     @AllArgsConstructor
     public static class Writer {
+        @NonNull
         private final FileChannelWriter out;
         private final boolean compress;
 
-        public Writer(FileChannel out, long offset, boolean compress) {
+        public Writer(@NonNull FileChannel out, long offset, boolean compress) {
             this.out = new FileChannelWriter(out, offset);
             this.compress = compress;
         }
