@@ -7,6 +7,8 @@ package com.groupon.lex.metrics.history.xdr;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrDecodingStream;
 import org.acplt.oncrpc.XdrEncodingStream;
@@ -16,6 +18,7 @@ import org.acplt.oncrpc.XdrEncodingStream;
  * @author ariane
  */
 public class Const {
+    private static final Logger LOG = Logger.getLogger(Const.class.getName());
     private Const() {}
 
     public static byte[] MAGIC = new byte[]{  17,  19,  23,  29,
@@ -51,6 +54,10 @@ public class Const {
         NEW_MINOR(0, 1),
         /** File is written with newer major version. */
         NEW_MAJOR(1, 1),
+        /** File is not a valid tsdata file, because magic doesn't match. */
+        INVALID_MAGIC(Integer.MAX_VALUE, Integer.MAX_VALUE),
+        /** File is not a valid tsdata file, because version number is negative. */
+        INVALID_NEG_VERSION(Integer.MAX_VALUE, Integer.MAX_VALUE),
         /** File is not a valid tsdata file. */
         INVALID(Integer.MAX_VALUE, Integer.MAX_VALUE);
 
@@ -85,8 +92,9 @@ public class Const {
     }
 
     public static Validation validateHeader(tsfile_mimeheader hdr) {
-        if (!Arrays.equals(MAGIC, hdr.magic)) return Validation.INVALID;
-        if (hdr.version_number < 0) return Validation.INVALID;
+        LOG.log(Level.INFO, "mimeheader: {0}", mimeHexdump(hdr.magic));
+        if (!Arrays.equals(MAGIC, hdr.magic)) return Validation.INVALID_MAGIC;
+        if (hdr.version_number < 0) return Validation.INVALID_NEG_VERSION;
         int maj_cmp = Short.compare(version_major(hdr.version_number), MAJOR);
         int min_cmp = Short.compare(version_minor(hdr.version_number), MINOR);
         if (maj_cmp != 0) return (maj_cmp < 0 ? Validation.OLD_MAJOR : Validation.NEW_MAJOR);
@@ -96,13 +104,13 @@ public class Const {
 
     public static int validateHeaderOrThrow(tsfile_mimeheader hdr) throws IOException {
         if (!validateHeader(hdr).isReadable())
-            throw new IOException("Can't read this file, header validation yields " + validateHeader(hdr).name());
+            throw new IOException("Can't read this file, header validation yields " + validateHeader(hdr).name() + "(" + versionStr(hdr.version_number) + ")");
         return hdr.version_number;
     }
 
     public static boolean validateHeaderOrThrowForWrite(tsfile_mimeheader hdr) throws IOException {
         if (!validateHeader(hdr).isAcceptable() || !isUpgradable(hdr.version_number))
-            throw new IOException("Can't read this file, header validation yields " + validateHeader(hdr).name());
+            throw new IOException("Can't read this file, header validation yields " + validateHeader(hdr).name() + "(" + versionStr(hdr.version_number) + ")");
         return needsUpgrade(hdr.version_number);
     }
 
@@ -123,5 +131,25 @@ public class Const {
 
     public static void writeMimeHeader(XdrEncodingStream encoder) throws IOException, OncRpcException {
         writeMimeHeader(encoder, MAJOR, MINOR);
+    }
+
+    private static String versionStr(int version) {
+        int major = version_major(version);
+        int minor = version_minor(version);
+        major &= 0xffff;
+        minor &= 0xffff;
+        return "v" + major + "." + minor;
+    }
+
+    private static String mimeHexdump(byte data[]) {
+        if (data.length == 0) return "(no data)";
+
+        String result = new String();
+        for (byte b : data) {
+            int v = b;
+            v &= 0xff;
+            result += " " + Integer.toHexString(v);
+        }
+        return result.substring(1);
     }
 }
