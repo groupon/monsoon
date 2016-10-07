@@ -79,7 +79,7 @@ public class TSDataVersionDispatch {
     public static TSData open(Path file, List<Factory> versionTable) throws IOException {
         try (Releaseable<FileChannel> fd = new Releaseable<>(FileChannel.open(file, StandardOpenOption.READ))) {
             final boolean completeGzipped;
-            try (FileReader reader = new FileChannelReader(fd.get(), 2)) {
+            try (FileReader reader = new FileChannelReader(fd.get(), 0)) {
                 final byte id1, id2;
                 ByteBuffer tmp_buf = ByteBuffer.allocate(2);
                 reader.read(tmp_buf);
