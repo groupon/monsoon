@@ -37,7 +37,7 @@ public class ConstTest {
     @Test
     public void bad_magic() {
         hdr.magic[0] = 'X';
-        assertEquals(Const.Validation.INVALID, Const.validateHeader(hdr));
+        assertEquals(Const.Validation.INVALID_MAGIC, Const.validateHeader(hdr));
     }
 
     @Test

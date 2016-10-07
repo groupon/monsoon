@@ -77,44 +77,28 @@ public class GzipWriter implements FileWriter {
     }
 
     private static class GzAdapter extends OutputStream {
-        private final ByteBuffer buf;
         private final FileWriter out;
 
         public GzAdapter(@NonNull FileWriter out) {
             this.out = out;
-            buf = out.allocateByteBuffer(8192);
         }
 
         @Override
         public void write(int b) throws IOException {
-            while (!buf.hasRemaining()) flushOut();
-            buf.put((byte) b);
+            byte tmp[] = new byte[1];
+            tmp[0] = (byte)(b & 0xff);
+            write(tmp);
         }
 
         @Override
         public void write(byte[] b, int off, int len) throws IOException {
-            while (len > 0) {
-                while (!buf.hasRemaining()) flushOut();
-
-                final int wlen = Math.min(len, buf.remaining());
-                buf.put(b, off, wlen);
-                off += wlen;
-                len -= wlen;
-            }
-        }
-
-        private void flushOut() throws IOException {
-            buf.flip();
-            out.write(buf);
-            buf.compact();
+            ByteBuffer buf = ByteBuffer.wrap(b, off, len);
+            while (buf.hasRemaining())
+                out.write(buf);
         }
 
         @Override
         public void close() throws IOException {
-            buf.flip();
-            while (buf.hasRemaining())
-                out.write(buf);
-            buf.compact();
             out.close();
         }
     }

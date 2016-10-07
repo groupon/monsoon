@@ -34,7 +34,6 @@ package com.groupon.lex.metrics.history.xdr.support.reader;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import static java.lang.Integer.min;
 import java.nio.ByteBuffer;
 import java.util.zip.GZIPInputStream;
 import lombok.NonNull;
@@ -51,8 +50,7 @@ public class GzipReader implements FileReader {
         final int rlen;
         if (data.hasArray()) {
             rlen = gzip.read(data.array(), data.arrayOffset() + data.position(), data.remaining());
-            if (rlen > 0)
-                data.position(data.position() + rlen);
+            if (rlen > 0) data.position(data.position() + rlen);
         } else {
             byte tmp[] = new byte[data.remaining()];
             rlen = gzip.read(tmp);
@@ -75,52 +73,36 @@ public class GzipReader implements FileReader {
     }
 
     private static class GzAdapter extends InputStream {
-        private final ByteBuffer buf;
         private final FileReader in;
 
         public GzAdapter(@NonNull FileReader in) {
             this.in = in;
-            this.buf = in.allocateByteBuffer(8192);
         }
 
         @Override
         public int read() throws IOException {
-            try {
-                while (!buf.hasRemaining()) readMore();
-                return (int)buf.get() & 0xff;
-            } catch (EOFException ex) {
-                return -1;
-            }
+            byte tmp[] = new byte[1];
+            int rlen = read(tmp);
+            if (rlen == -1) return -1;
+            return (int)tmp[0] & 0xff;
         }
 
         @Override
         public int read(byte b[], int off, int len) throws IOException {
-            try {
-                int rlen = 0;
-                while (len > 0) {
-                    if (!buf.hasRemaining()) readMore();
+            if (len == 0) return 0;
 
-                    final int bufGetLen = min(len, buf.remaining());
-                    buf.get(b, off, bufGetLen);
-                    off += bufGetLen;
-                    len -= bufGetLen;
-                    rlen += bufGetLen;
-                }
-                return rlen;
+            int rlen;
+            try {
+                rlen = in.read(ByteBuffer.wrap(b, off, len));
             } catch (EOFException ex) {
-                return -1;
+                rlen = -1;
             }
+            return rlen;
         }
 
         @Override
         public void close() throws IOException {
             in.close();
-        }
-
-        private void readMore() throws IOException {
-            buf.compact();
-            in.read(buf);
-            buf.flip();
         }
     }
 }

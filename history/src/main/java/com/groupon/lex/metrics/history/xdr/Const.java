@@ -57,9 +57,7 @@ public class Const {
         /** File is not a valid tsdata file, because magic doesn't match. */
         INVALID_MAGIC(Integer.MAX_VALUE, Integer.MAX_VALUE),
         /** File is not a valid tsdata file, because version number is negative. */
-        INVALID_NEG_VERSION(Integer.MAX_VALUE, Integer.MAX_VALUE),
-        /** File is not a valid tsdata file. */
-        INVALID(Integer.MAX_VALUE, Integer.MAX_VALUE);
+        INVALID_NEG_VERSION(Integer.MAX_VALUE, Integer.MAX_VALUE);
 
         private final int same_major_;
         private final int same_minor_;

@@ -73,6 +73,10 @@ public class TSDataVersionDispatch {
     }
 
     public static TSData open(Path file) throws IOException {
+        return open(file, VERSION_TABLE);
+    }
+
+    public static TSData open(Path file, List<Factory> versionTable) throws IOException {
         try (Releaseable<FileChannel> fd = new Releaseable<>(FileChannel.open(file, StandardOpenOption.READ))) {
             final boolean completeGzipped;
             try (FileReader reader = new FileChannelReader(fd.get(), 2)) {
@@ -97,7 +101,7 @@ public class TSDataVersionDispatch {
             final short majorVersion = version_major(version);
             final Factory factory;
             try {
-                factory = VERSION_TABLE.get(majorVersion);
+                factory = versionTable.get(majorVersion);
                 if (factory == null) throw new IndexOutOfBoundsException("null decoder");
             } catch (IndexOutOfBoundsException ex) {
                 throw new IOException("missing implementation for version " + majorVersion + "." + version_minor(version));

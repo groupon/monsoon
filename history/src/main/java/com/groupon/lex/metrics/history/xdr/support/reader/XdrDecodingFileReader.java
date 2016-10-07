@@ -42,18 +42,22 @@ import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrDecodingStream;
 
 public class XdrDecodingFileReader extends XdrDecodingStream implements Closeable {
+    private static final int MIN_BUFSIZ = 4;
+    private static final int DEFAULT_BUFSIZ = 64 * 1024;
     private final FileReader in;
     private final ByteBuffer buf;
 
     public XdrDecodingFileReader(@NonNull FileReader in, int bufSiz) {
-        if (bufSiz < 4) bufSiz = 4;
+        if (bufSiz < MIN_BUFSIZ) bufSiz = MIN_BUFSIZ;
         this.in = in;
         buf = in.allocateByteBuffer(bufSiz);
         buf.order(ByteOrder.BIG_ENDIAN);
+        buf.flip();
+        setCharacterEncoding("UTF-8");
     }
 
     public XdrDecodingFileReader(@NonNull FileReader in) {
-        this(in, 64 * 1024);
+        this(in, DEFAULT_BUFSIZ);
     }
 
     @Override
