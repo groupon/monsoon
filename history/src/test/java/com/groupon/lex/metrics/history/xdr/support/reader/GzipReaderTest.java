@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.history.xdr.support.reader;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
@@ -81,5 +82,30 @@ public class GzipReaderTest {
         }
 
         assertArrayEquals(expected, output);
+    }
+
+    @Test
+    public void readUsingDirectByteBuffer() throws Exception {
+        byte output[] = new byte[expected.length];
+
+        try (FileReader reader = new GzipReader(new FileChannelReader(file, 0))) {
+            ByteBuffer buf = ByteBuffer.allocateDirect(output.length + 100);
+            while (buf.position() < output.length)
+                reader.read(buf);
+
+            buf.flip();
+            buf.get(output);
+        }
+
+        assertArrayEquals(expected, output);
+    }
+
+    @Test(expected = EOFException.class)
+    public void eof() throws Exception {
+        try (FileReader reader = new GzipReader(new FileChannelReader(file, 0))) {
+            ByteBuffer buf = ByteBuffer.allocateDirect(expected.length + 100);
+            while (buf.hasRemaining())
+                reader.read(buf);
+        }
     }
 }
