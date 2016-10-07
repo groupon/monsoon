@@ -71,7 +71,7 @@ public class TSDataVersionDispatchTest {
     @Before
     public void setup() throws Exception {
         File fileName = File.createTempFile("monsoon-", "-TSDataVersionDispatch");
-//        fileName.deleteOnExit();
+        fileName.deleteOnExit();
         file = fileName.toPath();
         LOG.log(Level.INFO, "using test file: {0}", file);
 
@@ -103,7 +103,7 @@ public class TSDataVersionDispatchTest {
         TSData opened = TSDataVersionDispatch.open(file, FACTORY);
 
         assertSame(tsdata, opened);
-        verify(factory_v0, times(1)).open(Mockito.any(), false);
+        verify(factory_v0, times(1)).open(Mockito.any(), Mockito.anyBoolean());
         verifyNoMoreInteractions(factory_v0);
         verifyZeroInteractions(factory_v1, tsdata);
     }
@@ -115,7 +115,7 @@ public class TSDataVersionDispatchTest {
         TSData opened = TSDataVersionDispatch.open(file, FACTORY);
 
         assertSame(tsdata, opened);
-        verify(factory_v1, times(1)).open(Mockito.any(), false);
+        verify(factory_v1, times(1)).open(Mockito.any(), Mockito.anyBoolean());
         verifyNoMoreInteractions(factory_v1);
         verifyZeroInteractions(factory_v0, tsdata);
     }
@@ -127,7 +127,7 @@ public class TSDataVersionDispatchTest {
         TSData opened = TSDataVersionDispatch.open(file, FACTORY);
 
         assertSame(tsdata, opened);
-        verify(factory_v0, times(1)).open(Mockito.any(), true);
+        verify(factory_v0, times(1)).open(Mockito.any(), Mockito.anyBoolean());
         verifyNoMoreInteractions(factory_v0);
         verifyZeroInteractions(factory_v1, tsdata);
     }
@@ -139,7 +139,7 @@ public class TSDataVersionDispatchTest {
         TSData opened = TSDataVersionDispatch.open(file, FACTORY);
 
         assertSame(tsdata, opened);
-        verify(factory_v1, times(1)).open(Mockito.any(), true);
+        verify(factory_v1, times(1)).open(Mockito.any(), Mockito.anyBoolean());
         verifyNoMoreInteractions(factory_v1);
         verifyZeroInteractions(factory_v0, tsdata);
     }
