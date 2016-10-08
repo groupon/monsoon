@@ -46,6 +46,7 @@ import com.groupon.lex.metrics.history.v2.xdr.record_array;
 import com.groupon.lex.metrics.history.v2.xdr.tsdata;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
 import com.groupon.lex.metrics.history.xdr.Const;
+import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
 import com.groupon.lex.metrics.history.xdr.support.ObjectSequence;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
@@ -91,7 +92,7 @@ public final class ReadWriteState implements State {
     private final GCCloseable<FileChannel> file;
     private final List<SegmentReader<ReadonlyTSDataHeader>> tsdataHeaders;
     private DictionaryForWrite writerDictionary;
-    private final tsfile_header hdr;
+    private tsfile_header hdr;
 
     public ReadWriteState(GCCloseable<FileChannel> file, tsfile_header hdr) throws IOException, OncRpcException {
         this.file = file;
@@ -166,6 +167,7 @@ public final class ReadWriteState implements State {
     }
 
     private synchronized void addRecords(Collection<? extends TimeSeriesCollection> tscList) throws IOException, OncRpcException {
+        LOG.log(Level.FINER, "adding {0} records", tscList.size());
         if (tscList.isEmpty()) return;
 
         final boolean compressed;
@@ -183,14 +185,21 @@ public final class ReadWriteState implements State {
                 lock.unlock();
             }
         }
+        LOG.log(Level.FINER, "newWriterDict initialized (strOffset={0}, pathOffset={1}, tagsOffset={2})",
+                new Object[]{
+                    newWriterDict.getStringTable().getOffset(),
+                    newWriterDict.getPathTable().getOffset(),
+                    newWriterDict.getTagsTable().getOffset()});
 
         /* Encode all headers (which fills the newWriterDict in the process. */
         final List<EncodedTscHeaderForWrite> headers = tscList.stream()
                 .sorted()
                 .map(tsc -> new EncodedTscHeaderForWrite(tsc, newWriterDict))
                 .collect(Collectors.toList());
+        LOG.log(Level.FINER, "encoded {0} headers", headers);
         /* First header will write dictionary delta. */
-        headers.get(0).setNewWriterDict(newWriterDict);
+        if (!newWriterDict.isEmpty())
+            headers.get(0).setNewWriterDict(newWriterDict);
 
         /* Write all headers (fills in hdr.recordOffset from argument). */
         for (EncodedTscHeaderForWrite tscHdr : headers)
@@ -198,11 +207,14 @@ public final class ReadWriteState implements State {
 
         /* Prepare new dictionary for installation. */
         final DictionaryDelta newDictionary;
-        if (newWriterDict.isEmpty())
+        if (newWriterDict.isEmpty()) {
             newDictionary = null;
-        else
+            LOG.log(Level.FINER, "not installing new dictionary: delta is empty");
+        } else {
             newDictionary = writerDictionary.asDictionaryDelta();
-        writerDictionary = newWriterDict;
+            writerDictionary = newWriterDict;
+            LOG.log(Level.FINER, "installing new dictionary");
+        }
 
         /*
          * Prepare updated file header.
@@ -224,6 +236,7 @@ public final class ReadWriteState implements State {
              */
             hdr.file_size = recordOffset;
             writeHeader(hdr);
+            this.hdr = hdr;
 
             /*
              * Update all data structures.
@@ -235,8 +248,10 @@ public final class ReadWriteState implements State {
                     .collect(Collectors.toList());
 
             tsdataHeaders.addAll(newTsdataHeaders);
-            dictionary = calculateDictionary(file, compressed, tsdataHeaders)
-                    .cache(newDictionary);
+            if (newDictionary != null) {
+                dictionary = calculateDictionary(file, compressed, tsdataHeaders)
+                        .cache(newDictionary);
+            }
             tsdata.addAll(newTsdataHeaders.stream()
                     .map(roHdr -> {
                         return roHdr
@@ -349,19 +364,31 @@ public final class ReadWriteState implements State {
 
             final long recordEnd = recordOffset + HEADER_BYTES;
             try (FileChannelWriter fileWriter = new FileChannelWriter(file, recordEnd)) {
+                LOG.log(Level.FINEST, "file offset {0}", fileWriter.getOffset());
                 final Writer writer = new Writer(fileWriter, compressed);
-                if (newWriterDict.isEmpty())
+                if (newWriterDict == null) {
+                    LOG.log(Level.FINEST, "dictionary absent -> not writing delta");
                     tscHdr.dd_len = 0;
-                else
-                    tscHdr.dd_len = writer.write(newWriterDict.encode()).getLen();
+                } else {
+                    FilePos pos = writer.write(newWriterDict.encode());
+                    tscHdr.dd_len = pos.getLen();
+                    LOG.log(Level.FINEST, "dictionary present, encoded at position {0}", pos);
+                }
 
-                tscHdr.r_len = writer.write(encodedTsc).getLen();
+                {
+                    LOG.log(Level.FINEST, "file offset {0}", fileWriter.getOffset());
+                    FilePos pos = writer.write(encodedTsc);
+                    tscHdr.r_len = pos.getLen();
+                    LOG.log(Level.FINEST, "records encoded at position {0}", pos);
+                }
 
                 newFileEnd = fileWriter.getOffset();
+                LOG.log(Level.FINEST, "payload ends at {0}", newFileEnd);
             }
 
-            try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(file, recordOffset), HEADER_BYTES), 4))) {
+            try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(file, recordOffset), HEADER_BYTES), 4), TSDATA_HDR_LEN)) {
                 tscHdr.xdrEncode(writer);
+                LOG.log(Level.FINEST, "tsdata header written at {0}", recordOffset);
             }
 
             return newFileEnd;

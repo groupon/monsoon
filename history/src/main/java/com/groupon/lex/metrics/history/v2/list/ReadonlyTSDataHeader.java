@@ -44,12 +44,15 @@ import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import java.nio.channels.FileChannel;
 import java.util.Optional;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import lombok.Value;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
 @Value
 public class ReadonlyTSDataHeader {
+    private static final Logger LOG = Logger.getLogger(ReadonlyTSDataHeader.class.getName());
     private final long ts;
     private final FilePos dictionary, records;
 
@@ -71,7 +74,11 @@ public class ReadonlyTSDataHeader {
     }
 
     public SegmentReader<Optional<dictionary_delta>> dictionaryDecoder(GCCloseable<FileChannel> file, boolean compressed) {
-        if (dictionary.getLen() == 0) return SegmentReader.of(Optional.empty());
+        if (dictionary.getLen() == 0) {
+            LOG.log(Level.FINER, "no dictionary present");
+            return SegmentReader.of(Optional.empty());
+        }
+        LOG.log(Level.FINER, "dictionary present at {0}", dictionary);
         return new FileChannelSegmentReader<>(dictionary_delta::new, file, dictionary, compressed)
                 .map(Optional::of);
     }

@@ -40,7 +40,6 @@ import com.groupon.lex.metrics.history.v2.xdr.group_table;
 import com.groupon.lex.metrics.history.v2.xdr.tables_metric;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter;
-import static gnu.trove.TCollections.unmodifiableMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TLongSet;
@@ -88,7 +87,7 @@ public class GroupTable extends AbstractSegmentWriter {
                     final tables_metric tm = new tables_metric();
                     tm.metric_ref = mIdx;
                     tm.pos = ToXdr.filePos(filePosTbl.get(mIdx));
-                    return result;
+                    return tm;
                 })
                 .toArray(tables_metric[]::new);
 

@@ -138,10 +138,10 @@ public class RTFMetricTable {
                 if (presence[i]) ++len;
 
             int buildIdx = 0;
-            map = new int[len];
+            map = new int[presence.length];
             for (int i = 0; i < presence.length; ++i) {
                 if (presence[i])
-                    map[i] = buildIdx;
+                    map[i] = buildIdx++;
                 else
                     map[i] = -1;
             }
@@ -149,7 +149,7 @@ public class RTFMetricTable {
         }
 
         public final boolean contains(int index) {
-            return index >= 0 && index < map.length && map.length >= 0;
+            return index >= 0 && index < map.length && map[index] >= 0;
         }
 
         public final MetricValue get(int index) {

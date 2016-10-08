@@ -103,7 +103,7 @@ public class RWListFile implements TSData {
             state = new ReadOnlyState(file, hdr);
     }
 
-    public static RWListFile newFile(@NonNull GCCloseable<FileChannel> file, boolean compress) throws IOException, OncRpcException {
+    public static RWListFile newFile(@NonNull GCCloseable<FileChannel> file, boolean compress) throws IOException {
         final tsfile_header hdr = new tsfile_header();
         hdr.last = hdr.first = ToXdr.timestamp(new DateTime(DateTimeZone.UTC));
         hdr.file_size = MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN;
@@ -111,14 +111,18 @@ public class RWListFile implements TSData {
         hdr.reserved = 0;
         hdr.fdt = ToXdr.filePos(new FilePos(0, 0));
 
-        try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(file.get(), 0), MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN), 0))) {
-            writer.beginEncoding();
-            writeMimeHeader(writer, FILE_VERSION, (short)0);
-            hdr.xdrEncode(writer);
-            writer.endEncoding();
-        }
+        try {
+            try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(file.get(), 0), MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN), 0))) {
+                writer.beginEncoding();
+                writeMimeHeader(writer, FILE_VERSION, (short)0);
+                hdr.xdrEncode(writer);
+                writer.endEncoding();
+            }
 
-        return new RWListFile(file, true);
+            return new RWListFile(file, true);
+        } catch (OncRpcException ex) {
+            throw new IllegalStateException("newly created file may never throw encoding errors", ex);
+        }
     }
 
     @Override

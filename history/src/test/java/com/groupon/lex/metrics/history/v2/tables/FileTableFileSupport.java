@@ -56,7 +56,7 @@ public class FileTableFileSupport implements FileSupport.Writer {
     }
 
     @Override
-    public short getMajor() { return (short)3; }
+    public short getMajor() { return (short)2; }
     @Override
     public short getMinor() { return (short)0; }
 }

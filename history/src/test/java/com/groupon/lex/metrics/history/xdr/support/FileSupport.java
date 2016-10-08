@@ -22,6 +22,7 @@ import static java.nio.file.StandardOpenOption.WRITE;
 import java.util.Collection;
 import static java.util.Collections.singletonMap;
 import java.util.List;
+import java.util.Random;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -98,12 +99,21 @@ public class FileSupport {
 
         return new StreamedCollection<>(() -> Stream.generate(new CounterSupplier()))
                 .map((Integer i) -> {
-                    final DateTime now = NOW.plusMinutes(i);
-                    final MetricValue value = MetricValue.fromIntValue(i);
+                    System.err.println("computing TSC " + i);
+                    final DateTime now = NOW.plusSeconds(5 * i);
+                    final Random rnd = new Random(Integer.hashCode(i));  // Deterministic RNG.
 
                     final Stream<TimeSeriesValue> tsv_stream = group_names.stream()
-                            .map(name -> new MutableTimeSeriesValue(now, name, metric_names.stream(), Function.identity(), (ignored) -> value));
+                            .map(name -> {
+                                return new MutableTimeSeriesValue(
+                                        now,
+                                        name,
+                                        metric_names.stream(),
+                                        Function.identity(),
+                                        (ignored) -> MetricValue.fromIntValue(rnd.nextLong()));
+                            });
 
+                    System.err.println("emitting TSC " + i);
                     return new FileTimeSeriesCollection(now, tsv_stream);
                 });
     }

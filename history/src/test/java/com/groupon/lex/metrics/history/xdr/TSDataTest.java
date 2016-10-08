@@ -87,7 +87,7 @@ public class TSDataTest {
 
     @Before
     public void setup() throws Exception {
-        tmpdir = Files.createTempDirectory("monsoon-MmapReadonlyTSDataFileTest");
+        tmpdir = Files.createTempDirectory("monsoon-TSDataTest");
         tmpdir.toFile().deleteOnExit();
         tmpfile = tmpdir.resolve("test.tsd");
     }

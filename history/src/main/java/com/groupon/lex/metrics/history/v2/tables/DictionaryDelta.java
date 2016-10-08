@@ -163,19 +163,19 @@ public class DictionaryDelta {
 
     public String getString(int ref) {
         if (ref < stringRefOffset || ref - stringRefOffset >= stringTable.size())
-            throw new IllegalArgumentException("Invalid string reference");
+            throw new IllegalArgumentException("Invalid string reference (" + ref + " not between " + stringRefOffset + " and " + (stringRefOffset + stringTable.size()) + ")");
         return requireNonNull(stringTable.get(ref - stringRefOffset), "Programmer error: elements in dictionary should not be null");
     }
 
     public Tags getTags(int ref) {
         if (ref < tagsRefOffset || ref - tagsRefOffset >= tagsTable.size())
-            throw new IllegalArgumentException("Invalid tags reference");
+            throw new IllegalArgumentException("Invalid tags reference (" + ref + " not between " + tagsRefOffset + " and " + (tagsRefOffset + tagsTable.size()) + ")");
         return requireNonNull(tagsTable.get(ref - tagsRefOffset), "Programmer error: elements in dictionary should not be null");
     }
 
     public List<String> getPath(int ref) {
         if (ref < pathRefOffset || ref - pathRefOffset >= pathTable.size())
-            throw new IllegalArgumentException("Invalid path reference");
+            throw new IllegalArgumentException("Invalid path reference (" + ref + " not between " + pathRefOffset + " and " + (pathRefOffset + pathTable.size()) + ")");
         return requireNonNull(pathTable.get(ref - pathRefOffset), "Programmer error: elements in dictionary should not be null");
     }
 }

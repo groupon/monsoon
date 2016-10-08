@@ -2,20 +2,21 @@ package com.groupon.lex.metrics.history.xdr;
 
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.history.TSData;
+import com.groupon.lex.metrics.history.v2.list.RWListFile;
+import com.groupon.lex.metrics.history.v2.tables.ToXdrTables;
 import com.groupon.lex.metrics.history.xdr.TSDataScanDir.MetaData;
 import com.groupon.lex.metrics.history.xdr.support.MultiFileIterator;
 import com.groupon.lex.metrics.history.xdr.support.TSDataMap;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.lang.ref.SoftReference;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import static java.nio.channels.Channels.newOutputStream;
 import java.nio.channels.FileChannel;
-import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import static java.nio.file.StandardOpenOption.CREATE_NEW;
+import static java.nio.file.StandardOpenOption.READ;
+import static java.nio.file.StandardOpenOption.WRITE;
 import java.security.SecureRandom;
 import java.util.Collection;
 import java.util.Collections;
@@ -38,9 +39,9 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import java.util.zip.GZIPOutputStream;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -116,7 +117,7 @@ public class TSDataFileChain implements TSData {
     });
     private final Path dir_;
     private Optional<Path> write_filename_;
-    private SoftReference<WriteableTSDataFile> write_store_;
+    private SoftReference<RWListFile> write_store_;
 
     private TSDataFileChain(Path dir, Optional<Path> wfile, Collection<MetaData> rfiles, long max_filesize) {
         dir_ = requireNonNull(dir);
@@ -128,7 +129,7 @@ public class TSDataFileChain implements TSData {
         max_filesize_ = max_filesize;
     }
 
-    private TSDataFileChain(Path dir, Path wfile, WriteableTSDataFile wfd, long max_filesize) {
+    private TSDataFileChain(Path dir, Path wfile, RWListFile wfd, long max_filesize) {
         dir_ = requireNonNull(dir);
         write_filename_ = Optional.of(wfile);
         write_store_ = new SoftReference<>(wfd);
@@ -177,19 +178,23 @@ public class TSDataFileChain implements TSData {
         return openDir(new TSDataScanDir(dir), max_filesize);
     }
 
-    private synchronized Optional<WriteableTSDataFile> get_write_store_() throws IOException {
+    private synchronized Optional<RWListFile> get_write_store_() throws IOException {
         if (!write_filename_.isPresent()) return Optional.empty();
 
-        WriteableTSDataFile store = write_store_.get();
-        if (store == null) {
-            store = WriteableTSDataFile.open(write_filename_.get());
-            write_store_ = new SoftReference<>(store);
+        try {
+            RWListFile store = write_store_.get();
+            if (store == null) {
+                store = new RWListFile(new GCCloseable<>(FileChannel.open(write_filename_.get(), StandardOpenOption.READ, StandardOpenOption.WRITE)), true);
+                write_store_ = new SoftReference<>(store);
+            }
+            return Optional.of(store);
+        } catch (OncRpcException ex) {
+            throw new IOException("failed to open writeable file " + write_filename_.get(), ex);
         }
-        return Optional.of(store);
     }
 
-    private synchronized WriteableTSDataFile get_write_store_for_writing_(DateTime ts_trigger) throws IOException {
-        Optional<WriteableTSDataFile> opt_store = get_write_store_();
+    private synchronized RWListFile get_write_store_for_writing_(DateTime ts_trigger) throws IOException {
+        Optional<RWListFile> opt_store = get_write_store_();
         if (opt_store.filter((fd) -> fd.getFileSize() < max_filesize_).isPresent()) return opt_store.get();
 
         try {
@@ -441,25 +446,14 @@ public class TSDataFileChain implements TSData {
             }
         }
 
-        if (tsdata.isGzipped()) return false;
-        final Optional<GCCloseable<FileChannel>> opt_channel = tsdata.getFileChannel();
-        final GCCloseable<FileChannel> channel;
-        if (opt_channel.isPresent()) {
-            channel = opt_channel.get();
-        } else {
-            try {
-                channel = new GCCloseable<>(FileChannel.open(file.getFile(), StandardOpenOption.READ));
-            } catch (IOException ex) {
-                LOG.log(Level.WARNING, "unable to open file: " + file + ", skipping compression...", ex);
-                return false;
-            }
-        }
+        final ToXdrTables tables = new ToXdrTables();
+        tsdata.stream().forEach(tables::add);
 
         final String base_name = file.getFile().getFileName().toString();
         FileChannel compressed_data;
         Path new_filename;
         for (int i = 0; true; ++i) {
-            new_filename = file.getFile().resolveSibling(base_name + (i == 0 ? "" : "." + i) + ".gz");
+            new_filename = file.getFile().resolveSibling(base_name + (i == 0 ? "" : "." + i) + ".optimized");
             try {
                 compressed_data = FileChannel.open(new_filename, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
                 break;
@@ -474,41 +468,37 @@ public class TSDataFileChain implements TSData {
             return false;
         }
 
-        try (WritableByteChannel output = Channels.newChannel(new GZIPOutputStream(newOutputStream(compressed_data)))) {
-            final FileChannel fd = channel.get();
-            final long size = fd.size();
-
-            final ByteBuffer buf = ByteBuffer.allocateDirect(4096);
-            long pos = 0;
-            for (;;) {
-                int rlen;
-                rlen = fd.read(buf, pos);
-                if (rlen == -1) break;
-                pos += rlen;
-                buf.flip();
-
-                output.write(buf);
-                buf.compact();
+        try {
+            try {
+                tables.write(compressed_data, false);
+            } catch (OncRpcException ex) {
+                throw new IOException("encoding failure", ex);
             }
-            if (pos != size)
-                throw new IOException("incorrect number of bytes written");
 
             Files.delete(file.getFile());
             read_stores_.remove(file);  // Remove if present.
             read_stores_.put(new Key(new_filename, file.getBegin(), file.getEnd()), null);
             return true;
         } catch (IOException ex) {
-            LOG.log(Level.SEVERE, "unable to write gzip file " + new_filename, ex);
+            LOG.log(Level.SEVERE, "unable to write optimized file " + new_filename, ex);
             try {
                 Files.delete(new_filename);
             } catch (IOException ex1) {
                 LOG.log(Level.SEVERE, "unable to remove output file " + new_filename, ex1);
+                ex.addSuppressed(ex1);
             }
             return false;
+        } finally {
+            try {
+                assert(compressed_data != null);
+                compressed_data.close();
+            } catch (IOException ex) {
+                LOG.log(Level.WARNING, "unable to close optimized file {0}", new_filename);
+            }
         }
     }
 
-    private synchronized WriteableTSDataFile install_new_store_(Optional<WriteableTSDataFile> old_store, Path file, WriteableTSDataFile new_store) {
+    private synchronized RWListFile install_new_store_(Optional<RWListFile> old_store, Path file, RWListFile new_store) {
         requireNonNull(file);
         requireNonNull(new_store);
 
@@ -523,7 +513,7 @@ public class TSDataFileChain implements TSData {
         return new_store;
     }
 
-    private WriteableTSDataFile new_store_(Optional<WriteableTSDataFile> old_store, DateTime begin) throws IOException {
+    private RWListFile new_store_(Optional<RWListFile> old_store, DateTime begin) throws IOException {
         requireNonNull(begin);
         final String prefix = String.format("monsoon-%04d%02d%02d-%02d%02d", begin.getYear(), begin.getMonthOfYear(), begin.getDayOfMonth(), begin.getHourOfDay(), begin.getMinuteOfHour());
 
@@ -532,8 +522,9 @@ public class TSDataFileChain implements TSData {
          */
         String name = prefix + ".tsd";
         Path new_filename = dir_.resolve(name);
+        GCCloseable<FileChannel> fd = null;
         try {
-            return install_new_store_(old_store, new_filename, WriteableTSDataFile.newFile(new_filename, begin, begin));
+            fd = new GCCloseable<>(FileChannel.open(new_filename, READ, WRITE, CREATE_NEW));
         } catch (IOException ex) {
             /* Ignore. */
         }
@@ -542,24 +533,28 @@ public class TSDataFileChain implements TSData {
          * Try with random number as differentiator between filenames.
          */
         SecureRandom random = new SecureRandom();
-        for (int i = 0; i < 15; ++i) {
+        for (int i = 0; i < 15 && fd == null; ++i) {
             long idx = random.nextLong();
             name = String.format("%s-%d.tsd", prefix, idx);
             new_filename = dir_.resolve(name);
             try {
-                return install_new_store_(old_store, new_filename, WriteableTSDataFile.newFile(new_filename, begin, begin));
+                fd = new GCCloseable<>(FileChannel.open(new_filename, READ, WRITE, CREATE_NEW));
             } catch (IOException ex) {
                 /* Ignore. */
             }
         }
 
-        /*
-         * Try one more time with differentiator, but let the exception out this time.
-         */
-        long idx = random.nextLong();
-        name = String.format("%s-%d.tsd", prefix, idx);
-        new_filename = dir_.resolve(name);
-        return install_new_store_(old_store, new_filename, WriteableTSDataFile.newFile(new_filename, begin, begin));
+        if (fd == null) {
+            /*
+             * Try one more time with differentiator, but let the exception out this time.
+             */
+            long idx = random.nextLong();
+            name = String.format("%s-%d.tsd", prefix, idx);
+            new_filename = dir_.resolve(name);
+            fd = new GCCloseable<>(FileChannel.open(new_filename, READ, WRITE, CREATE_NEW));
+        }
+
+        return install_new_store_(old_store, new_filename, RWListFile.newFile(fd, false));
     }
 
     @Override
