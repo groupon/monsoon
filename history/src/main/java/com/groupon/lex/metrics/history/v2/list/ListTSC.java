@@ -91,7 +91,7 @@ public class ListTSC extends AbstractTimeSeriesCollection {
         try {
             return data.decode();
         } catch (IOException | OncRpcException ex) {
-            throw new DecodingException("unable to extract metrics for " + timestamp);
+            throw new DecodingException("unable to extract metrics for " + timestamp, ex);
         }
     }
 
