@@ -211,7 +211,7 @@ public final class ReadWriteState implements State {
             newDictionary = null;
             LOG.log(Level.FINER, "not installing new dictionary: delta is empty");
         } else {
-            newDictionary = writerDictionary.asDictionaryDelta();
+            newDictionary = newWriterDict.asDictionaryDelta();
             writerDictionary = newWriterDict;
             LOG.log(Level.FINER, "installing new dictionary");
         }
