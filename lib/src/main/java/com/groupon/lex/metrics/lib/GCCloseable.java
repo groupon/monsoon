@@ -31,7 +31,7 @@ public class GCCloseable<T extends AutoCloseable> {
 
         assert(item != null);
         try {
-            LOG.log(Level.INFO, "closing " + item);
+            LOG.log(Level.FINE, "closing {0}", item);
             item.close();
         } catch (Exception ex) {
             LOG.log(Level.SEVERE, "Failed to close " + item, ex);
