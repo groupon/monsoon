@@ -58,12 +58,7 @@ public abstract class AbstractSegmentWriter {
         }
 
         public FilePos write(XdrAble object) throws IOException, OncRpcException {
-            final long initPos;
-            if (compress)
-                initPos = (out.getOffset() + 3) & ~3l;
-            else
-                initPos = (out.getOffset() + 7) & ~7l;
-            out.setOffset(initPos);
+            final long initPos = out.getOffset();
 
             try (Crc32AppendingFileWriter outerWriter = new Crc32AppendingFileWriter(new CloseInhibitingWriter(out), 4)) {
                 try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(wrapWriter(new CloseInhibitingWriter(outerWriter), compress))) {

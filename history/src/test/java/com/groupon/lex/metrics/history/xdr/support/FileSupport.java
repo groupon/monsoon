@@ -99,7 +99,6 @@ public class FileSupport {
 
         return new StreamedCollection<>(() -> Stream.generate(new CounterSupplier()))
                 .map((Integer i) -> {
-                    System.err.println("computing TSC " + i);
                     final DateTime now = NOW.plusSeconds(5 * i);
                     final Random rnd = new Random(Integer.hashCode(i));  // Deterministic RNG.
 
@@ -113,7 +112,6 @@ public class FileSupport {
                                         (ignored) -> MetricValue.fromIntValue(rnd.nextLong()));
                             });
 
-                    System.err.println("emitting TSC " + i);
                     return new FileTimeSeriesCollection(now, tsv_stream);
                 });
     }

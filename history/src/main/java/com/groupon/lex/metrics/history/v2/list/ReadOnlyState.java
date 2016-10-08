@@ -52,11 +52,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import lombok.Getter;
 import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
 
 public class ReadOnlyState implements State {
+    private static final Logger LOG = Logger.getLogger(ReadOnlyState.class.getName());
     /** Cached TSData headers. */
     private final List<SegmentReader<TimeSeriesCollection>> tsdata;
     @Getter
@@ -116,6 +119,7 @@ public class ReadOnlyState implements State {
     }
 
     public static SegmentReader<ReadonlyTSDataHeader> readTSDataHeader(GCCloseable<FileChannel> file, long offset) {
+        LOG.log(Level.FINEST, "new ReadonlyTSDataHeader segment at {0}", offset);
         return new FileChannelSegmentReader<>(tsdata::new, file, new FilePos(offset, TSDATA_HDR_LEN), false)
                 .map(tsd -> new ReadonlyTSDataHeader(offset, tsd))
                 .cache();

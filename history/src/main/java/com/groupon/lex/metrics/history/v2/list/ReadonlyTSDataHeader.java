@@ -63,6 +63,8 @@ public class ReadonlyTSDataHeader {
             this.records = new FilePos(this.dictionary.getOffset(), tsd.r_len);
         else
             this.records = new FilePos(this.dictionary.getOffset() + segmentLength(this.dictionary.getLen()), tsd.r_len);
+
+        LOG.log(Level.FINER, "offset = {0}, dictionary at {1}, records at {2}", new Object[]{offset, this.dictionary, this.records});
     }
 
     public DateTime getTimestamp() {

@@ -387,7 +387,9 @@ public final class ReadWriteState implements State {
             }
 
             try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(file, recordOffset), HEADER_BYTES), 4), TSDATA_HDR_LEN)) {
+                writer.beginEncoding();
                 tscHdr.xdrEncode(writer);
+                writer.endEncoding();
                 LOG.log(Level.FINEST, "tsdata header written at {0}", recordOffset);
             }
 

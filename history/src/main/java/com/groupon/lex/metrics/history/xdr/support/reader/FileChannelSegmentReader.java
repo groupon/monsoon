@@ -36,6 +36,8 @@ import com.groupon.lex.metrics.lib.GCCloseable;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NonNull;
@@ -45,6 +47,7 @@ import org.acplt.oncrpc.XdrAble;
 
 @AllArgsConstructor
 public class FileChannelSegmentReader<T extends XdrAble> implements SegmentReader<T> {
+    private static final Logger LOG = Logger.getLogger(FileChannelSegmentReader.class.getName());
     @NonNull
     private final Supplier<T> type;
     @NonNull
@@ -59,6 +62,7 @@ public class FileChannelSegmentReader<T extends XdrAble> implements SegmentReade
         try (XdrDecodingFileReader reader = new XdrDecodingFileReader(wrapReader(new Crc32VerifyingFileReader(new FileChannelReader(file.get(), pos.getOffset()), pos.getLen(), 4)))) {
             reader.beginDecoding();
             T instance = type.get();
+            LOG.log(Level.FINEST, "decoding {0} at {1}", new Object[]{instance.getClass(), pos});
             instance.xdrDecode(reader);
             reader.endDecoding();
             return instance;
