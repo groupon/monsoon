@@ -94,7 +94,7 @@ public class MmapReadonlyTSDataFileTest {
         assertEquals(Files.size(tmpfile), fd.getFileSize());
         assertEquals(tsdata.get(0).getTimestamp(), fd.getBegin());
         assertEquals(tsdata.get(tsdata.size() - 1).getTimestamp(), fd.getEnd());
-        assertFalse(fd.isGzipped());
+        assertEquals(file_support.isCompressed(), fd.isGzipped());
         assertFalse(fd.getFileChannel().isPresent());
         assertEquals(tsdata.size(), fd.size());
         assertEquals(file_support.getMajor(), fd.getMajor());
