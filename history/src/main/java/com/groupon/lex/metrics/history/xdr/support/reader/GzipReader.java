@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.history.xdr.support.reader;
 
+import com.groupon.lex.metrics.history.xdr.support.IOLengthVerificationFailed;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,9 +41,15 @@ import lombok.NonNull;
 
 public class GzipReader implements FileReader {
     private final GZIPInputStream gzip;
+    private final boolean validateAllRead;
+
+    public GzipReader(FileReader in, boolean validateAllRead) throws IOException {
+        this.gzip = new GZIPInputStream(new GzAdapter(in));
+        this.validateAllRead = validateAllRead;
+    }
 
     public GzipReader(FileReader in) throws IOException {
-        this.gzip = new GZIPInputStream(new GzAdapter(in));
+        this(in, true);
     }
 
     @Override
@@ -64,6 +71,10 @@ public class GzipReader implements FileReader {
 
     @Override
     public void close() throws IOException {
+        if (validateAllRead) {
+            if (gzip.read() != -1)
+                throw new IOLengthVerificationFailed(0, 0);
+        }
         gzip.close();
     }
 

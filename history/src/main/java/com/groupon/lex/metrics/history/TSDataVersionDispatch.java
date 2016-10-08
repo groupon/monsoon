@@ -142,7 +142,7 @@ public class TSDataVersionDispatch {
     }
 
     private static FileReader wrapGzip(FileReader in, boolean gzipped) throws IOException {
-        if (gzipped) in = new GzipReader(in);
+        if (gzipped) in = new GzipReader(in, false);
         return in;
     }
 }
