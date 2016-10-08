@@ -470,7 +470,7 @@ public class TSDataFileChain implements TSData {
 
         try {
             try {
-                tables.write(compressed_data, false);
+                tables.write(compressed_data, true);
             } catch (OncRpcException ex) {
                 throw new IOException("encoding failure", ex);
             }
@@ -505,7 +505,9 @@ public class TSDataFileChain implements TSData {
         write_filename_.ifPresent(filename -> {
             final Key old_store_key = new Key(filename, old_store.get().getBegin(), old_store.get().getEnd());
             read_stores_.put(old_store_key, old_store.orElse(null));
+            final long t0 = System.currentTimeMillis();
             compress_file_(old_store_key, old_store.orElse(null));
+            LOG.log(Level.INFO, "optimizing file {0} took {1} msec", new Object[]{filename, System.currentTimeMillis() - t0});
         });
 
         write_filename_ = Optional.of(file);
@@ -554,7 +556,8 @@ public class TSDataFileChain implements TSData {
             fd = new GCCloseable<>(FileChannel.open(new_filename, READ, WRITE, CREATE_NEW));
         }
 
-        return install_new_store_(old_store, new_filename, RWListFile.newFile(fd, false));
+        LOG.log(Level.INFO, "rotating into new file {0}", new_filename);
+        return install_new_store_(old_store, new_filename, RWListFile.newFile(fd, true));
     }
 
     @Override
