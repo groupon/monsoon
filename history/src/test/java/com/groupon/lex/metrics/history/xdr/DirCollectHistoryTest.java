@@ -33,7 +33,7 @@ import org.junit.Test;
 public class DirCollectHistoryTest {
     private static final long LIMIT = 4l * 1024 * 1024;
     private static final long MAX_FILESIZE = 1l * 1024 * 1024;
-    private final FileSupport file_support = new FileSupport(Const.MAJOR, Const.MINOR);
+    private final FileSupport file_support = new FileSupport(FileSupport.NO_WRITER, false);
     private Path tmpdir;
     private DirCollectHistory hist;
 

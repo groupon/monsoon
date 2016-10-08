@@ -29,7 +29,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.history.v2.xdr.list;
+package com.groupon.lex.metrics.history.v2.list;
 
 import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
 import com.groupon.lex.metrics.history.v2.tables.DictionaryDelta;
@@ -38,10 +38,10 @@ import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.ALL_HDR_CRC_LEN;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.TSDATA_HDR_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
-import static com.groupon.lex.metrics.history.v2.xdr.list.ReadOnlyState.calculateDictionary;
-import static com.groupon.lex.metrics.history.v2.xdr.list.ReadOnlyState.calculateTimeSeries;
-import static com.groupon.lex.metrics.history.v2.xdr.list.ReadOnlyState.readAllTSDataHeaders;
-import static com.groupon.lex.metrics.history.v2.xdr.list.ReadOnlyState.readTSDataHeader;
+import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.calculateDictionary;
+import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.calculateTimeSeries;
+import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.readAllTSDataHeaders;
+import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.readTSDataHeader;
 import com.groupon.lex.metrics.history.v2.xdr.record_array;
 import com.groupon.lex.metrics.history.v2.xdr.tsdata;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
@@ -100,6 +100,8 @@ public final class ReadWriteState implements State {
         dictionary = calculateDictionary(file, isGzipped(), tsdataHeaders)
                 .cache();
         tsdata = calculateTimeSeries(file, isGzipped(), tsdataHeaders, SegmentReader.ofSupplier(this::getDictionary).flatMap(x -> x));
+
+        writerDictionary = new DictionaryForWrite(dictionary.decode());
     }
 
     private <T> T doReadLocked(Supplier<T> fn) {

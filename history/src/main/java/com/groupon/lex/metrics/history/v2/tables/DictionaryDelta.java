@@ -50,9 +50,11 @@ import java.util.List;
 import static java.util.Objects.requireNonNull;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
 
+@EqualsAndHashCode
 public class DictionaryDelta {
     private final List<String> stringTable;
     private final List<List<String>> pathTable;

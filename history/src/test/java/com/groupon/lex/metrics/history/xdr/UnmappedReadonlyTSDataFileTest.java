@@ -10,7 +10,8 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
-import static com.groupon.lex.metrics.history.xdr.support.FileSupport.compress_file;
+import com.groupon.lex.metrics.history.xdr.support.FileSupport0;
+import com.groupon.lex.metrics.history.xdr.support.FileSupport1;
 import com.groupon.lex.metrics.history.xdr.support.FileTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -30,7 +31,6 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.junit.After;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import org.junit.Before;
@@ -52,8 +52,10 @@ public class UnmappedReadonlyTSDataFileTest {
     @Parameterized.Parameters
     public static Collection<Object[]> parameters() {
         return Arrays.asList(
-                new Object[]{ new FileSupport((short)0, (short)1) },
-                new Object[]{ new FileSupport((short)1, (short)0) }
+                new Object[]{ new FileSupport(new FileSupport0(), false) },
+                new Object[]{ new FileSupport(new FileSupport1(), false) },
+                new Object[]{ new FileSupport(new FileSupport0(), true) },
+                new Object[]{ new FileSupport(new FileSupport1(), true) }
         );
     }
 
@@ -87,7 +89,7 @@ public class UnmappedReadonlyTSDataFileTest {
     }
 
     @Test
-    public void read_uncompressed() throws Exception {
+    public void read() throws Exception {
         file_support.create_file(tmpfile, tsdata);
 
         final UnmappedReadonlyTSDataFile fd = UnmappedReadonlyTSDataFile.open(tmpfile);
@@ -95,27 +97,7 @@ public class UnmappedReadonlyTSDataFileTest {
         assertEquals(Files.size(tmpfile), fd.getFileSize());
         assertEquals(tsdata.get(0).getTimestamp(), fd.getBegin());
         assertEquals(tsdata.get(tsdata.size() - 1).getTimestamp(), fd.getEnd());
-        assertFalse(fd.isGzipped());
-        assertTrue(fd.getFileChannel().isPresent());
-        assertEquals(tsdata.size(), fd.size());
-        assertEquals(file_support.getMajor(), fd.getMajor());
-        assertEquals(file_support.getMinor(), fd.getMinor());
-        assertThat(fd, IsIterableContainingInOrder.contains(tsdata.stream().map(Matchers::equalTo).collect(Collectors.toList())));
-        assertThat(fd.streamReversed().collect(Collectors.toList()),
-                IsIterableContainingInOrder.contains(expect_reversed.stream().map(Matchers::equalTo).collect(Collectors.toList())));
-    }
-
-    @Test
-    public void read_compressed() throws Exception {
-        file_support.create_file(tmpfile, tsdata);
-        compress_file(tmpfile);
-
-        final UnmappedReadonlyTSDataFile fd = UnmappedReadonlyTSDataFile.open(tmpfile);
-
-        assertEquals(Files.size(tmpfile), fd.getFileSize());
-        assertEquals(tsdata.get(0).getTimestamp(), fd.getBegin());
-        assertEquals(tsdata.get(tsdata.size() - 1).getTimestamp(), fd.getEnd());
-        assertTrue(fd.isGzipped());
+        assertEquals(file_support.isCompressed(), fd.isGzipped());
         assertTrue(fd.getFileChannel().isPresent());
         assertEquals(tsdata.size(), fd.size());
         assertEquals(file_support.getMajor(), fd.getMajor());

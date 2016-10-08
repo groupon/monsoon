@@ -42,7 +42,7 @@ import org.junit.Test;
  */
 public class TSDataFileChainTest {
     private static final Logger LOG = Logger.getLogger(TSDataFileChainTest.class.getName());
-    private final FileSupport file_support = new FileSupport(Const.MAJOR, Const.MINOR);
+    private final FileSupport file_support = new FileSupport(FileSupport.NO_WRITER, false);
     private Path tmpdir, emptydir;
     private TSDataFileChain fd;
     public static final int LARGE_COUNT = 500;  // Enough to trigger file roll-over.

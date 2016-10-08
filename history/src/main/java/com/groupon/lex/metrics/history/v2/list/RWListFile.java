@@ -29,7 +29,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.history.v2.xdr.list;
+package com.groupon.lex.metrics.history.v2.list;
 
 import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
@@ -70,7 +70,7 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
 public class RWListFile implements TSData {
-    private static final short FILE_VERSION = 3;  // Only file version that uses Table format.
+    private static final short FILE_VERSION = 2;  // Only file version that uses Table format.
     private final State state;
 
     public RWListFile(@NonNull GCCloseable<FileChannel> file, boolean forWrite) throws IOException, OncRpcException {
@@ -83,7 +83,7 @@ public class RWListFile implements TSData {
             /* Check the mime header and version number first. */
             final int version = validateHeaderOrThrow(reader);
             if (Const.version_major(version) != FILE_VERSION)
-                throw new IllegalArgumentException("TableFile is version 3 only");
+                throw new IllegalArgumentException("ListFile is version " + FILE_VERSION + " only");
 
             /* Read the header; we don't actually process its information until
              * the CRC validation completes (it's in the close part of try-with-resources). */
@@ -113,7 +113,7 @@ public class RWListFile implements TSData {
 
         try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(file.get(), 0), MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN), 0))) {
             writer.beginEncoding();
-            writeMimeHeader(writer);
+            writeMimeHeader(writer, FILE_VERSION, (short)0);
             hdr.xdrEncode(writer);
             writer.endEncoding();
         }

@@ -61,7 +61,7 @@ import org.acplt.oncrpc.XdrAble;
 import org.joda.time.DateTime;
 
 public class ReadonlyTableFile implements TSData {
-    private static final short FILE_VERSION = 3;  // Only file version that uses Table format.
+    private static final short FILE_VERSION = 2;  // Only file version that uses Table format.
     private final SegmentReader<RTFFileDataTables> body;
     private final GCCloseable<FileChannel> fd;
     @Getter
@@ -168,7 +168,7 @@ public class ReadonlyTableFile implements TSData {
             /* Check the mime header and version number first. */
             version = validateHeaderOrThrow(reader);
             if (Const.version_major(version) != FILE_VERSION)
-                throw new IllegalArgumentException("TableFile is version 3 only");
+                throw new IllegalArgumentException("TableFile is version " + FILE_VERSION + " only");
 
             /* Read the header; we don't actually process its information until
              * the CRC validation completes (it's in the close part of try-with-resources). */

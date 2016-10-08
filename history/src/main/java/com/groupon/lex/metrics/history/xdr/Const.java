@@ -22,7 +22,7 @@ public class Const {
                                              'M', 'O', 'N', '-',
                                              's', 'o', 'o', 'n' };  // 12 chars
     public static final int MIME_HEADER_LEN = 16;  // Mime header is 16 bytes.
-    public static final short MAJOR = 1;
+    public static final short MAJOR = 2;
     public static final short MINOR = 0;
 
     public static int version_from_majmin(short maj, short min) {

@@ -11,13 +11,21 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.history.TSData;
+import com.groupon.lex.metrics.history.v2.list.FileListFileSupport;
+import com.groupon.lex.metrics.history.v2.list.RWListFile;
+import com.groupon.lex.metrics.history.v2.tables.FileTableFileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
-import static com.groupon.lex.metrics.history.xdr.support.FileSupport.compress_file;
+import com.groupon.lex.metrics.history.xdr.support.FileSupport0;
+import com.groupon.lex.metrics.history.xdr.support.FileSupport1;
 import com.groupon.lex.metrics.history.xdr.support.FileTimeSeriesCollection;
+import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import java.io.File;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collection;
 import static java.util.Collections.EMPTY_LIST;
@@ -32,11 +40,14 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.hamcrest.Matchers;
-import static org.hamcrest.Matchers.instanceOf;
 import org.hamcrest.collection.IsIterableContainingInOrder;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -44,10 +55,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.Ignore;
 
 /**
  *
@@ -62,8 +70,14 @@ public class TSDataTest {
     @Parameterized.Parameters
     public static Collection<Object[]> parameters() {
         return Arrays.asList(
-                new Object[]{ new FileSupport((short)0, (short)1) },
-                new Object[]{ new FileSupport((short)1, (short)0) }
+                new Object[]{ new FileSupport(new FileSupport0(), false) },
+                new Object[]{ new FileSupport(new FileSupport1(), false) },
+                new Object[]{ new FileSupport(new FileTableFileSupport(), false) },
+                new Object[]{ new FileSupport(new FileListFileSupport(), false) },
+                new Object[]{ new FileSupport(new FileSupport0(), true) },
+                new Object[]{ new FileSupport(new FileSupport1(), true) },
+                new Object[]{ new FileSupport(new FileTableFileSupport(), true) },
+                new Object[]{ new FileSupport(new FileListFileSupport(), true) }
         );
     }
 
@@ -84,7 +98,7 @@ public class TSDataTest {
     }
 
     @Test
-    public void read_uncompressed() throws Exception {
+    public void read() throws Exception {
         final List<TimeSeriesCollection> tsdata = create_tsdata_(100).collect(Collectors.toList());
         file_support.create_file(tmpfile, tsdata);
 
@@ -93,60 +107,12 @@ public class TSDataTest {
         assertEquals(Files.size(tmpfile), fd.getFileSize());
         assertEquals(tsdata.get(0).getTimestamp(), fd.getBegin());
         assertEquals(tsdata.get(tsdata.size() - 1).getTimestamp(), fd.getEnd());
-        assertFalse(fd.isGzipped());
+        assertEquals(file_support.isCompressed(), fd.isGzipped());
         assertNotNull(fd.getFileChannel());
         assertEquals(tsdata.size(), fd.size());
         assertEquals(file_support.getMajor(), fd.getMajor());
         assertEquals(file_support.getMinor(), fd.getMinor());
         assertThat(fd, IsIterableContainingInOrder.contains(tsdata.stream().map(Matchers::equalTo).collect(Collectors.toList())));
-    }
-
-    @Test
-    public void read_compressed() throws Exception {
-        final List<TimeSeriesCollection> tsdata = create_tsdata_(100).collect(Collectors.toList());
-        file_support.create_file(tmpfile, tsdata);
-        compress_file(tmpfile);
-
-        final TSData fd = TSData.readonly(tmpfile);
-
-        assertEquals(Files.size(tmpfile), fd.getFileSize());
-        assertEquals(create_tsdata_(100).findFirst().get().getTimestamp(), fd.getBegin());
-        assertEquals(create_tsdata_(100).skip(99).findFirst().get().getTimestamp(), fd.getEnd());
-        assertTrue(fd.isGzipped());
-        assertNotNull(fd.getFileChannel());
-        assertEquals(tsdata.size(), fd.size());
-        assertEquals(file_support.getMajor(), fd.getMajor());
-        assertEquals(file_support.getMinor(), fd.getMinor());
-        assertThat(fd, IsIterableContainingInOrder.contains(create_tsdata_(100).map(Matchers::equalTo).collect(Collectors.toList())));
-    }
-
-    @Test
-    public void read_really_large_file() throws Exception {
-        // Use the TSData writer to create this file.
-        int count = 0;
-        {
-            final TSData writer = WriteableTSDataFile.newFile(tmpfile, tsdata_begin_(TSData.MAX_MMAP_FILESIZE), tsdata_begin_(TSData.MAX_MMAP_FILESIZE));
-            Iterator<TimeSeriesCollection> iter = create_tsdata_(TSData.MAX_MMAP_FILESIZE).iterator();
-
-            while (writer.getFileSize() <= TSData.MAX_MMAP_FILESIZE) {
-                writer.add(iter.next());
-                ++count;
-            }
-        }
-
-        // Use streaming matcher, to evade giant collection.
-        final int expected_count = count;
-        Iterator<TimeSeriesCollection> expected = create_tsdata_(TSData.MAX_MMAP_FILESIZE).limit(expected_count).iterator();
-
-        TSData fd = TSData.readonly(tmpfile);
-        assertThat(fd, instanceOf(UnmappedReadonlyTSDataFile.class));
-
-        Iterator<TimeSeriesCollection> fd_iter = fd.iterator();
-        while (expected.hasNext()) {
-            assertTrue(fd_iter.hasNext());
-            assertEquals(expected.next(), fd_iter.next());
-        }
-        assertFalse(fd_iter.hasNext());
     }
 
     @Test(expected = UnsupportedOperationException.class)
@@ -167,8 +133,39 @@ public class TSDataTest {
         fd.addAll(tsdata);
     }
 
-    private DateTime tsdata_begin_(int count) {
-        return NOW.minusMinutes(count - 1);
+    /* This test is designed not to fit in memory. */
+    @Test
+    @Ignore
+    public void read_really_large_file() throws Exception {
+        final int FILESIZE = 32 * 1024 * 1024;
+        // Use the TSData writer to create this file.
+        int count = 0;
+        {
+            File collectionFile = File.createTempFile("monsoon-", "-TSDataTest--really_large");
+            collectionFile.deleteOnExit();
+            final TSData writer = RWListFile.newFile(new GCCloseable<>(FileChannel.open(collectionFile.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE)), true);
+            Iterator<TimeSeriesCollection> iter = create_tsdata_(FILESIZE).iterator();
+
+            while (writer.getFileSize() <= FILESIZE) {
+                writer.add(iter.next());
+                ++count;
+            }
+
+            file_support.create_file(tmpfile, writer);
+        }
+
+        // Use streaming matcher, to evade giant collection.
+        final int expected_count = count;
+        Iterator<TimeSeriesCollection> expected = create_tsdata_(FILESIZE).limit(expected_count).iterator();
+
+        TSData fd = TSData.readonly(tmpfile);
+
+        Iterator<TimeSeriesCollection> fd_iter = fd.iterator();
+        while (expected.hasNext()) {
+            assertTrue(fd_iter.hasNext());
+            assertEquals(expected.next(), fd_iter.next());
+        }
+        assertFalse(fd_iter.hasNext());
     }
 
     private Stream<TimeSeriesCollection> create_tsdata_(int count) {

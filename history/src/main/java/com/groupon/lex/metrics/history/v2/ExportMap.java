@@ -34,16 +34,26 @@ package com.groupon.lex.metrics.history.v2;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import java.util.ArrayList;
+import static java.util.Collections.EMPTY_MAP;
 import java.util.List;
+import java.util.Map;
+import lombok.EqualsAndHashCode;
 
+@EqualsAndHashCode
 public class ExportMap<T> implements Cloneable {
     private static final int NO_ENTRY = -1;
     private final TObjectIntMap<T> table = new TObjectIntHashMap<>(10, 0.5f, NO_ENTRY);
     private int initSeq;
     private int nextSeq;
 
-    public ExportMap(int nextSeq) { this.initSeq = this.nextSeq = nextSeq; }
-    public ExportMap() { this(0); }
+    public ExportMap() { this(0, EMPTY_MAP); }
+    public ExportMap(int nextSeq, Map<Integer, T> init) {
+        this.initSeq = this.nextSeq = nextSeq;
+        init.forEach((idx, val) -> {
+            if (this.nextSeq <= idx) this.nextSeq = idx + 1;
+            table.put(val, idx);
+        });
+    }
 
     private ExportMap(ExportMap<T> original) {
         table.putAll(original.table);
@@ -58,14 +68,14 @@ public class ExportMap<T> implements Cloneable {
     }
 
     public int getOffset() { return initSeq; }
-    public boolean isEmpty() { return table.isEmpty(); }
+    public boolean isEmpty() { return !table.containsValue(initSeq); }
 
     public ArrayList<T> invert() {
         final ArrayList<T> data = new ArrayList<>(nextSeq);
         for (int i = 0; i < nextSeq; ++i) data.add(null);  // Make all elements accessable by data.set().
 
         table.forEachEntry((key, value) -> {
-            data.set(value - initSeq, key);
+            data.set(value, key);
             return true;
         });
         return data;

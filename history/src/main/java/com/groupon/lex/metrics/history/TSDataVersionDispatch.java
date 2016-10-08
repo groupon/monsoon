@@ -132,12 +132,9 @@ public class TSDataVersionDispatch {
     }
 
     private static class TSData_0_and_1 implements Factory {
-        private static final int MIN_MMAP_SIZE =  1 * 1024 * 1024;
-        private static final int MAX_MMAP_SIZE = 32 * 1024 * 1024;
-
         @Override
         public TSData open(Releaseable<FileChannel> fd, boolean completeGzipped) throws IOException {
-            if (fd.get().size() >= MIN_MMAP_SIZE && fd.get().size() <= MAX_MMAP_SIZE)
+            if (!completeGzipped)
                 return new MmapReadonlyTSDataFile(fd.get().map(FileChannel.MapMode.READ_ONLY, 0, fd.get().size()));
             else
                 return new UnmappedReadonlyTSDataFile(new GCCloseable<>(fd.release()));

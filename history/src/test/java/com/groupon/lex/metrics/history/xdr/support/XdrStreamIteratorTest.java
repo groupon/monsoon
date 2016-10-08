@@ -45,8 +45,8 @@ public class XdrStreamIteratorTest {
     @Parameterized.Parameters
     public static Collection<Object[]> parameters() {
         return Arrays.asList(
-                new Object[]{ new FileSupport((short)0, (short)1) },
-                new Object[]{ new FileSupport((short)1, (short)0) }
+                new Object[]{ new FileSupport(new FileSupport0(), false) },
+                new Object[]{ new FileSupport(new FileSupport1(), false) }
         );
     }
 

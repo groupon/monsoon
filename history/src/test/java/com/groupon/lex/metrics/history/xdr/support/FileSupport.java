@@ -5,15 +5,15 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.history.TSDataVersionDispatch.Releaseable;
+import com.groupon.lex.metrics.history.xdr.Const;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.io.IOException;
 import static java.lang.Math.sqrt;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import static java.nio.file.StandardOpenOption.CREATE;
@@ -26,7 +26,9 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.zip.GZIPOutputStream;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -34,60 +36,47 @@ import org.joda.time.DateTimeZone;
  * Utilities for creating and compressing TSData files.
  * @author ariane
  */
+@RequiredArgsConstructor
 public class FileSupport {
     public static interface Writer {
-        public ByteBuffer create_file(List<? extends TimeSeriesCollection> tsdata, short minor) throws IOException;
+        public void create_file(Releaseable<FileChannel> fd, Collection<? extends TimeSeriesCollection> tsdata, boolean compress) throws IOException;
+        public short getMajor();
+        public short getMinor();
     }
 
-    private final short major;
-    private final short minor;
-    public final DateTime NOW = new DateTime(DateTimeZone.UTC);
-
-    public short getMajor() { return major; }
-    public short getMinor() { return minor; }
-
-    public FileSupport(short major, short minor) {
-        this.major = major;
-        this.minor = minor;
-    }
-
-    /** Create a file. */
-    public void create_file(Path file, List<? extends TimeSeriesCollection> tsdata) throws IOException {
-        final Writer writer;
-        switch(major) {
-            default:
-                throw new IOException("major " + major + " not recognized");
-            case 0:
-                writer = new FileSupport0();
-                break;
-            case 1:
-                writer = new FileSupport1();
-                break;
+    public static final Writer NO_WRITER = new Writer() {
+        @Override
+        public void create_file(Releaseable<FileChannel> fd, Collection<? extends TimeSeriesCollection> tsdata, boolean compress) throws IOException {
+            throw new UnsupportedOperationException("Not a writer.");
         }
 
-        try (FileChannel fd = FileChannel.open(file, READ, WRITE, CREATE)) {
-            fd.write(writer.create_file(tsdata, minor));
+        @Override
+        public short getMajor() {
+            return Const.MAJOR;
+        }
+
+        @Override
+        public short getMinor() {
+            return Const.MINOR;
+        }
+    };
+
+    @NonNull
+    private final Writer writer;
+    @Getter
+    private final boolean compressed;
+    public final DateTime NOW = new DateTime(DateTimeZone.UTC);
+
+    public short getMajor() { return writer.getMajor(); }
+    public short getMinor() { return writer.getMinor(); }
+
+    /** Create a file. */
+    public void create_file(Path file, Collection<? extends TimeSeriesCollection> tsdata) throws IOException {
+        try (Releaseable<FileChannel> fd = new Releaseable<>(FileChannel.open(file, READ, WRITE, CREATE))) {
+            writer.create_file(fd, tsdata, compressed);
         } catch (IOException | RuntimeException ex) {
             Files.delete(file);
             throw ex;
-        }
-    }
-
-    /** Compress file in place. */
-    public static void compress_file(Path file) throws IOException {
-        final ByteBuffer file_data;
-        try (FileChannel fd = FileChannel.open(file, READ, WRITE)) {
-            file_data = ByteBuffer.allocateDirect((int)fd.size());
-            fd.read(file_data);
-            file_data.flip();
-
-            // Write data in place.
-            fd.position(0);
-            fd.truncate(0);
-
-            try (WritableByteChannel out = Channels.newChannel(new GZIPOutputStream(Channels.newOutputStream(fd)))) {
-                out.write(file_data);
-            }
         }
     }
 

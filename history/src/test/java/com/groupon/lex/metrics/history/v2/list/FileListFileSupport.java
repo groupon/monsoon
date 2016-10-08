@@ -29,36 +29,35 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.history.v2.xdr.list;
+package com.groupon.lex.metrics.history.v2.list;
 
-import com.groupon.lex.metrics.history.xdr.support.DecodingException;
-import com.groupon.lex.metrics.history.xdr.support.ObjectSequence;
-import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
+import com.groupon.lex.metrics.history.TSDataVersionDispatch;
+import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.Collection;
 import org.acplt.oncrpc.OncRpcException;
-import org.joda.time.DateTime;
 
-public interface State {
-    public ObjectSequence<SegmentReader<TimeSeriesCollection>> sequence();
-    public void add(TimeSeriesCollection tsc);
-    public void addAll(Collection<? extends TimeSeriesCollection> tsc);
-    public boolean isGzipped();
-    public DateTime getBegin();
-    public DateTime getEnd();
-    public GCCloseable<FileChannel> getFile();
-
-    public default ObjectSequence<TimeSeriesCollection> decodedSequence() {
-        return sequence()
-                .map((segment) -> {
-                    try {
-                        return segment.decode();
-                    } catch (IOException | OncRpcException ex) {
-                        throw new DecodingException("stream decoding error", ex);
-                    }
-                }, true, true, true);
+/**
+ *
+ * @author ariane
+ */
+public class FileListFileSupport implements FileSupport.Writer {
+    @Override
+    public void create_file(TSDataVersionDispatch.Releaseable<FileChannel> fd, Collection<? extends TimeSeriesCollection> tsdata, boolean compress) throws IOException {
+        try {
+            RWListFile listFile = RWListFile.newFile(new GCCloseable<>(fd.release()), true);
+            tsdata.forEach(listFile::add);
+        } catch (OncRpcException ex) {
+            throw new IOException(ex);
+        }
     }
+
+    @Override
+    public short getMajor() { return (short)3; }
+    @Override
+    public short getMinor() { return (short)0; }
+
 }

@@ -32,9 +32,6 @@ import org.joda.time.DateTime;
  * @author ariane
  */
 public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory {
-    public final static int MIN_MMAP_FILESIZE =  0 * 1024 * 1024;
-    public final static int MAX_MMAP_FILESIZE = 32 * 1024 * 1024;
-
     /** Get the lowest timestamp covered by this TSData series. */
     public DateTime getBegin();
     /** Get the highest timestamp covered by this TSData series. */

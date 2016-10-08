@@ -33,10 +33,10 @@ package com.groupon.lex.metrics.history.v2;
 
 import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.TSDataVersionDispatch;
+import com.groupon.lex.metrics.history.v2.list.RWListFile;
 import com.groupon.lex.metrics.history.v2.tables.ReadonlyTableFile;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
-import com.groupon.lex.metrics.history.v2.xdr.list.RWListFile;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
 import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelReader;
