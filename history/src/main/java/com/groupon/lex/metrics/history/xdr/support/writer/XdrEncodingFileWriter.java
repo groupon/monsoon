@@ -42,7 +42,7 @@ import org.acplt.oncrpc.XdrEncodingStream;
 
 public class XdrEncodingFileWriter extends XdrEncodingStream implements AutoCloseable {
     private static final int MIN_BUFSIZ = 4;
-    private static final int DEFAULT_BUFSIZ = 64 * 1024;
+    private static final int DEFAULT_BUFSIZ = 128;
     private final ByteBuffer buf;
     private final FileWriter out;
 
@@ -51,10 +51,18 @@ public class XdrEncodingFileWriter extends XdrEncodingStream implements AutoClos
     }
 
     public XdrEncodingFileWriter(@NonNull FileWriter out, int bufsiz) {
-        if (bufsiz < MIN_BUFSIZ) bufsiz = MIN_BUFSIZ;
+        this(out, out.allocateByteBuffer(bufsiz));
+    }
+
+    public XdrEncodingFileWriter(@NonNull FileWriter out, ByteBuffer useBuffer) {
+        if (useBuffer == null)
+            useBuffer = out.allocateByteBuffer(DEFAULT_BUFSIZ);
+        else
+            useBuffer.clear();
+        if (useBuffer.remaining() < MIN_BUFSIZ) useBuffer = out.allocateByteBuffer(MIN_BUFSIZ);
+        useBuffer.order(ByteOrder.BIG_ENDIAN);
         this.out = out;
-        buf = out.allocateByteBuffer(bufsiz);
-        buf.order(ByteOrder.BIG_ENDIAN);
+        this.buf = useBuffer;
         setCharacterEncoding("UTF-8");
     }
 

@@ -33,6 +33,7 @@ package com.groupon.lex.metrics.history.xdr.support.writer;
 
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
@@ -51,6 +52,7 @@ public abstract class AbstractSegmentWriter {
         @NonNull
         private final FileChannelWriter out;
         private final boolean compress;
+        private ByteBuffer useBuffer;  // May be null.
 
         public Writer(@NonNull FileChannel out, long offset, boolean compress) {
             this.out = new FileChannelWriter(out, offset);
@@ -61,7 +63,7 @@ public abstract class AbstractSegmentWriter {
             final long initPos = out.getOffset();
 
             try (Crc32AppendingFileWriter outerWriter = new Crc32AppendingFileWriter(new CloseInhibitingWriter(out), 4)) {
-                try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(wrapWriter(new CloseInhibitingWriter(outerWriter), compress))) {
+                try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(wrapWriter(new CloseInhibitingWriter(outerWriter), compress), useBuffer)) {
                     writer.beginEncoding();
                     object.xdrEncode(writer);
                     writer.endEncoding();

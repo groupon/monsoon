@@ -53,6 +53,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import java.io.IOException;
 import static java.lang.Long.max;
 import static java.lang.Long.min;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.Collection;
@@ -106,16 +107,17 @@ public class ToXdrTables {
         /** Space for headers. */
         final long hdrSpace = MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN;
         final long hdrBegin = 0;
+        final ByteBuffer buffer = (compress ? ByteBuffer.allocate(65536) : ByteBuffer.allocateDirect(65536));
 
         /** Create writer. */
         final FileChannelWriter fd = new FileChannelWriter(out, hdrBegin + hdrSpace);
 
         /** Write all tables. */
-        final FilePos bodyPos = writeTables(fd, compress);
+        final FilePos bodyPos = writeTables(fd, compress, buffer);
 
         /** Write the headers. */
         fd.setOffset(hdrBegin);
-        try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(fd, hdrSpace), 0))) {
+        try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(fd, hdrSpace), 0), buffer)) {
             writer.beginEncoding();
             writeMimeHeader(writer);
             encodeHeader(compress, bodyPos, out.size()).xdrEncode(writer);
@@ -123,11 +125,11 @@ public class ToXdrTables {
         }
     }
 
-    private FilePos writeTables(FileChannelWriter out, boolean compress) throws IOException, OncRpcException {
+    private FilePos writeTables(FileChannelWriter out, boolean compress, ByteBuffer useBuffer) throws IOException, OncRpcException {
         long[] timestamps = this.timestamps.toArray();
         Arrays.sort(timestamps);
 
-        final Writer writer = new Writer(out, compress);
+        final Writer writer = new Writer(out, compress, useBuffer);
         tables.write(writer, timestamps);
         return writer.write(encodeBody(timestamps));
     }

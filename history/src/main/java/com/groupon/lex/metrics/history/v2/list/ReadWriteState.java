@@ -59,6 +59,7 @@ import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Collection;
 import static java.util.Collections.singletonList;
@@ -190,6 +191,7 @@ public final class ReadWriteState implements State {
                     newWriterDict.getStringTable().getOffset(),
                     newWriterDict.getPathTable().getOffset(),
                     newWriterDict.getTagsTable().getOffset()});
+        final ByteBuffer useBuffer = (compressed ? ByteBuffer.allocate(65536) : ByteBuffer.allocateDirect(65536));
 
         /* Encode all headers (which fills the newWriterDict in the process. */
         final List<EncodedTscHeaderForWrite> headers = tscList.stream()
@@ -203,7 +205,7 @@ public final class ReadWriteState implements State {
 
         /* Write all headers (fills in hdr.recordOffset from argument). */
         for (EncodedTscHeaderForWrite tscHdr : headers)
-            recordOffset = tscHdr.write(file.get(), recordOffset, compressed);
+            recordOffset = tscHdr.write(file.get(), recordOffset, compressed, useBuffer);
 
         /* Prepare new dictionary for installation. */
         final DictionaryDelta newDictionary;
@@ -235,7 +237,7 @@ public final class ReadWriteState implements State {
              * would pretend nothing was written.
              */
             hdr.file_size = recordOffset;
-            writeHeader(hdr);
+            writeHeader(hdr, useBuffer);
             this.hdr = hdr;
 
             /*
@@ -327,8 +329,8 @@ public final class ReadWriteState implements State {
     }
 
     /** Write current header to file. */
-    private void writeHeader(tsfile_header hdr) throws OncRpcException, IOException {
-        try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(file.get(), 0), ALL_HDR_CRC_LEN), 4), ALL_HDR_CRC_LEN)) {
+    private void writeHeader(tsfile_header hdr, ByteBuffer useBuffer) throws OncRpcException, IOException {
+        try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(file.get(), 0), ALL_HDR_CRC_LEN), 4), useBuffer)) {
             Const.writeMimeHeader(writer);
             hdr.xdrEncode(writer);
         }
@@ -355,7 +357,7 @@ public final class ReadWriteState implements State {
             encodedTsc = ToXdr.timeSeriesCollection(tsc, dict);
         }
 
-        public long write(FileChannel file, long recordOffset, boolean compressed) throws IOException, OncRpcException {
+        public long write(FileChannel file, long recordOffset, boolean compressed, ByteBuffer useBuffer) throws IOException, OncRpcException {
             this.recordOffset = recordOffset;
             final long newFileEnd;
             final tsdata tscHdr = new tsdata();
@@ -365,7 +367,7 @@ public final class ReadWriteState implements State {
             final long recordEnd = recordOffset + HEADER_BYTES;
             try (FileChannelWriter fileWriter = new FileChannelWriter(file, recordEnd)) {
                 LOG.log(Level.FINEST, "file offset {0}", fileWriter.getOffset());
-                final Writer writer = new Writer(fileWriter, compressed);
+                final Writer writer = new Writer(fileWriter, compressed, useBuffer);
                 if (newWriterDict == null) {
                     LOG.log(Level.FINEST, "dictionary absent -> not writing delta");
                     tscHdr.dd_len = 0;
