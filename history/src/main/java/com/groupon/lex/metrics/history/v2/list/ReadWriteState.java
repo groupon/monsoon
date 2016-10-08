@@ -124,8 +124,7 @@ public final class ReadWriteState implements State {
         return doReadLocked(() -> (hdr.flags & header_flags.DISTINCT) == header_flags.DISTINCT);
     }
 
-    @Override
-    public boolean isGzipped() {
+    private boolean isGzipped() {
         return doReadLocked(() -> (hdr.flags & header_flags.GZIP) == header_flags.GZIP);
     }
 

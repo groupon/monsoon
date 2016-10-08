@@ -41,6 +41,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.ToString;
 import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -51,9 +52,10 @@ import org.joda.time.DateTimeZone;
  */
 public class TSDataFileChain implements TSData {
     private static final Logger LOG = Logger.getLogger(TSDataFileChain.class.getName());
-    public static long MAX_FILESIZE = 64 * 1024 * 1024;
+    public static long MAX_FILESIZE = 256 * 1024 * 1024;
     private final long max_filesize_;
 
+    @ToString
     public static class Key implements Comparable<Key> {
         private final Path file_;
         private final DateTime begin_;
@@ -300,8 +302,13 @@ public class TSDataFileChain implements TSData {
     }
 
     @Override
-    public boolean isGzipped() {
-        return false;
+    public boolean canAddSingleRecord() {
+        return true;
+    }
+
+    @Override
+    public boolean isOptimized() {
+        return true;
     }
 
     @Override

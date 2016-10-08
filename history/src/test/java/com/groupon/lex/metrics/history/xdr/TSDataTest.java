@@ -107,7 +107,6 @@ public class TSDataTest {
         assertEquals(Files.size(tmpfile), fd.getFileSize());
         assertEquals(tsdata.get(0).getTimestamp(), fd.getBegin());
         assertEquals(tsdata.get(tsdata.size() - 1).getTimestamp(), fd.getEnd());
-        assertEquals(file_support.isCompressed(), fd.isGzipped());
         assertNotNull(fd.getFileChannel());
         assertEquals(tsdata.size(), fd.size());
         assertEquals(file_support.getMajor(), fd.getMajor());
@@ -351,7 +350,12 @@ public class TSDataTest {
         }
 
         @Override
-        public boolean isGzipped() {
+        public boolean canAddSingleRecord() {
+            return false;
+        }
+
+        @Override
+        public boolean isOptimized() {
             return false;
         }
 

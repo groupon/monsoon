@@ -185,9 +185,9 @@ public class RWListFile implements TSData {
     }
 
     @Override
-    public boolean isGzipped() {
-        return state.isGzipped();
-    }
+    public boolean canAddSingleRecord() { return true; }
+    @Override
+    public boolean isOptimized() { return false; }
 
     @Override
     public long getFileSize() {

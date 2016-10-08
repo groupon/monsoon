@@ -66,22 +66,20 @@ public class ReadOnlyState implements State {
     private final GCCloseable<FileChannel> file;
     @Getter
     private final DateTime begin, end;
-    @Getter
-    private final boolean gzipped;
     private final boolean sorted;
     private final boolean distinct;
 
     public ReadOnlyState(GCCloseable<FileChannel> file, tsfile_header hdr) throws IOException, OncRpcException {
         this.file = file;
-        this.gzipped = (hdr.flags & header_flags.GZIP) == header_flags.GZIP;
+        final boolean gzipped = (hdr.flags & header_flags.GZIP) == header_flags.GZIP;
         this.sorted = (hdr.flags & header_flags.SORTED) == header_flags.SORTED;
         this.distinct = (hdr.flags & header_flags.DISTINCT) == header_flags.DISTINCT;
         this.begin = FromXdr.timestamp(hdr.first);
         this.end = FromXdr.timestamp(hdr.last);
 
         final List<SegmentReader<ReadonlyTSDataHeader>> tsdataHeaders = readAllTSDataHeaders(file, hdr.file_size);
-        final SegmentReader<DictionaryDelta> dictionary = calculateDictionary(file, this.gzipped, tsdataHeaders).cache();
-        this.tsdata = unmodifiableList(calculateTimeSeries(file, this.gzipped, tsdataHeaders, dictionary));
+        final SegmentReader<DictionaryDelta> dictionary = calculateDictionary(file, gzipped, tsdataHeaders).cache();
+        this.tsdata = unmodifiableList(calculateTimeSeries(file, gzipped, tsdataHeaders, dictionary));
     }
 
     @Override

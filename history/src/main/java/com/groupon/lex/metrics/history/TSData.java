@@ -42,8 +42,10 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
     public short getMajor();
     /** Returns the minor version of the TSData file.  Note that this is the file-data version, not the application version. */
     public short getMinor();
-    /** Returns true if the file is compressed. */
-    public boolean isGzipped();
+    /** Returns true if the file is suitable for adding single records at a time. */
+    public boolean canAddSingleRecord();
+    /** Returns true if the file is optimized for access by (GroupPath, Tags, MetricName) tuple. */
+    public boolean isOptimized();
 
     /**
      * Returns an iterator for this TSData.

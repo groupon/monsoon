@@ -88,7 +88,6 @@ public class TSDataFileChainTest {
         fill_(COUNT);
 
         assertFalse(fd.isEmpty());
-        assertFalse(fd.isGzipped());
         assertEquals(COUNT, fd.size());
 
         Iterator<TimeSeriesCollection> expected = create_tsdata_().limit(COUNT).iterator();
@@ -114,8 +113,6 @@ public class TSDataFileChainTest {
         final int COUNT = LARGE_COUNT;
         fill_(COUNT);
 
-        assertFalse(fd.isGzipped());
-
         Iterator<TimeSeriesCollection> expected = create_tsdata_().limit(COUNT).iterator();
         Iterator<TimeSeriesCollection> actual = fd.stream().iterator();
         while (expected.hasNext())
@@ -127,8 +124,6 @@ public class TSDataFileChainTest {
     public void streamReversed() {
         final int COUNT = LARGE_COUNT;
         fill_(COUNT);
-
-        assertFalse(fd.isGzipped());
 
         List<TimeSeriesCollection> expected_list = create_tsdata_().limit(COUNT).collect(Collectors.toList());
         reverse(expected_list);
@@ -145,7 +140,6 @@ public class TSDataFileChainTest {
         fill_(COUNT);
 
         assertFalse(fd.isEmpty());
-        assertFalse(fd.isGzipped());
         assertEquals(COUNT, fd.size());
         final DateTime begin = create_tsdata_().skip(COUNT / 6).findAny().get().getTimestamp();
 
@@ -162,7 +156,6 @@ public class TSDataFileChainTest {
         fill_(COUNT);
 
         assertFalse(fd.isEmpty());
-        assertFalse(fd.isGzipped());
         assertEquals(COUNT, fd.size());
         final DateTime begin = create_tsdata_().skip(COUNT / 6).findAny().get().getTimestamp();
         final DateTime end = create_tsdata_().skip(5 * COUNT / 6).findAny().get().getTimestamp();

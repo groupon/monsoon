@@ -68,8 +68,6 @@ public class ReadonlyTableFile implements TSData {
     private final DateTime begin, end;
     @Getter
     private final long fileSize;
-    @Getter
-    private final boolean gzipped;
     private final int version;
     private final SegmentReader.Factory<XdrAble> segmentFactory;
 
@@ -150,6 +148,10 @@ public class ReadonlyTableFile implements TSData {
     public short getMajor() { return Const.version_major(version); }
     @Override
     public short getMinor() { return Const.version_minor(version); }
+    @Override
+    public boolean canAddSingleRecord() { return false; }
+    @Override
+    public boolean isOptimized() { return true; }
 
     @Override
     public Optional<GCCloseable<FileChannel>> getFileChannel() {
@@ -182,7 +184,7 @@ public class ReadonlyTableFile implements TSData {
         if ((hdr.flags & header_flags.KIND_MASK) != header_flags.KIND_TABLES)
             throw new IllegalArgumentException("Not a file in table encoding");
 
-        gzipped = ((hdr.flags & header_flags.GZIP) == header_flags.GZIP);
+        final boolean gzipped = ((hdr.flags & header_flags.GZIP) == header_flags.GZIP);
         if ((hdr.flags & header_flags.DISTINCT) != header_flags.DISTINCT)
             throw new IllegalArgumentException("Bad TableFile: marked as containing duplicate timestamps");
         if ((hdr.flags & header_flags.SORTED) != header_flags.SORTED)

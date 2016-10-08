@@ -46,7 +46,6 @@ public interface State {
     public ObjectSequence<SegmentReader<TimeSeriesCollection>> sequence();
     public void add(TimeSeriesCollection tsc);
     public void addAll(Collection<? extends TimeSeriesCollection> tsc);
-    public boolean isGzipped();
     public DateTime getBegin();
     public DateTime getEnd();
     public GCCloseable<FileChannel> getFile();

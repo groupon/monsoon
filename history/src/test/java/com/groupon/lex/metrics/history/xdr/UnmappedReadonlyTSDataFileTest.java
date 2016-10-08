@@ -97,7 +97,6 @@ public class UnmappedReadonlyTSDataFileTest {
         assertEquals(Files.size(tmpfile), fd.getFileSize());
         assertEquals(tsdata.get(0).getTimestamp(), fd.getBegin());
         assertEquals(tsdata.get(tsdata.size() - 1).getTimestamp(), fd.getEnd());
-        assertEquals(file_support.isCompressed(), fd.isGzipped());
         assertTrue(fd.getFileChannel().isPresent());
         assertEquals(tsdata.size(), fd.size());
         assertEquals(file_support.getMajor(), fd.getMajor());
