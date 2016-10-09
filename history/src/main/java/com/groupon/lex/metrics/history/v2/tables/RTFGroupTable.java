@@ -63,7 +63,7 @@ public class RTFGroupTable {
                         tm -> segmentFactory.get(metric_table::new, FromXdr.filePos(tm.pos))
                                 .map(mt -> new RTFMetricTable(mt, dictionary))
                                 .peek(RTFMetricTable::validate)
-                                .share()));
+                                .cache()));
     }
 
     public void validate() {}
