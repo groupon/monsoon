@@ -45,8 +45,8 @@ public class TSDataFileChainTest {
     private final FileSupport file_support = new FileSupport(FileSupport.NO_WRITER, false);
     private Path tmpdir, emptydir;
     private TSDataFileChain fd;
-    public static final int LARGE_COUNT = 500;  // Enough to trigger file roll-over.
-    public static final int CHAIN_WIDTH = 10000;  // Need wide enough scrapes to trigger file roll-over.
+    public static final int LARGE_COUNT = 100;  // Enough to trigger file roll-over.
+    public static final int CHAIN_WIDTH = 1000;  // Need wide enough scrapes to trigger file roll-over.
 
     @Before
     public void setup() throws Exception {
@@ -54,7 +54,7 @@ public class TSDataFileChainTest {
         tmpdir.toFile().deleteOnExit();
         emptydir = Files.createTempDirectory("monsoon-TSDataFileChainTest-empty");
         emptydir.toFile().deleteOnExit();
-        fd = TSDataFileChain.openDir(tmpdir, 1024 * 1024);
+        fd = TSDataFileChain.openDir(tmpdir, 128 * 1024);
     }
 
     @After
@@ -84,7 +84,7 @@ public class TSDataFileChainTest {
 
     @Test
     public void iterator() {
-        final int COUNT = 10;
+        final int COUNT = 5;
         fill_(COUNT);
 
         assertFalse(fd.isEmpty());
@@ -101,7 +101,7 @@ public class TSDataFileChainTest {
     public void size() {
         assertTrue(fd.isEmpty());
 
-        final int COUNT = 25;
+        final int COUNT = 5;
         fill_(COUNT);
 
         assertFalse(fd.isEmpty());
@@ -136,12 +136,12 @@ public class TSDataFileChainTest {
 
     @Test
     public void stream_with_begin() {
-        final int COUNT = 50;
+        final int COUNT = 10;
         fill_(COUNT);
 
         assertFalse(fd.isEmpty());
         assertEquals(COUNT, fd.size());
-        final DateTime begin = create_tsdata_().skip(COUNT / 6).findAny().get().getTimestamp();
+        final DateTime begin = create_tsdata_().skip(COUNT / 2).findAny().get().getTimestamp();
 
         Iterator<TimeSeriesCollection> expected = create_tsdata_().limit(COUNT).filter(ts -> !ts.getTimestamp().isBefore(begin)).iterator();
         Iterator<TimeSeriesCollection> actual = fd.stream(begin).iterator();
@@ -242,7 +242,7 @@ public class TSDataFileChainTest {
 
     @Test
     public void add() {
-        final int COUNT = 7;
+        final int COUNT = 3;
         fill_(COUNT);
 
         final TimeSeriesCollection tsdata = create_tsdata_().skip(COUNT + 1).findFirst().get();
