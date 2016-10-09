@@ -48,16 +48,21 @@ public class XdrDecodingFileReader extends XdrDecodingStream implements Closeabl
     private final ByteBuffer buf;
 
     public XdrDecodingFileReader(@NonNull FileReader in, int bufSiz) {
-        if (bufSiz < MIN_BUFSIZ) bufSiz = MIN_BUFSIZ;
-        this.in = in;
-        buf = in.allocateByteBuffer(bufSiz);
-        buf.order(ByteOrder.BIG_ENDIAN);
-        buf.flip();
-        setCharacterEncoding("UTF-8");
+        this(in, in.allocateByteBuffer(bufSiz));
     }
 
     public XdrDecodingFileReader(@NonNull FileReader in) {
         this(in, DEFAULT_BUFSIZ);
+    }
+
+    public XdrDecodingFileReader(@NonNull FileReader in, @NonNull ByteBuffer useBuffer) {
+        useBuffer.clear();
+        if (useBuffer.remaining() < MIN_BUFSIZ) useBuffer = in.allocateByteBuffer(MIN_BUFSIZ);
+        useBuffer.order(ByteOrder.BIG_ENDIAN);
+        useBuffer.flip();
+        this.in = in;
+        this.buf = useBuffer;
+        setCharacterEncoding("UTF-8");
     }
 
     @Override

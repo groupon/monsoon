@@ -46,29 +46,46 @@ import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter.
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
 
 @RequiredArgsConstructor
-public class Tables extends AbstractSegmentWriter {
+public class Tables extends AbstractSegmentWriter implements Closeable {
     @NonNull
     private final DictionaryForWrite dictionary;
     private final TIntObjectMap<GroupTbl> groups = new TIntObjectHashMap<>();
 
-    public void add(long ts, Collection<TimeSeriesValue> tsdata) {
-        tsdata.forEach((tsv) -> add(ts, tsv));
+    @Override
+    public void close() {
+        groups.forEachValue(grpTbl -> {
+            try {
+                grpTbl.close();
+            } catch (IOException ex) {
+                Logger.getLogger(GroupTbl.class.getName()).log(Level.WARNING, "unable to close groups", ex);
+                /* Let Garbage Collector deal with dangling FileChannel. */
+            }
+            return true;
+        });
     }
 
-    public void add(long ts, TimeSeriesValue tsv) {
+    public void add(long ts, Collection<TimeSeriesValue> tsdata) throws IOException {
+        for (TimeSeriesValue tsv : tsdata)
+            add(ts, tsv);
+    }
+
+    public void add(long ts, TimeSeriesValue tsv) throws IOException {
         add(ts, tsv.getGroup().getPath(), tsv.getGroup().getTags(), tsv.getMetrics());
     }
 
-    private void add(long ts, SimpleGroupPath grpPath, Tags grpTags, Map<MetricName, MetricValue> metrics) {
+    private void add(long ts, SimpleGroupPath grpPath, Tags grpTags, Map<MetricName, MetricValue> metrics) throws IOException {
         final int pathIdx = dictionary.getPathTable().getOrCreate(grpPath.getPath());
         GroupTbl dest = groups.get(pathIdx);
         if (dest == null) {
@@ -100,13 +117,26 @@ public class Tables extends AbstractSegmentWriter {
     }
 
     @RequiredArgsConstructor
-    private static class GroupTbl {
+    private static class GroupTbl implements Closeable {
         @NonNull
         private final DictionaryForWrite dictionary;
         private final TIntObjectMap<GroupTable> t_group = new TIntObjectHashMap<>();
         private final TIntObjectMap<FilePos> filePosTbl = new TIntObjectHashMap<>();
 
-        public void add(long ts, Tags grpTags, Map<MetricName, MetricValue> metrics) {
+        @Override
+        public void close() throws IOException {
+            t_group.forEachValue(grpTbl -> {
+                try {
+                    grpTbl.close();
+                } catch (IOException ex) {
+                    Logger.getLogger(GroupTbl.class.getName()).log(Level.WARNING, "unable to close metrics", ex);
+                    /* Let Garbage Collector deal with dangling FileChannel. */
+                }
+                return true;
+            });
+        }
+
+        public void add(long ts, Tags grpTags, Map<MetricName, MetricValue> metrics) throws IOException {
             final int tagIdx = dictionary.getTagsTable().getOrCreate(grpTags);
             GroupTable dest = t_group.get(tagIdx);
             if (dest == null) {

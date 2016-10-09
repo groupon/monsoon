@@ -37,13 +37,17 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.ForkJoinPool;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 
 @AllArgsConstructor
 public class FileChannelReader implements FileReader {
     @NonNull
     private final FileChannel fd;
+    @Getter
+    @Setter
     private long offset;
 
     @Override

@@ -5,6 +5,7 @@ import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.v2.list.RWListFile;
 import com.groupon.lex.metrics.history.v2.tables.ToXdrTables;
 import com.groupon.lex.metrics.history.xdr.TSDataScanDir.MetaData;
+import com.groupon.lex.metrics.history.xdr.support.FileUtil;
 import com.groupon.lex.metrics.history.xdr.support.MultiFileIterator;
 import com.groupon.lex.metrics.history.xdr.support.TSDataMap;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -14,10 +15,6 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import static java.nio.file.StandardOpenOption.CREATE_NEW;
-import static java.nio.file.StandardOpenOption.READ;
-import static java.nio.file.StandardOpenOption.WRITE;
-import java.security.SecureRandom;
 import java.util.Collection;
 import java.util.Collections;
 import static java.util.Collections.emptyList;
@@ -443,64 +440,57 @@ public class TSDataFileChain implements TSData {
      * @param tsdata TSData, if it is opened.
      * @return True if the file was compressed and the key was replaced, false otherwise.
      */
-    private synchronized boolean compress_file_(Key file, TSData tsdata) {
+    private synchronized void compress_file_(Key file, TSData tsdata) throws IOException {
         if (tsdata == null) {
             try {
                 tsdata = TSData.readonly(file.getFile());
             } catch (IOException ex) {
                 LOG.log(Level.WARNING, "unable to open " + file.getFile(), ex);
-                return false;
+                throw ex;
             }
         }
 
-        final ToXdrTables tables = new ToXdrTables();
-        tsdata.stream().forEach(tables::add);
+        try (final ToXdrTables tables = new ToXdrTables()) {
+            for (TimeSeriesCollection tsc : tsdata)
+                tables.add(tsc);
 
-        final String base_name = file.getFile().getFileName().toString();
-        FileChannel compressed_data;
-        Path new_filename;
-        for (int i = 0; true; ++i) {
-            new_filename = file.getFile().resolveSibling(base_name + (i == 0 ? "" : "." + i) + ".optimized");
+            final FileChannel compressed_data;
+            final Path new_filename;
+            {
+                final DateTime begin = tsdata.getBegin();
+                final String prefix = String.format("monsoon-%04d%02d%02d-%02d%02d", begin.getYear(), begin.getMonthOfYear(), begin.getDayOfMonth(), begin.getHourOfDay(), begin.getMinuteOfHour());
+
+                FileUtil.NamedFileChannel newFile = FileUtil.createNewFile(dir_, prefix, ".optimized");
+                new_filename = newFile.getFileName();
+                compressed_data = newFile.getFileChannel();
+            }
+
             try {
-                compressed_data = FileChannel.open(new_filename, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
-                break;
+                try {
+                    tables.write(compressed_data, true);
+                } catch (OncRpcException ex) {
+                    throw new IOException("encoding failure", ex);
+                }
+
+                Files.delete(file.getFile());
+                read_stores_.remove(file);  // Remove if present.
+                read_stores_.put(new Key(new_filename, file.getBegin(), file.getEnd()), null);
             } catch (IOException ex) {
-                LOG.log(Level.INFO, "unable to create new file " + new_filename, ex);
-                new_filename = null;
-                compressed_data = null;
-            }
-        }
-        if (compressed_data == null) {
-            LOG.log(Level.WARNING, "unable to create new file for compressing {0}", file);
-            return false;
-        }
-
-        try {
-            try {
-                tables.write(compressed_data, true);
-            } catch (OncRpcException ex) {
-                throw new IOException("encoding failure", ex);
-            }
-
-            Files.delete(file.getFile());
-            read_stores_.remove(file);  // Remove if present.
-            read_stores_.put(new Key(new_filename, file.getBegin(), file.getEnd()), null);
-            return true;
-        } catch (IOException ex) {
-            LOG.log(Level.SEVERE, "unable to write optimized file " + new_filename, ex);
-            try {
-                Files.delete(new_filename);
-            } catch (IOException ex1) {
-                LOG.log(Level.SEVERE, "unable to remove output file " + new_filename, ex1);
-                ex.addSuppressed(ex1);
-            }
-            return false;
-        } finally {
-            try {
-                assert(compressed_data != null);
-                compressed_data.close();
-            } catch (IOException ex) {
-                LOG.log(Level.WARNING, "unable to close optimized file {0}", new_filename);
+                LOG.log(Level.SEVERE, "unable to write optimized file " + new_filename, ex);
+                try {
+                    Files.delete(new_filename);
+                } catch (IOException ex1) {
+                    LOG.log(Level.SEVERE, "unable to remove output file " + new_filename, ex1);
+                    ex.addSuppressed(ex1);
+                }
+                throw ex;
+            } finally {
+                try {
+                    assert(compressed_data != null);
+                    compressed_data.close();
+                } catch (IOException ex) {
+                    LOG.log(Level.WARNING, "unable to close optimized file {0}", new_filename);
+                }
             }
         }
     }
@@ -513,8 +503,12 @@ public class TSDataFileChain implements TSData {
             final Key old_store_key = new Key(filename, old_store.get().getBegin(), old_store.get().getEnd());
             read_stores_.put(old_store_key, old_store.orElse(null));
             final long t0 = System.currentTimeMillis();
-            compress_file_(old_store_key, old_store.orElse(null));
-            LOG.log(Level.INFO, "optimizing file {0} took {1} msec", new Object[]{filename, System.currentTimeMillis() - t0});
+            try {
+                compress_file_(old_store_key, old_store.orElse(null));
+                LOG.log(Level.INFO, "optimizing file {0} took {1} msec", new Object[]{filename, System.currentTimeMillis() - t0});
+            } catch (IOException ex) {
+                LOG.log(Level.INFO, "optimizing file {0} failed after {1} msec", new Object[]{filename, System.currentTimeMillis() - t0});
+            }
         });
 
         write_filename_ = Optional.of(file);
@@ -523,48 +517,10 @@ public class TSDataFileChain implements TSData {
     }
 
     private RWListFile new_store_(Optional<RWListFile> old_store, DateTime begin) throws IOException {
-        requireNonNull(begin);
         final String prefix = String.format("monsoon-%04d%02d%02d-%02d%02d", begin.getYear(), begin.getMonthOfYear(), begin.getDayOfMonth(), begin.getHourOfDay(), begin.getMinuteOfHour());
-
-        /*
-         * Try with normal basename.
-         */
-        String name = prefix + ".tsd";
-        Path new_filename = dir_.resolve(name);
-        GCCloseable<FileChannel> fd = null;
-        try {
-            fd = new GCCloseable<>(FileChannel.open(new_filename, READ, WRITE, CREATE_NEW));
-        } catch (IOException ex) {
-            /* Ignore. */
-        }
-
-        /*
-         * Try with random number as differentiator between filenames.
-         */
-        SecureRandom random = new SecureRandom();
-        for (int i = 0; i < 15 && fd == null; ++i) {
-            long idx = random.nextLong();
-            name = String.format("%s-%d.tsd", prefix, idx);
-            new_filename = dir_.resolve(name);
-            try {
-                fd = new GCCloseable<>(FileChannel.open(new_filename, READ, WRITE, CREATE_NEW));
-            } catch (IOException ex) {
-                /* Ignore. */
-            }
-        }
-
-        if (fd == null) {
-            /*
-             * Try one more time with differentiator, but let the exception out this time.
-             */
-            long idx = random.nextLong();
-            name = String.format("%s-%d.tsd", prefix, idx);
-            new_filename = dir_.resolve(name);
-            fd = new GCCloseable<>(FileChannel.open(new_filename, READ, WRITE, CREATE_NEW));
-        }
-
-        LOG.log(Level.INFO, "rotating into new file {0}", new_filename);
-        return install_new_store_(old_store, new_filename, RWListFile.newFile(fd, true));
+        FileUtil.NamedFileChannel newFile = FileUtil.createNewFile(dir_, prefix, ".tsd");
+        LOG.log(Level.INFO, "rotating into new file {0}", newFile.getFileName());
+        return install_new_store_(old_store, newFile.getFileName(), RWListFile.newFile(new GCCloseable<>(newFile.getFileChannel()), true));
     }
 
     @Override

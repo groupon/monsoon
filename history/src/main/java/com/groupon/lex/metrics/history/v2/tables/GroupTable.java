@@ -39,7 +39,7 @@ import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.createPresenceBitset;
 import com.groupon.lex.metrics.history.v2.xdr.group_table;
 import com.groupon.lex.metrics.history.v2.xdr.tables_metric;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter;
+import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter.Writer;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TLongSet;
@@ -48,38 +48,45 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
 import static gnu.trove.TCollections.unmodifiableMap;
+import java.io.Closeable;
 
-@RequiredArgsConstructor
-public class GroupTable extends AbstractSegmentWriter {
-    @NonNull
+public class GroupTable implements Closeable {
     private final DictionaryForWrite dictionary;
     private final TLongSet timestamps = new TLongHashSet();
     private final TIntObjectMap<FilePos> filePosTbl = new TIntObjectHashMap<>();
-    private final TIntObjectMap<MetricTable> metricTbl = new TIntObjectHashMap<>();
+    private final MetricsTmpfile metrics;
 
-    public void add(long ts, @NonNull Map<MetricName, MetricValue> metrics) {
+    public GroupTable(@NonNull DictionaryForWrite dictionary) throws IOException {
+        this.dictionary = dictionary;
+        this.metrics = new MetricsTmpfile();
+    }
+
+    public void add(long ts, @NonNull Map<MetricName, MetricValue> metrics) throws IOException {
         timestamps.add(ts);
-        metrics.entrySet().forEach(entry -> {
-            final int mIdx = dictionary.getPathTable().getOrCreate(entry.getKey().getPath());
+        for (Map.Entry<MetricName, MetricValue> entry : metrics.entrySet())
+            this.metrics.add(ts, entry.getKey(), entry.getValue(), dictionary);
+    }
+
+    private TIntObjectMap<MetricTable> getTables() throws IOException {
+        final TIntObjectMap<MetricTable> metricTbl = new TIntObjectHashMap<>();
+
+        for (MetricsTmpfile.Tuple entry : metrics.loadAll(dictionary.asDictionaryDelta())) {
+            final int mIdx = dictionary.getPathTable().getOrCreate(entry.getMetricName().getPath());
             MetricTable mt = metricTbl.get(mIdx);
             if (mt == null) {
                 mt = new MetricTable(dictionary);
                 metricTbl.put(mIdx, mt);
             }
 
-            mt.add(ts, entry.getValue());
-        });
-    }
+            mt.add(entry.getTimestamp(), entry.getMetricValue());
+        }
 
-    public TIntObjectMap<MetricTable> getTables() {
         return unmodifiableMap(metricTbl);
     }
 
-    @Override
-    public group_table encode(long timestamps[]) {
+    private group_table encode(long timestamps[], TIntObjectMap<MetricTable> metricTbl) {
         group_table result = new group_table();
         result.presence = createPresenceBitset(this.timestamps, timestamps);
         result.metric_tbl = Arrays.stream(metricTbl.keys())
@@ -94,8 +101,8 @@ public class GroupTable extends AbstractSegmentWriter {
         return result;
     }
 
-    @Override
     public FilePos write(Writer writer, long timestamps[]) throws OncRpcException, IOException {
+        final TIntObjectMap<MetricTable> metricTbl = getTables();
         for (int mIdx : metricTbl.keys()) {
             if (!filePosTbl.containsKey(mIdx)) {
                 final MetricTable tbl = metricTbl.get(mIdx);
@@ -104,6 +111,32 @@ public class GroupTable extends AbstractSegmentWriter {
             }
         }
 
-        return super.write(writer, timestamps);
+        return writer.write(encode(timestamps, metricTbl));
+    }
+
+    @Override
+    public void close() throws IOException {
+        metrics.close();
+    }
+
+    public static class MetricsTmpfileException extends RuntimeException {
+        public MetricsTmpfileException() {
+        }
+
+        public MetricsTmpfileException(String message) {
+            super(message);
+        }
+
+        public MetricsTmpfileException(String message, Throwable cause) {
+            super(message, cause);
+        }
+
+        public MetricsTmpfileException(Throwable cause) {
+            super(cause);
+        }
+
+        public MetricsTmpfileException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
+            super(message, cause, enableSuppression, writableStackTrace);
+        }
     }
 }

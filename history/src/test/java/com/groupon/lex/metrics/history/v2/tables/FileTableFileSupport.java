@@ -48,7 +48,8 @@ public class FileTableFileSupport implements FileSupport.Writer {
     public void create_file(TSDataVersionDispatch.Releaseable<FileChannel> fd, Collection<? extends TimeSeriesCollection> tsdata, boolean compress) throws IOException {
         try {
             ToXdrTables newTables = new ToXdrTables();
-            tsdata.forEach(newTables::add);
+            for (TimeSeriesCollection tsc : tsdata)
+                newTables.add(tsc);
             newTables.write(fd.get(), compress);
         } catch (OncRpcException ex) {
             throw new IOException(ex);

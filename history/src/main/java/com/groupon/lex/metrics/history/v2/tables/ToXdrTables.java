@@ -50,6 +50,7 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
+import java.io.Closeable;
 import java.io.IOException;
 import static java.lang.Long.max;
 import static java.lang.Long.min;
@@ -69,7 +70,7 @@ import org.joda.time.DateTimeZone;
  * before all data has been gathered.
  * @author ariane
  */
-public class ToXdrTables {
+public class ToXdrTables implements Closeable {
     private long begin, end;
     private final TLongSet timestamps = new TLongHashSet();
     private final DictionaryForWrite dictionary = new DictionaryForWrite();
@@ -79,15 +80,20 @@ public class ToXdrTables {
         tables = new Tables(dictionary);
     }
 
-    public void add(TimeSeriesCollection tsdata) {
+    @Override
+    public void close() throws IOException {
+        tables.close();
+    }
+
+    public void add(TimeSeriesCollection tsdata) throws IOException {
         add(tsdata.getTimestamp(), tsdata.getTSValues());
     }
 
-    public void add(DateTime ts, Collection<TimeSeriesValue> tsdata) {
+    public void add(DateTime ts, Collection<TimeSeriesValue> tsdata) throws IOException {
         tables.add(updateTimestamps(ts), tsdata);
     }
 
-    public void add(DateTime ts, TimeSeriesValue tsv) {
+    public void add(DateTime ts, TimeSeriesValue tsv) throws IOException {
         tables.add(updateTimestamps(ts), tsv);
     }
 
