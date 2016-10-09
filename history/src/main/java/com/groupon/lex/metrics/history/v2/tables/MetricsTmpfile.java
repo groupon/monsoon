@@ -38,15 +38,11 @@ import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import com.groupon.lex.metrics.history.v2.xdr.metric_value;
 import com.groupon.lex.metrics.history.xdr.support.FileUtil;
-import com.groupon.lex.metrics.history.xdr.support.reader.CloseInhibitingReader;
-import com.groupon.lex.metrics.history.xdr.support.reader.Crc32VerifyingFileReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.SizeVerifyingReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.XdrDecodingFileReader;
 import com.groupon.lex.metrics.history.xdr.support.writer.CloseInhibitingWriter;
-import com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
-import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import java.io.Closeable;
 import java.io.File;
@@ -54,10 +50,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
-import java.util.ArrayList;
+import java.util.Spliterator;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrAble;
@@ -66,8 +66,8 @@ import org.acplt.oncrpc.XdrEncodingStream;
 
 public class MetricsTmpfile implements Closeable {
     private final FileChannel fd;
+    private int count = 0;
     private long offset = 0;
-    private final ByteBuffer useBuffer = ByteBuffer.allocateDirect(128);
     private static final Path TMPDIR = new File(System.getProperty("java.io.tmpdir")).toPath();
 
     public MetricsTmpfile() throws IOException {
@@ -79,77 +79,33 @@ public class MetricsTmpfile implements Closeable {
     }
 
     public long add(long timestamp, MetricName name, MetricValue value, DictionaryForWrite dict) throws IOException {
+        final ByteBuffer useBuffer = ByteBuffer.allocate(128);
         final SerializedForm sf = new SerializedForm(
                 timestamp,
                 dict.getPathTable().getOrCreate(name.getPath()),
                 ToXdr.metricValue(value, dict.getStringTable()::getOrCreate));
         final long initOffset = offset;
         final long newOffset;
-        final long segmentLen;
 
-        try (FileChannelWriter writer = new FileChannelWriter(fd, offset + 8)) {
-            try (Crc32AppendingFileWriter crcWriter = new Crc32AppendingFileWriter(new CloseInhibitingWriter(writer), 4)) {
-                try (XdrEncodingFileWriter xdr = new XdrEncodingFileWriter(new CloseInhibitingWriter(crcWriter), useBuffer)) {
-                    xdr.beginEncoding();
-                    sf.xdrEncode(xdr);
-                    xdr.endEncoding();
-                } catch (OncRpcException ex) {
-                    throw new IOException("serialization error (temporary storage)", ex);
-                }
-
-                segmentLen = crcWriter.getWritten();
+        try (FileChannelWriter writer = new FileChannelWriter(fd, offset)) {
+            try (XdrEncodingFileWriter xdr = new XdrEncodingFileWriter(new CloseInhibitingWriter(writer), useBuffer)) {
+                xdr.beginEncoding();
+                sf.xdrEncode(xdr);
+                xdr.endEncoding();
+            } catch (OncRpcException ex) {
+                throw new IOException("serialization error (temporary storage)", ex);
             }
 
             newOffset = writer.getOffset();
         }
 
-        try (XdrEncodingFileWriter xdr = new XdrEncodingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(fd, offset), 8), useBuffer)) {
-            xdr.beginEncoding();
-            xdr.xdrEncodeLong(segmentLen);
-            xdr.endEncoding();
-        } catch (OncRpcException ex) {
-            throw new IOException("serialization error (temporary storage)", ex);
-        }
-
         offset = newOffset;
+        ++count;
         return initOffset;
     }
 
-    public ArrayList<Tuple> loadAll(DictionaryDelta dict) throws IOException {
-        final ArrayList<Tuple> tuples = new ArrayList<>();
-
-        try (FileChannelReader fdReader = new FileChannelReader(fd, 0)) {
-            try (SizeVerifyingReader reader = new SizeVerifyingReader(new CloseInhibitingReader(fdReader), offset)) {
-                while (fdReader.getOffset() != offset) {
-                    final SerializedForm sf = new SerializedForm();
-                    final long segmentLen;
-
-                    try (XdrDecodingFileReader xdr = new XdrDecodingFileReader(new SizeVerifyingReader(new CloseInhibitingReader(reader), 8), useBuffer)) {
-                        xdr.beginDecoding();
-                        segmentLen = xdr.xdrDecodeLong();
-                        xdr.endDecoding();
-                    } catch (OncRpcException ex) {
-                        throw new IOException("deserialization error (temporary storage)", ex);
-                    }
-
-                    try (XdrDecodingFileReader xdr = new XdrDecodingFileReader(new Crc32VerifyingFileReader(new CloseInhibitingReader(reader), segmentLen, 4), useBuffer)) {
-                        xdr.beginDecoding();
-                        sf.xdrDecode(xdr);
-                        xdr.endDecoding();
-                    } catch (OncRpcException ex) {
-                        throw new IOException("deserialization error (temporary storage)", ex);
-                    }
-
-                    tuples.add(new Tuple(
-                            sf.getTimestamp(),
-                            MetricName.valueOf(dict.getPath(sf.getMetricNameRef())),
-                            FromXdr.metricValue(sf.getMetricValue(), dict::getString)));
-                }
-            }
-        }
-
-        tuples.trimToSize();
-        return tuples;
+    public Stream<Tuple> stream(DictionaryDelta dict) throws IOException {
+        return StreamSupport.stream(() -> new SpliteratorImpl(dict), SpliteratorImpl.CHARACTERISTICS, false);
     }
 
     @Override
@@ -160,7 +116,7 @@ public class MetricsTmpfile implements Closeable {
     @Value
     public static class Tuple {
         private final long timestamp;
-        private final MetricName metricName;
+        private final int metricPathRef;
         private final MetricValue metricValue;
     }
 
@@ -184,6 +140,52 @@ public class MetricsTmpfile implements Closeable {
             timestamp = xdr.xdrDecodeLong();
             metricNameRef = xdr.xdrDecodeInt();
             metricValue = new metric_value(xdr);
+        }
+    }
+
+    @RequiredArgsConstructor
+    private class SpliteratorImpl implements Spliterator<Tuple> {
+        public static final int CHARACTERISTICS =
+                Spliterator.SIZED |
+                Spliterator.SUBSIZED |
+                Spliterator.IMMUTABLE |
+                Spliterator.NONNULL;
+        private final DictionaryDelta dict;
+        private int index = 0;
+        private final int count = MetricsTmpfile.this.count;
+        private final XdrDecodingFileReader xdr = new XdrDecodingFileReader(new SizeVerifyingReader(new FileChannelReader(fd, 0), offset), ByteBuffer.allocateDirect(65536));
+
+        @Override
+        public boolean tryAdvance(Consumer<? super Tuple> action) {
+            try {
+                if (index == count) return false;
+
+                final SerializedForm sf = new SerializedForm();
+                xdr.beginDecoding();
+                sf.xdrDecode(xdr);
+                xdr.endDecoding();
+
+                ++index;
+                action.accept(new Tuple(
+                        sf.getTimestamp(),
+                        sf.getMetricNameRef(),
+                        FromXdr.metricValue(sf.getMetricValue(), dict::getString)));
+                if (index == count) xdr.close();
+                return true;
+            } catch (IOException | OncRpcException ex) {
+                throw new RuntimeException("temporary file doesn't work properly");
+            }
+        }
+
+        @Override
+        public Spliterator<Tuple> trySplit() { return null; }
+
+        @Override
+        public long estimateSize() { return count; }
+
+        @Override
+        public int characteristics() {
+            return CHARACTERISTICS;
         }
     }
 }

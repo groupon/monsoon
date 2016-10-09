@@ -72,16 +72,17 @@ public class GroupTable implements Closeable {
     private TIntObjectMap<MetricTable> getTables() throws IOException {
         final TIntObjectMap<MetricTable> metricTbl = new TIntObjectHashMap<>();
 
-        for (MetricsTmpfile.Tuple entry : metrics.loadAll(dictionary.asDictionaryDelta())) {
-            final int mIdx = dictionary.getPathTable().getOrCreate(entry.getMetricName().getPath());
-            MetricTable mt = metricTbl.get(mIdx);
-            if (mt == null) {
-                mt = new MetricTable(dictionary);
-                metricTbl.put(mIdx, mt);
-            }
+        metrics.stream(dictionary.asDictionaryDelta())
+                .forEach(entry -> {
+                    final int mIdx = entry.getMetricPathRef();
+                    MetricTable mt = metricTbl.get(mIdx);
+                    if (mt == null) {
+                        mt = new MetricTable(dictionary);
+                        metricTbl.put(mIdx, mt);
+                    }
 
-            mt.add(entry.getTimestamp(), entry.getMetricValue());
-        }
+                    mt.add(entry.getTimestamp(), entry.getMetricValue());
+                });
 
         return unmodifiableMap(metricTbl);
     }
