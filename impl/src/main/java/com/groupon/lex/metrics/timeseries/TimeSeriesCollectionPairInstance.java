@@ -31,13 +31,14 @@
  */
 package com.groupon.lex.metrics.timeseries;
 
+import com.groupon.lex.metrics.MutableTimeSeriesCollectionPair;
 import org.joda.time.DateTime;
 
 /**
  *
  * @author ariane
  */
-public class TimeSeriesCollectionPairInstance extends AbstractTSCPair {
+public class TimeSeriesCollectionPairInstance extends AbstractTSCPair implements MutableTimeSeriesCollectionPair {
     private final MutableTimeSeriesCollection current_;
 
     public TimeSeriesCollectionPairInstance(DateTime now) {
@@ -45,12 +46,15 @@ public class TimeSeriesCollectionPairInstance extends AbstractTSCPair {
     }
 
     @Override
-    public TimeSeriesCollection getCurrentCollection() {
+    public MutableTimeSeriesCollection getCurrentCollection() {
         return current_;
     }
 
     public TimeSeriesCollectionPairInstance startNewCycle(DateTime timestamp, ExpressionLookBack lookback) {
-        update(current_, lookback, () -> current_.clear(timestamp));
+        update(
+                new SimpleTimeSeriesCollection(current_.getTimestamp(), current_.getTSValues()),
+                lookback,
+                () -> current_.clear(timestamp));
         return this;
     }
 

@@ -34,6 +34,7 @@ package com.groupon.lex.metrics.config.impl;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.MutableTimeSeriesCollectionPair;
 import com.groupon.lex.metrics.Path;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
@@ -109,7 +110,7 @@ public class DerivedMetricTransformerImpl implements TimeSeriesTransformer {
                 .map(TimeSeriesMetricExpression::getLookBack));
     }
 
-    private static void addMetricMappingToCtx(Context ctx, SimpleGroupPath groupPath, MetricName metric, TagData tagData, Map.Entry<Tags, MetricValue> resolvedMetric) {
+    private static void addMetricMappingToCtx(Context<MutableTimeSeriesCollectionPair> ctx, SimpleGroupPath groupPath, MetricName metric, TagData tagData, Map.Entry<Tags, MetricValue> resolvedMetric) {
         final GroupName group;
         if (tagData.isEmpty()) {
             group = GroupName.valueOf(groupPath, resolvedMetric.getKey());

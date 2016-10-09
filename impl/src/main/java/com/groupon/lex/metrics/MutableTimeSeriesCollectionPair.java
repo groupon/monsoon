@@ -31,39 +31,14 @@
  */
 package com.groupon.lex.metrics;
 
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
-import com.groupon.lex.metrics.timeseries.Alert;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPairInstance;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-import org.joda.time.DateTime;
+import com.groupon.lex.metrics.timeseries.MutableTimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
 
-public class PullMetricRegistryInstance extends MetricRegistryInstance {
-    public PullMetricRegistryInstance(boolean has_config, EndpointRegistration api) {
-        super(has_config, api);
-    }
-
-    public PullMetricRegistryInstance(Supplier<DateTime> now, boolean has_config, EndpointRegistration api) {
-        super(now, has_config, api);
-    }
-
+/**
+ * Collection pair for use during modifying operations.
+ * @author ariane
+ */
+public interface MutableTimeSeriesCollectionPair extends TimeSeriesCollectionPair {
     @Override
-    protected CollectionContext beginCollection(DateTime now) {
-        return new CollectionContext() {
-            private final TimeSeriesCollectionPairInstance tsdata = new TimeSeriesCollectionPairInstance(now);
-
-            @Override
-            public Consumer<Alert> alertManager() {
-                return (Alert alert) -> {};
-            }
-
-            @Override
-            public MutableTimeSeriesCollectionPair tsdata() {
-                return tsdata;
-            }
-
-            @Override
-            public void commit() {}
-        };
-    }
+    public MutableTimeSeriesCollection getCurrentCollection();
 }

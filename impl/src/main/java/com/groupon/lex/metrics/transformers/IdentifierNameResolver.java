@@ -119,7 +119,7 @@ public class IdentifierNameResolver implements NameResolver {
     }
 
     @Override
-    public Optional<Path> apply(Context ctx) {
+    public Optional<Path> apply(Context<?> ctx) {
         return ctx.getAliasFromIdentifier(Path.class, identifier_)
                 .map(path -> sub_select_.map(s -> s.apply(path)).orElseGet(() -> SimpleGroupPath.valueOf(path.getPath())));
     }

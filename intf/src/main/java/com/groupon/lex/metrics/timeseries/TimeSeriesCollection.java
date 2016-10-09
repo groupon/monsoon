@@ -32,12 +32,8 @@
 package com.groupon.lex.metrics.timeseries;
 
 import com.groupon.lex.metrics.GroupName;
-import com.groupon.lex.metrics.MetricName;
-import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import java.util.Collection;
-import static java.util.Collections.singletonMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -48,19 +44,11 @@ import org.joda.time.DateTimeZone;
  *
  * @author ariane
  */
-public interface TimeSeriesCollection extends Cloneable, Comparable<TimeSeriesCollection> {
+public interface TimeSeriesCollection extends Comparable<TimeSeriesCollection> {
     public static DateTime now() {
         return DateTime.now(DateTimeZone.UTC);
     }
 
-    public TimeSeriesCollection add(TimeSeriesValue tsv);
-    public TimeSeriesCollection renameGroup(GroupName oldname, GroupName newname);
-
-    public default TimeSeriesCollection addMetric(GroupName group, MetricName metric, MetricValue value) {
-        return addMetrics(group, singletonMap(metric, value));
-    }
-
-    public TimeSeriesCollection addMetrics(GroupName group, Map<MetricName, MetricValue> metrics);
     public DateTime getTimestamp();
     public boolean isEmpty();
     public Set<GroupName> getGroups();
@@ -74,8 +62,6 @@ public interface TimeSeriesCollection extends Cloneable, Comparable<TimeSeriesCo
                 .map(Stream::of)
                 .map(TimeSeriesValueSet::new);
     }
-
-    public TimeSeriesCollection clone();
 
     @Override
     public default int compareTo(TimeSeriesCollection o) {

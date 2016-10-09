@@ -38,7 +38,6 @@ import com.groupon.lex.metrics.timeseries.Alert;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
 import com.groupon.lex.metrics.timeseries.TimeSeriesTransformer;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
@@ -207,7 +206,7 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
 
     public static interface CollectionContext {
         public Consumer<Alert> alertManager();
-        public TimeSeriesCollectionPair tsdata();
+        public MutableTimeSeriesCollectionPair tsdata();
         public void commit();
     }
 
@@ -225,7 +224,7 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
         // Scrape metrics from all collectors.
         final DateTime now = now();
         final CollectionContext cctx = beginCollection(now);
-        final TimeSeriesCollectionPair tsdata = cctx.tsdata();
+        final MutableTimeSeriesCollectionPair tsdata = cctx.tsdata();
         streamGroups(now).forEach(tsdata.getCurrentCollection()::add);
 
         // Build a rule evaluation context.

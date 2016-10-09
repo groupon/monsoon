@@ -31,7 +31,7 @@
  */
 package com.groupon.lex.metrics.history.xdr.support;
 
-import com.groupon.lex.metrics.timeseries.BackRefTimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -99,9 +99,9 @@ public class MultiFileIterator implements Iterator<TimeSeriesCollection> {
          * If multiple TS Collections share the same timestamp, merge them together.
          */
         if (!tsMerge.isEmpty()) {
-            next = new BackRefTimeSeriesCollection(
+            next = new SimpleTimeSeriesCollection(
                     next.getTimestamp(),
-                    Stream.concat(next.getTSValues().stream(), tsMerge.stream().flatMap(c -> c.getTSValues().stream())));
+                    Stream.concat(next.getTSValues().stream(), tsMerge.stream().flatMap(c -> c.getTSValues().stream())).distinct());
         }
 
         updateFileIters();  // Update file iters after using them.

@@ -34,10 +34,10 @@ package com.groupon.lex.metrics.history.v2.xdr;
 import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.support.ByteCountingXdrEncodingStream.xdrSize;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.FileTimeSeriesCollection;
 import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
 import com.groupon.lex.metrics.history.xdr.support.ObjectSequence;
 import static com.groupon.lex.metrics.history.xdr.support.reader.Crc32Reader.CRC_LEN;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.util.Collections;
@@ -103,7 +103,8 @@ public class Util {
 
                 // If more than 1 adjecent element share timestamp, merge them together.
                 if (curIdx + 1 < nextIdx) {
-                    TimeSeriesCollection replacement = new FileTimeSeriesCollection(curElem.getTimestamp(), collection.subList(curIdx, nextIdx).stream()
+                    // XXX this is expensive, use lazy merge instead!
+                    TimeSeriesCollection replacement = new SimpleTimeSeriesCollection(curElem.getTimestamp(), collection.subList(curIdx, nextIdx).stream()
                             .flatMap(tsc -> tsc.getTSValues().stream())
                             .collect(Collectors.toMap(TimeSeriesValue::getGroup, Function.identity(), (x, y) -> x))
                             .values()

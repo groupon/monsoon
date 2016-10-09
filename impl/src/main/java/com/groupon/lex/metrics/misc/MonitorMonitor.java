@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.MutableTimeSeriesCollectionPair;
 import com.groupon.lex.metrics.timeseries.Alert;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.TimeSeriesTransformer;
@@ -129,7 +130,7 @@ public class MonitorMonitor implements TimeSeriesTransformer {
      * @param ctx Rule evaluation context.
      */
     @Override
-    public void transform(Context ctx) {
+    public void transform(Context<MutableTimeSeriesCollectionPair> ctx) {
         DateTime now = ctx.getTSData().getCurrentCollection().getTimestamp();
 
         ctx.getTSData().getCurrentCollection().addMetrics(MONITOR_GROUP, get_metrics_(now, ctx));

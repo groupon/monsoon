@@ -3,7 +3,6 @@ package com.groupon.lex.metrics.transformers;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPairInstance;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
@@ -31,11 +30,11 @@ public class IdentifierNameResolverTest {
     @Before
     public void setup() {
         final GroupName group_name = GroupName.valueOf(group_path);
-        final TimeSeriesCollectionPair ts_data = new TimeSeriesCollectionPairInstance(DateTime.now(DateTimeZone.UTC));
+        final TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance(DateTime.now(DateTimeZone.UTC));
         tsv0 = new MutableTimeSeriesValue(ts_data.getCurrentCollection().getTimestamp(), group_name, EMPTY_MAP);
         ts_data.getCurrentCollection().add(tsv0);
 
-        final MutableContext m_ctx = new MutableContext(ts_data, (alert) -> {});
+        final MutableContext<?> m_ctx = new MutableContext<>(ts_data, (alert) -> {});
         m_ctx.putGroupAlias(IDENTIFIER, group_path);
 
         ctx = m_ctx;

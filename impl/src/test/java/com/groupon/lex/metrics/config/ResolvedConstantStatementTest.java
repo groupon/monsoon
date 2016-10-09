@@ -34,11 +34,11 @@ package com.groupon.lex.metrics.config;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.MutableTimeSeriesCollectionPair;
 import com.groupon.lex.metrics.expression.GroupExpression;
 import com.groupon.lex.metrics.expression.LiteralGroupExpression;
+import com.groupon.lex.metrics.timeseries.MutableTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
 import com.groupon.lex.metrics.timeseries.expression.Context;
@@ -95,11 +95,11 @@ public class ResolvedConstantStatementTest {
     @Mock
     private GroupExpression group;
     @Mock
-    private TimeSeriesCollectionPair ts_data_pair;
+    private MutableTimeSeriesCollectionPair ts_data_pair;
     @Mock
-    private TimeSeriesCollection ts_data;
+    private MutableTimeSeriesCollection ts_data;
     @Mock
-    private Context ctx;
+    private Context<MutableTimeSeriesCollectionPair> ctx;
 
     private final TimeSeriesValue tsv = new MutableTimeSeriesValue(DateTime.now(DateTimeZone.UTC), GroupName.valueOf("foo"), EMPTY_MAP);
 

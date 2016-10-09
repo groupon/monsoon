@@ -12,8 +12,9 @@ import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.xdr.support.ImmutableTimeSeriesValue;
-import com.groupon.lex.metrics.history.xdr.support.FileTimeSeriesCollection;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.util.Arrays;
 import java.util.Map;
@@ -89,8 +90,8 @@ public class FromXdr {
                 });
     }
 
-    public static FileTimeSeriesCollection datapoints(tsfile_datapoint tsv) {
+    public static TimeSeriesCollection datapoints(tsfile_datapoint tsv) {
         final DateTime ts = FromXdr.timestamp(tsv.ts);
-        return new FileTimeSeriesCollection(ts, process_path_(ts, tsv.groups));
+        return new SimpleTimeSeriesCollection(ts, process_path_(ts, tsv.groups));
     }
 }

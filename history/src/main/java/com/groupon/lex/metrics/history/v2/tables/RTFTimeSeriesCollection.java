@@ -32,14 +32,11 @@
 package com.groupon.lex.metrics.history.v2.tables;
 
 import com.groupon.lex.metrics.GroupName;
-import com.groupon.lex.metrics.MetricName;
-import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.AbstractTimeSeriesCollection;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
 import java.io.IOException;
@@ -83,21 +80,6 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
                 .filter((gt -> gt.contains(index)))
                 .map(optGt -> optGt.map(gt -> new RTFTimeSeriesValue(ts, index, GroupName.valueOf(path, tags), gt)))
                 .cache();
-    }
-
-    @Override
-    public TimeSeriesCollection add(TimeSeriesValue tsv) {
-        throw new UnsupportedOperationException("History is read only.");
-    }
-
-    @Override
-    public TimeSeriesCollection renameGroup(GroupName oldname, GroupName newname) {
-        throw new UnsupportedOperationException("History is read only.");
-    }
-
-    @Override
-    public TimeSeriesCollection addMetrics(GroupName group, Map<MetricName, MetricValue> metrics) {
-        throw new UnsupportedOperationException("History is read only.");
     }
 
     @Override
@@ -187,7 +169,4 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
                 })
                 .map(x -> x);  // Fixing compiler's idea of the type.
     }
-
-    @Override
-    public RTFTimeSeriesCollection clone() { return this; }  // Read-only doesn't need clone.
 }

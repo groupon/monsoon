@@ -57,7 +57,7 @@ public class MutableContextTest {
 
     @Test
     public void constructor() {
-        MutableContext ctx = new MutableContext(ts_data, alert_manager);
+        MutableContext<?> ctx = new MutableContext<>(ts_data, alert_manager);
 
         assertSame(alert_manager, ctx.getAlertManager());
         assertSame(ts_data, ctx.getTSData());
@@ -67,8 +67,8 @@ public class MutableContextTest {
 
     @Test
     public void construct_from_copy() {
-        Context parent = new SimpleContext(ts_data, alert_manager);
-        MutableContext ctx = new MutableContext(parent);
+        Context<?> parent = new SimpleContext<>(ts_data, alert_manager);
+        MutableContext<?> ctx = new MutableContext<>(parent);
 
         assertSame(alert_manager, ctx.getAlertManager());
         assertSame(ts_data, ctx.getTSData());
@@ -78,9 +78,9 @@ public class MutableContextTest {
 
     @Test
     public void construct_from_copy_with_tsdata() {
-        Context parent = new SimpleContext(ts_data, alert_manager);
+        Context<?> parent = new SimpleContext<>(ts_data, alert_manager);
         TimeSeriesCollectionPair new_tsdata = new TimeSeriesCollectionPairInstance(DateTime.now(DateTimeZone.UTC));
-        MutableContext ctx = new MutableContext(new_tsdata, parent);
+        MutableContext<?> ctx = new MutableContext<>(new_tsdata, parent);
 
         assertSame(alert_manager, ctx.getAlertManager());
         assertSame(new_tsdata, ctx.getTSData());
@@ -90,7 +90,7 @@ public class MutableContextTest {
 
     @Test
     public void put_1() {
-        MutableContext ctx = new MutableContext(ts_data, alert_manager);
+        MutableContext<?> ctx = new MutableContext<>(ts_data, alert_manager);
         ctx.put("identifier", String.class, DATA, ALIAS);
 
         assertThat(ctx.getAllIdentifiers(), hasKey("identifier"));
@@ -108,7 +108,7 @@ public class MutableContextTest {
 
     @Test
     public void put_using_opt_value_present() {
-        MutableContext ctx = new MutableContext(ts_data, alert_manager);
+        MutableContext<?> ctx = new MutableContext<>(ts_data, alert_manager);
         ctx.put("identifier", String.class, Optional.of(DATA), ALIAS);
 
         assertThat(ctx.getAllIdentifiers(), hasKey("identifier"));
@@ -126,7 +126,7 @@ public class MutableContextTest {
 
     @Test
     public void put_using_opt_value_absent() {
-        MutableContext ctx = new MutableContext(ts_data, alert_manager);
+        MutableContext<?> ctx = new MutableContext<>(ts_data, alert_manager);
         ctx.put("identifier", String.class, Optional.empty(), ALIAS);
 
         assertThat(ctx.getAllIdentifiers(), hasKey("identifier"));
@@ -144,7 +144,7 @@ public class MutableContextTest {
 
     @Test
     public void put_using_producer() {
-        MutableContext ctx = new MutableContext(ts_data, alert_manager);
+        MutableContext<?> ctx = new MutableContext<>(ts_data, alert_manager);
         ctx.putSupplied("identifier", String.class, (c) -> Optional.of(DATA), () -> ALIAS);
 
         // Check that identifier is resolveable to the same type.
@@ -160,7 +160,7 @@ public class MutableContextTest {
 
     @Test
     public void remove() {
-        MutableContext ctx = new MutableContext(ts_data, alert_manager);
+        MutableContext<?> ctx = new MutableContext<>(ts_data, alert_manager);
         ctx.put("identifier", String.class, Optional.empty(), ALIAS);
         assertThat(ctx.getAllIdentifiers(), hasKey("identifier"));
 
@@ -180,7 +180,7 @@ public class MutableContextTest {
     @Test(expected = IllegalArgumentException.class)
     public void put_when_lying_about_type() {
         Class clazz = Float.class;
-        MutableContext ctx = new MutableContext(ts_data, alert_manager);
+        MutableContext<?> ctx = new MutableContext<>(ts_data, alert_manager);
 
         ctx.put("identifier", clazz, DATA, ALIAS);
     }
@@ -188,7 +188,7 @@ public class MutableContextTest {
     @Test(expected = IllegalArgumentException.class)
     public void put_when_lying_about_type_using_optional() {
         Class<String> clazz = (Class<String>)(Class)Float.class;  // Tricking the type system, using type erase and reintroduction to mismap the type.
-        MutableContext ctx = new MutableContext(ts_data, alert_manager);
+        MutableContext<?> ctx = new MutableContext<>(ts_data, alert_manager);
 
         ctx.put("identifier", clazz, Optional.of(DATA), ALIAS);
     }
@@ -196,7 +196,7 @@ public class MutableContextTest {
     @Test(expected = IllegalArgumentException.class)
     public void put_using_producer_when_lying_about_type() {
         Class clazz = Float.class;
-        MutableContext ctx = new MutableContext(ts_data, alert_manager);
+        MutableContext<?> ctx = new MutableContext<>(ts_data, alert_manager);
 
         ctx.putSupplied("identifier", clazz, (c) -> Optional.of(DATA), () -> ALIAS);
         ctx.getFromIdentifier(clazz, "identifier");

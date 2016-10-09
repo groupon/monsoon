@@ -38,6 +38,7 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.config.ParserSupport;
 import com.groupon.lex.metrics.history.CollectHistory;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
@@ -439,7 +440,7 @@ public class ClientServerTest {
                 .map(i -> {
                     final DateTime t = T0.plus(Duration.standardSeconds(10 * i));
                     final MetricValue counter = MetricValue.fromIntValue(i);
-                    return new RpcTimeSeriesCollection(t, Stream.of(new ImmutableTimeSeriesValue(t, groupName, singletonMap(metricName, counter))));
+                    return new SimpleTimeSeriesCollection(t, Stream.of(new ImmutableTimeSeriesValue(t, groupName, singletonMap(metricName, counter))));
                 });
     }
 

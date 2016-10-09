@@ -33,7 +33,6 @@ package com.groupon.lex.metrics.history.v2.list;
 
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
-import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.v2.tables.DictionaryDelta;
@@ -45,7 +44,6 @@ import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.history.xdr.support.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.timeseries.AbstractTimeSeriesCollection;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
 import gnu.trove.map.hash.THashMap;
@@ -96,21 +94,6 @@ public class ListTSC extends AbstractTimeSeriesCollection {
     }
 
     @Override
-    public TimeSeriesCollection add(TimeSeriesValue tsv) {
-        throw new UnsupportedOperationException("Immutable.");
-    }
-
-    @Override
-    public TimeSeriesCollection renameGroup(GroupName oldname, GroupName newname) {
-        throw new UnsupportedOperationException("Immutable.");
-    }
-
-    @Override
-    public TimeSeriesCollection addMetrics(GroupName group, Map<MetricName, MetricValue> metrics) {
-        throw new UnsupportedOperationException("Immutable.");
-    }
-
-    @Override
     public boolean isEmpty() {
         return getData().isEmpty();
     }
@@ -141,11 +124,6 @@ public class ListTSC extends AbstractTimeSeriesCollection {
     @Override
     public Optional<TimeSeriesValue> get(GroupName name) {
         return Optional.ofNullable(getData().get(name));
-    }
-
-    @Override
-    public TimeSeriesCollection clone() {
-        return this;  // Immutable entity does not need copy.
     }
 
     @RequiredArgsConstructor

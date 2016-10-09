@@ -31,7 +31,7 @@
  */
 package com.groupon.lex.metrics.history;
 
-import com.groupon.lex.metrics.timeseries.BackRefTimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.EmptyTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.InterpolatedTSC;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.util.ArrayDeque;
@@ -161,7 +161,7 @@ public class IntervalIterator implements Iterator<TimeSeriesCollection> {
         if (future.getFirst().getTimestamp().equals(nextTS))
             next = future.removeFirst();
         else
-            next = new BackRefTimeSeriesCollection(nextTS);
+            next = new EmptyTimeSeriesCollection(nextTS);
 
         nextTS = nextTS.plus(interval);
 

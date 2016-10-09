@@ -17,9 +17,9 @@ import com.groupon.lex.metrics.history.v2.tables.FileTableFileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport0;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport1;
-import com.groupon.lex.metrics.history.xdr.support.FileTimeSeriesCollection;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.File;
 import java.nio.channels.FileChannel;
@@ -181,8 +181,8 @@ public class TSDataTest {
                     }
                 })
                 .map(new Function<Integer, TimeSeriesCollection>() {
-                    public FileTimeSeriesCollection apply(Integer i) {
-                        return new FileTimeSeriesCollection(now.plusMinutes(i), Stream.of(
+                    public TimeSeriesCollection apply(Integer i) {
+                        return new SimpleTimeSeriesCollection(now.plusMinutes(i), Stream.of(
                                 new MutableTimeSeriesValue(now.plusMinutes(i),
                                         GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
                                         singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))),

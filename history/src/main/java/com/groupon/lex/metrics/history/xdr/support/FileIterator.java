@@ -31,7 +31,7 @@
  */
 package com.groupon.lex.metrics.history.xdr.support;
 
-import com.groupon.lex.metrics.timeseries.BackRefTimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -78,11 +78,12 @@ public class FileIterator implements Iterator<TimeSeriesCollection> {
             else
                 next = null;
         }
-        result = new BackRefTimeSeriesCollection(
+        result = new SimpleTimeSeriesCollection(
                 result.getTimestamp(),
                 Stream.concat(
-                        result.getTSValues().stream(),
-                        tsMerge.stream().flatMap(c -> c.getTSValues().stream())));
+                            result.getTSValues().stream(),
+                            tsMerge.stream().flatMap(c -> c.getTSValues().stream())
+                        .distinct()));
         return result;
     }
 }

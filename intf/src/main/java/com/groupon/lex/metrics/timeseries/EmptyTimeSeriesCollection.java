@@ -29,41 +29,54 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics;
+package com.groupon.lex.metrics.timeseries;
 
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
-import com.groupon.lex.metrics.timeseries.Alert;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPairInstance;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
+import com.groupon.lex.metrics.GroupName;
+import com.groupon.lex.metrics.SimpleGroupPath;
+import java.util.Collection;
+import static java.util.Collections.EMPTY_SET;
+import java.util.Optional;
+import java.util.Set;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.joda.time.DateTime;
 
-public class PullMetricRegistryInstance extends MetricRegistryInstance {
-    public PullMetricRegistryInstance(boolean has_config, EndpointRegistration api) {
-        super(has_config, api);
-    }
+/**
+ * An empty time series collection.
+ * @author ariane
+ */
+@RequiredArgsConstructor
+public class EmptyTimeSeriesCollection extends AbstractTimeSeriesCollection {
+    @Getter
+    private final DateTime timestamp;
 
-    public PullMetricRegistryInstance(Supplier<DateTime> now, boolean has_config, EndpointRegistration api) {
-        super(now, has_config, api);
+    @Override
+    public boolean isEmpty() {
+        return true;
     }
 
     @Override
-    protected CollectionContext beginCollection(DateTime now) {
-        return new CollectionContext() {
-            private final TimeSeriesCollectionPairInstance tsdata = new TimeSeriesCollectionPairInstance(now);
+    public Set<GroupName> getGroups() {
+        return EMPTY_SET;
+    }
 
-            @Override
-            public Consumer<Alert> alertManager() {
-                return (Alert alert) -> {};
-            }
+    @Override
+    public Set<SimpleGroupPath> getGroupPaths() {
+        return EMPTY_SET;
+    }
 
-            @Override
-            public MutableTimeSeriesCollectionPair tsdata() {
-                return tsdata;
-            }
+    @Override
+    public Collection<TimeSeriesValue> getTSValues() {
+        return EMPTY_SET;
+    }
 
-            @Override
-            public void commit() {}
-        };
+    @Override
+    public TimeSeriesValueSet getTSValue(SimpleGroupPath name) {
+        return TimeSeriesValueSet.EMPTY;
+    }
+
+    @Override
+    public Optional<TimeSeriesValue> get(GroupName name) {
+        return Optional.empty();
     }
 }

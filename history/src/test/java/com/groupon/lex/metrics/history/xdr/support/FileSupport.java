@@ -8,6 +8,7 @@ import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.TSDataVersionDispatch.Releaseable;
 import com.groupon.lex.metrics.history.xdr.Const;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.io.IOException;
@@ -112,7 +113,7 @@ public class FileSupport {
                                         (ignored) -> MetricValue.fromIntValue(rnd.nextLong()));
                             });
 
-                    return new FileTimeSeriesCollection(now, tsv_stream);
+                    return new SimpleTimeSeriesCollection(now, tsv_stream);
                 });
     }
 

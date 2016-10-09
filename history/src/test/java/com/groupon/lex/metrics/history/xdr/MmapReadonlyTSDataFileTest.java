@@ -12,8 +12,8 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport0;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport1;
-import com.groupon.lex.metrics.history.xdr.support.FileTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -66,7 +66,7 @@ public class MmapReadonlyTSDataFileTest {
 
         tsdata = new ArrayList<>();
         for (int i = 0; i < 100; ++i) {
-            tsdata.add(new FileTimeSeriesCollection(now.plusMinutes(i), Stream.of(
+            tsdata.add(new SimpleTimeSeriesCollection(now.plusMinutes(i), Stream.of(
                 new MutableTimeSeriesValue(now.plusMinutes(i),
                         GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
                         singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))))));

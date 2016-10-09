@@ -103,7 +103,6 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
         this(new DateTime(DateTimeZone.UTC));
     }
 
-    @Override
     public MutableTimeSeriesCollection add(TimeSeriesValue tsv) {
         return add(new MutableTimeSeriesValue(tsv));
     }
@@ -113,7 +112,6 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
         return this;
     }
 
-    @Override
     public TimeSeriesCollection renameGroup(GroupName oldname, GroupName newname) {
         LOG.log(Level.FINE, "renaming {0} => {1}", new Object[]{oldname, newname});
         remove_(oldname)
@@ -124,12 +122,10 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
         return this;
     }
 
-    @Override
     public TimeSeriesCollection addMetric(GroupName group, MetricName metric, MetricValue value) {
         return addMetrics(group, singletonMap(metric, value));
     }
 
-    @Override
     public TimeSeriesCollection addMetrics(GroupName group, Map<MetricName, MetricValue> metrics) {
         final Optional<MutableTimeSeriesValue> opt_tsv = remove_(group);  // Unlink, since we may alter the hash bucket.
         if (!opt_tsv.isPresent()) {
@@ -190,11 +186,6 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
         data_.clear();
         data_by_path_.clear();
         return this;
-    }
-
-    @Override
-    public MutableTimeSeriesCollection clone() {
-        return new MutableTimeSeriesCollection(getTimestamp(), getData().values().stream());
     }
 
     @Override

@@ -6,6 +6,7 @@ import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.history.xdr.BufferSupplier;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -40,7 +41,7 @@ import org.junit.runners.Parameterized;
 public class XdrStreamIteratorTest {
     private final FileSupport file_support;
     private Path tmpdir, tmpfile;
-    private List<FileTimeSeriesCollection> tsdata;
+    private List<TimeSeriesCollection> tsdata;
 
     @Parameterized.Parameters
     public static Collection<Object[]> parameters() {
@@ -60,7 +61,7 @@ public class XdrStreamIteratorTest {
 
         tsdata = new ArrayList<>();
         for (int i = 0; i < 100; ++i) {
-            tsdata.add(new FileTimeSeriesCollection(now.plusMinutes(i), Stream.of(
+            tsdata.add(new SimpleTimeSeriesCollection(now.plusMinutes(i), Stream.of(
                 new MutableTimeSeriesValue(now.plusMinutes(i),
                         GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
                         singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))))));

@@ -6,7 +6,6 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.history.xdr.support.FileTimeSeriesCollection;
 import com.groupon.lex.metrics.history.v0.xdr.tsfile_datapoint;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -20,6 +19,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferEncodingStream;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import static org.junit.Assert.assertEquals;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -90,7 +90,7 @@ public class XdrReadBackTest {
             put(MetricName.valueOf("string"), MetricValue.fromStrValue("chocoladevla"));
         }};
         final DateTime now = DateTime.now(DateTimeZone.UTC);
-        tsv_ = new FileTimeSeriesCollection(now, Stream.of(new MutableTimeSeriesValue(now, GroupName.valueOf(GROUP), metrics)));
+        tsv_ = new SimpleTimeSeriesCollection(now, Stream.of(new MutableTimeSeriesValue(now, GroupName.valueOf(GROUP), metrics)));
     }
 
     @Test
