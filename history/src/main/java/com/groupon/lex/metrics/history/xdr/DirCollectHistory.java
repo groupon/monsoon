@@ -42,6 +42,14 @@ public class DirCollectHistory extends AbstractCollectHistory<TSDataFileChain> {
         this(dir, Optional.of(disk_usage_limit), Optional.of(max_filesize));
     }
 
+    public boolean hasPendingTasks() {
+        return getTSData().hasPendingTasks();
+    }
+
+    public void waitPendingTasks() {
+        getTSData().waitPendingTasks();
+    }
+
     protected Optional<TSDataFileChain.Key> selectOldestKey() {
         return getTSData().getKeys().stream()
                 .sorted(Comparator.comparing(TSDataFileChain.Key::getEnd))

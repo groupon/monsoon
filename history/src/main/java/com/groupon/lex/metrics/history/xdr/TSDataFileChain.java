@@ -15,6 +15,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import static java.util.Collections.emptyList;
@@ -30,6 +31,9 @@ import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import java.util.Spliterators;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -53,6 +57,35 @@ public class TSDataFileChain implements TSData {
     private final long max_filesize_;
     private static final boolean COMPRESS_ACTIVE_FILE = true;
     private static final boolean COMPRESS_OPTIMIZED_FILE = true;
+    private List<Future<?>> pendingTasks = new ArrayList<>();
+
+    /** Tests if there are any pending tasks to be completed. */
+    public synchronized boolean hasPendingTasks() {
+        Iterator<Future<?>> futIter = pendingTasks.iterator();
+        while (futIter.hasNext()) {
+            Future<?> fut = futIter.next();
+            if (fut.isDone()) futIter.remove();
+        }
+        return !pendingTasks.isEmpty();
+    }
+
+    public void waitPendingTasks() {
+        final List<Future<?>> copy;
+        synchronized(this) {
+            copy = new ArrayList<>(pendingTasks);
+        }
+        for (Future<?> fut : copy) {
+            try {
+                fut.get();
+            } catch (InterruptedException ex) {
+                LOG.log(Level.WARNING, "interrupted while waiting for pending task", ex);
+            } catch (ExecutionException ex) {
+                LOG.log(Level.WARNING, "pending task completed exceptionally", ex);
+            }
+        }
+
+        hasPendingTasks();  // Clears out the completed futures.
+    }
 
     @ToString
     public static class Key implements Comparable<Key> {
@@ -442,7 +475,7 @@ public class TSDataFileChain implements TSData {
      * @param tsdata TSData, if it is opened.
      * @return True if the file was compressed and the key was replaced, false otherwise.
      */
-    private synchronized void compress_file_(Key file, TSData tsdata) throws IOException {
+    private void compress_file_(Key file, TSData tsdata) throws IOException {
         if (tsdata == null) {
             try {
                 tsdata = TSData.readonly(file.getFile());
@@ -474,9 +507,11 @@ public class TSDataFileChain implements TSData {
                     throw new IOException("encoding failure", ex);
                 }
 
-                Files.delete(file.getFile());
-                read_stores_.remove(file);  // Remove if present.
-                read_stores_.put(new Key(new_filename, file.getBegin(), file.getEnd()), null);
+                synchronized(this) {
+                    Files.delete(file.getFile());
+                    read_stores_.remove(file);  // Remove if present.
+                    read_stores_.put(new Key(new_filename, file.getBegin(), file.getEnd()), null);
+                }
             } catch (IOException ex) {
                 LOG.log(Level.SEVERE, "unable to write optimized file " + new_filename, ex);
                 try {
@@ -504,13 +539,17 @@ public class TSDataFileChain implements TSData {
         write_filename_.ifPresent(filename -> {
             final Key old_store_key = new Key(filename, old_store.get().getBegin(), old_store.get().getEnd());
             read_stores_.put(old_store_key, old_store.orElse(null));
-            final long t0 = System.currentTimeMillis();
-            try {
-                compress_file_(old_store_key, old_store.orElse(null));
-                LOG.log(Level.INFO, "optimizing file {0} took {1} msec", new Object[]{filename, System.currentTimeMillis() - t0});
-            } catch (IOException ex) {
-                LOG.log(Level.INFO, "optimizing file {0} failed after {1} msec", new Object[]{filename, System.currentTimeMillis() - t0});
-            }
+
+            // Optimize in the background, to not block writing of more data.
+            pendingTasks.add(ForkJoinPool.commonPool().submit(() -> {
+                final long t0 = System.currentTimeMillis();
+                try {
+                    compress_file_(old_store_key, old_store.orElse(null));
+                    LOG.log(Level.INFO, "optimizing file {0} took {1} msec", new Object[]{filename, System.currentTimeMillis() - t0});
+                } catch (IOException | RuntimeException ex) {
+                    LOG.log(Level.WARNING, "optimizing file " + filename + " failed after " + (System.currentTimeMillis() - t0) + " msec", ex);
+                }
+            }));
         });
 
         write_filename_ = Optional.of(file);
@@ -527,6 +566,7 @@ public class TSDataFileChain implements TSData {
 
     @Override
     public synchronized boolean add(TimeSeriesCollection e) {
+        hasPendingTasks();
         try {
             return get_write_store_for_writing_(e.getTimestamp()).add(e);
         } catch (IOException ex) {
@@ -536,6 +576,7 @@ public class TSDataFileChain implements TSData {
 
     @Override
     public boolean addAll(Collection<? extends TimeSeriesCollection> e) {
+        hasPendingTasks();
         return e.stream()
                 .map(TimeSeriesCollection::getTimestamp)
                 .min(Comparator.naturalOrder())

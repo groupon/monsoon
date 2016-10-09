@@ -268,6 +268,7 @@ public class TSDataFileChainTest {
     public void file_size() throws Exception {
         final int COUNT = LARGE_COUNT;
         fill_(COUNT);
+        fd.waitPendingTasks();
 
         final long expected = Files.list(tmpdir)
                 .mapToLong((path) -> {

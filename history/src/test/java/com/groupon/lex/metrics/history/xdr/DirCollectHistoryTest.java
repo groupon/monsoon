@@ -79,6 +79,7 @@ public class DirCollectHistoryTest {
         // Secondly, add the same amount again.
         for (int i = 0; i < count_until_90_percent; ++i) {
             hist.add(iter.next());
+            hist.waitPendingTasks();
             assertThat(getTmpdirSize(), Matchers.lessThanOrEqualTo(LIMIT));
         }
     }
