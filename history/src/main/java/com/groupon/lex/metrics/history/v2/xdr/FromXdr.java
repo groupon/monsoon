@@ -91,7 +91,7 @@ public class FromXdr {
         int resultIdx = 0;
         for (int i = 0; i < b.value.length; ++i) {
             int count = (int)b.value[i] & 0xffff;
-            Arrays.fill(result, resultIdx, count, resultVal);
+            Arrays.fill(result, resultIdx, resultIdx + count, resultVal);
 
             resultIdx += count;
             resultVal = !resultVal;
