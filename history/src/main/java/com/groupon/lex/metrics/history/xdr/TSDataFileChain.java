@@ -51,6 +51,8 @@ public class TSDataFileChain implements TSData {
     private static final Logger LOG = Logger.getLogger(TSDataFileChain.class.getName());
     public static long MAX_FILESIZE = 256 * 1024 * 1024;
     private final long max_filesize_;
+    private static final boolean COMPRESS_ACTIVE_FILE = true;
+    private static final boolean COMPRESS_OPTIMIZED_FILE = true;
 
     @ToString
     public static class Key implements Comparable<Key> {
@@ -467,7 +469,7 @@ public class TSDataFileChain implements TSData {
 
             try {
                 try {
-                    tables.write(compressed_data, true);
+                    tables.write(compressed_data, COMPRESS_OPTIMIZED_FILE);
                 } catch (OncRpcException ex) {
                     throw new IOException("encoding failure", ex);
                 }
@@ -520,7 +522,7 @@ public class TSDataFileChain implements TSData {
         final String prefix = String.format("monsoon-%04d%02d%02d-%02d%02d", begin.getYear(), begin.getMonthOfYear(), begin.getDayOfMonth(), begin.getHourOfDay(), begin.getMinuteOfHour());
         FileUtil.NamedFileChannel newFile = FileUtil.createNewFile(dir_, prefix, ".tsd");
         LOG.log(Level.INFO, "rotating into new file {0}", newFile.getFileName());
-        return install_new_store_(old_store, newFile.getFileName(), RWListFile.newFile(new GCCloseable<>(newFile.getFileChannel()), true));
+        return install_new_store_(old_store, newFile.getFileName(), RWListFile.newFile(new GCCloseable<>(newFile.getFileChannel()), COMPRESS_ACTIVE_FILE));
     }
 
     @Override
