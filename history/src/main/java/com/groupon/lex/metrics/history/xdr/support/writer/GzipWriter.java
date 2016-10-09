@@ -42,7 +42,7 @@ public class GzipWriter implements FileWriter {
     private final GZIPOutputStream gzip;
 
     public GzipWriter(@NonNull FileWriter out) throws IOException {
-        gzip = new GZIPOutputStream(new GzAdapter(out));
+        gzip = new GZIPOutputStream(new GzAdapter(out), 65536);
     }
 
     @Override
