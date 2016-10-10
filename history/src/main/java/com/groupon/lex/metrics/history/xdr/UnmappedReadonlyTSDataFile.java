@@ -97,7 +97,7 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
     }
 
     @Override
-    public boolean canAddSingleRecord() { return true; }
+    public boolean canAddSingleRecord() { return !is_gzipped_; }
     @Override
     public boolean isOptimized() { return false; }
 
