@@ -53,8 +53,10 @@ import org.joda.time.DateTimeZone;
  */
 public class TSDataFileChain implements TSData {
     private static final Logger LOG = Logger.getLogger(TSDataFileChain.class.getName());
-    public static long MAX_FILESIZE = 256 * 1024 * 1024;
+    public static long MAX_FILESIZE = 512 * 1024 * 1024;
+    public static int MAX_FILERECORDS = 7220;
     private final long max_filesize_;
+    private final int max_filerecords_ = MAX_FILERECORDS;
     private static final boolean COMPRESS_ACTIVE_FILE = true;
     private static final boolean COMPRESS_OPTIMIZED_FILE = true;
     private List<Future<?>> pendingTasks = new ArrayList<>();
@@ -229,7 +231,7 @@ public class TSDataFileChain implements TSData {
 
     private synchronized RWListFile get_write_store_for_writing_(DateTime ts_trigger) throws IOException {
         Optional<RWListFile> opt_store = get_write_store_();
-        if (opt_store.filter((fd) -> fd.getFileSize() < max_filesize_).isPresent()) return opt_store.get();
+        if (opt_store.filter((fd) -> fd.getFileSize() < max_filesize_ && fd.size() < max_filerecords_).isPresent()) return opt_store.get();
 
         try {
             return new_store_(opt_store, ts_trigger);
