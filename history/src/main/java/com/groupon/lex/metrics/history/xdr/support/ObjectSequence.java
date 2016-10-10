@@ -78,6 +78,16 @@ public class ObjectSequence<T> {
         return underlying.isEmpty();
     }
 
+    public Object[] toArray() {
+        return stream().toArray();
+    }
+
+    public <T> T[] toArray(T[] a) {
+        return stream().toArray((size) -> {
+            return (T[])java.lang.reflect.Array.newInstance(a.getClass().getComponentType(), size);
+        });
+    }
+
     public ObjectSequence<T> reverse() {
         return new ObjectSequence<>(underlying.reverse(), fn, sorted, nonnull, distinct);
     }
