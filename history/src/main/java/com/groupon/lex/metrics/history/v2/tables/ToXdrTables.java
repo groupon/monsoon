@@ -56,8 +56,6 @@ import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
-import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
-import gnu.trove.iterator.TLongObjectIterator;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
@@ -70,7 +68,11 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.NonNull;
 import org.acplt.oncrpc.OncRpcException;
@@ -131,20 +133,21 @@ public class ToXdrTables implements Closeable {
         return ctx.newWriter().write(result);
     }
 
+    private Map<SimpleGroupPath, Set<GroupName>> computeGroupKeys() {
+        return tsdata.valueCollection().stream()
+                .flatMap(tsc -> tsc.getGroups().stream())
+                .collect(Collectors.groupingBy(GroupName::getPath, Collectors.toSet()));
+    }
+
     private tables createTables(Context ctx) throws IOException, OncRpcException {
         TIntObjectMap<tables_tag[]> groupPathMap = new TIntObjectHashMap<>();
 
         // Write dependency data.
-        final TLongObjectIterator<TimeSeriesCollection> tsdataIter = tsdata.iterator();
-        while (tsdataIter.hasNext()) {
-            tsdataIter.advance();
-            final TimeSeriesCollection tsc = tsdataIter.value();
-
-            for (SimpleGroupPath grp : tsc.getGroupPaths()) {
-                final int grpRef = dict.getPathTable().getOrCreate(grp.getPath());
-                if (!groupPathMap.containsKey(grpRef))
-                    groupPathMap.put(grpRef, createTagTableArray(grp, ctx));
-            }
+        for (Map.Entry<SimpleGroupPath, Set<GroupName>> grpEntry : computeGroupKeys().entrySet()) {
+            final SimpleGroupPath grp = grpEntry.getKey();
+            final int grpRef = dict.getPathTable().getOrCreate(grp.getPath());
+            assert(!groupPathMap.containsKey(grpRef));
+            groupPathMap.put(grpRef, createTagTableArray(grp, grpEntry.getValue(), ctx));
         }
 
         // yield encoded table
@@ -158,22 +161,15 @@ public class ToXdrTables implements Closeable {
                 .toArray(tables_group[]::new));
     }
 
-    private tables_tag[] createTagTableArray(SimpleGroupPath grp, Context ctx) throws IOException, OncRpcException {
+    private tables_tag[] createTagTableArray(SimpleGroupPath grp, Collection<GroupName> grpNames, Context ctx) throws IOException, OncRpcException {
         TIntObjectMap<FilePos> tagMap = new TIntObjectHashMap<>();
 
         // Write dependency data.
-        final TLongObjectIterator<TimeSeriesCollection> tsdataIter = tsdata.iterator();
-        while (tsdataIter.hasNext()) {
-            tsdataIter.advance();
-            final TimeSeriesCollection tsc = tsdataIter.value();
-
-            for (GroupName grpName : tsc.getGroups()) {
-                if (Objects.equals(grpName.getPath(), grp)) {
-                    final int tagRef = dict.getTagsTable().getOrCreate(grpName.getTags());
-                    if (!tagMap.containsKey(tagRef))
-                        tagMap.put(tagRef, writeGroupTable(grpName, ctx));
-                }
-            }
+        for (GroupName grpName : grpNames) {
+            assert(Objects.equals(grp, grpName.getPath()));
+            final int tagRef = dict.getTagsTable().getOrCreate(grpName.getTags());
+            assert(!tagMap.containsKey(tagRef));
+            tagMap.put(tagRef, writeGroupTable(grpName, ctx));
         }
 
         // yield encoded table
@@ -187,26 +183,29 @@ public class ToXdrTables implements Closeable {
                 .toArray(tables_tag[]::new);
     }
 
+    private Set<MetricName> computeMetricNames(GroupName grpName) {
+        return tsdata.valueCollection().stream()
+                .map(tsc -> tsc.get(grpName))
+                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
+                .flatMap(tsv -> tsv.getMetrics().keySet().stream())
+                .collect(Collectors.toSet());
+    }
+
     private FilePos writeGroupTable(GroupName grpName, Context ctx) throws IOException, OncRpcException {
         TIntObjectMap<FilePos> metricsMap = new TIntObjectHashMap<>();
         TLongSet presence = new TLongHashSet();
 
+        // Fill presence set.
+        tsdata.valueCollection().stream()
+                .filter(tsv -> tsv.get(grpName).isPresent())
+                .mapToLong(tsv -> tsv.getTimestamp().toDateTime(DateTimeZone.UTC).getMillis())
+                .forEach(presence::add);
+
         // Write dependency tables.
-        final TLongObjectIterator<TimeSeriesCollection> tsdataIter = tsdata.iterator();
-        while (tsdataIter.hasNext()) {
-            tsdataIter.advance();
-            final long ts = tsdataIter.key();
-            final TimeSeriesCollection tsc = tsdataIter.value();
-
-            final TimeSeriesValue tsv = tsc.get(grpName).orElse(null);
-            if (tsv == null) continue;
-
-            presence.add(ts);  // Record presence of this group.
-            for (MetricName metricName : tsv.getMetrics().keySet()) {
-                final int metricRef = dict.getPathTable().getOrCreate(metricName.getPath());
-                if (!metricsMap.containsKey(metricRef))
-                    metricsMap.put(metricRef, writeMetrics(grpName, metricName, ctx));
-            }
+        for (MetricName metricName : computeMetricNames(grpName)) {
+            final int metricRef = dict.getPathTable().getOrCreate(metricName.getPath());
+            assert(!metricsMap.containsKey(metricRef));
+            metricsMap.put(metricRef, writeMetrics(grpName, metricName, ctx));
         }
 
         // Write group table.
