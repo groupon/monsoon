@@ -32,13 +32,10 @@
 package com.groupon.lex.metrics.history.v2.list;
 
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
-import static com.groupon.lex.metrics.history.v2.xdr.Util.TSDATA_HDR_LEN;
-import static com.groupon.lex.metrics.history.v2.xdr.Util.segmentLength;
 import com.groupon.lex.metrics.history.v2.xdr.dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.record_array;
 import com.groupon.lex.metrics.history.v2.xdr.tsdata;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import static com.groupon.lex.metrics.history.xdr.support.reader.Crc32Reader.CRC_LEN;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelSegmentReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.lib.GCCloseable;
@@ -46,37 +43,33 @@ import java.nio.channels.FileChannel;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import lombok.Value;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
-@Value
 public class ReadonlyTSDataHeader {
     private static final Logger LOG = Logger.getLogger(ReadonlyTSDataHeader.class.getName());
     private final long ts;
-    private final FilePos dictionary, records;
+    private final FilePos dictionary, records, previousTSData;
 
-    public ReadonlyTSDataHeader(long offset, tsdata tsd) {
+    public ReadonlyTSDataHeader(tsdata tsd) {
         this.ts = FromXdr.timestamp(tsd.ts).getMillis();
-        this.dictionary = new FilePos(offset + TSDATA_HDR_LEN + CRC_LEN, tsd.dd_len);
-        if (this.dictionary.getLen() == 0)
-            this.records = new FilePos(this.dictionary.getOffset(), tsd.r_len);
-        else
-            this.records = new FilePos(this.dictionary.getOffset() + segmentLength(this.dictionary.getLen()), tsd.r_len);
+        this.dictionary = (tsd.dict == null ? null : FromXdr.filePos(tsd.dict));
+        this.records = FromXdr.filePos(tsd.records);
+        this.previousTSData = (tsd.previous == null ? null : FromXdr.filePos(tsd.previous));
 
-        LOG.log(Level.FINER, "offset = {0}, dictionary at {1}, records at {2}", new Object[]{offset, this.dictionary, this.records});
+        LOG.log(Level.FINER, "previous at {0}, dictionary at {1}, records at {2}", new Object[]{this.previousTSData, this.dictionary, this.records});
     }
 
     public DateTime getTimestamp() {
         return new DateTime(ts, DateTimeZone.UTC);
     }
 
-    public long nextOffset() {
-        return records.getOffset() + segmentLength(records.getLen());
+    public Optional<FilePos> previousOffset() {
+        return Optional.ofNullable(previousTSData);
     }
 
     public SegmentReader<Optional<dictionary_delta>> dictionaryDecoder(GCCloseable<FileChannel> file, boolean compressed) {
-        if (dictionary.getLen() == 0) {
+        if (dictionary == null) {
             LOG.log(Level.FINER, "no dictionary present");
             return SegmentReader.of(Optional.empty());
         }

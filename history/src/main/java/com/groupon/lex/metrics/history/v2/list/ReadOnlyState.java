@@ -33,12 +33,9 @@ package com.groupon.lex.metrics.history.v2.list;
 
 import com.groupon.lex.metrics.history.v2.tables.DictionaryDelta;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
-import static com.groupon.lex.metrics.history.v2.xdr.Util.ALL_HDR_CRC_LEN;
-import static com.groupon.lex.metrics.history.v2.xdr.Util.TSDATA_HDR_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
 import com.groupon.lex.metrics.history.v2.xdr.tsdata;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
-import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
 import com.groupon.lex.metrics.history.xdr.support.ObjectSequence;
@@ -50,6 +47,7 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
 import java.util.logging.Level;
@@ -77,7 +75,7 @@ public class ReadOnlyState implements State {
         this.begin = FromXdr.timestamp(hdr.first);
         this.end = FromXdr.timestamp(hdr.last);
 
-        final List<SegmentReader<ReadonlyTSDataHeader>> tsdataHeaders = readAllTSDataHeaders(file, hdr.file_size);
+        final List<SegmentReader<ReadonlyTSDataHeader>> tsdataHeaders = readAllTSDataHeaders(file, FromXdr.filePos(hdr.fdt));
         final SegmentReader<DictionaryDelta> dictionary = calculateDictionary(file, gzipped, tsdataHeaders).cache();
         this.tsdata = unmodifiableList(calculateTimeSeries(file, gzipped, tsdataHeaders, dictionary));
     }
@@ -98,28 +96,26 @@ public class ReadOnlyState implements State {
         throw new UnsupportedOperationException("read-only file");
     }
 
-    public static List<SegmentReader<ReadonlyTSDataHeader>> readAllTSDataHeaders(GCCloseable<FileChannel> file, long eofOffset) throws IOException, OncRpcException {
+    public static List<SegmentReader<ReadonlyTSDataHeader>> readAllTSDataHeaders(GCCloseable<FileChannel> file, FilePos recordPos) throws IOException, OncRpcException {
         final ArrayList<SegmentReader<ReadonlyTSDataHeader>> headers = new ArrayList<>();
-        long offset = ALL_HDR_CRC_LEN;
-        while (offset != eofOffset) {
-            final SegmentReader<ReadonlyTSDataHeader> tsd = readTSDataHeader(file, offset);
+        if (recordPos.getOffset() == 0) return headers;  // Empty list.
+
+        while (recordPos != null) {
+            final SegmentReader<ReadonlyTSDataHeader> tsd = readTSDataHeader(file, recordPos);
             final ReadonlyTSDataHeader hdr = tsd.decode();
-
-            offset = hdr.nextOffset();
-            if (offset > eofOffset)
-                throw new DecodingException("record persists past end of file");
-
+            recordPos = hdr.previousOffset().orElse(null);
             headers.add(tsd);
         }
 
         headers.trimToSize();
+        Collections.reverse(headers);  // We read headers from last (most recently added) to first (least recently added), reversing makes the ordering make sense.
         return headers;
     }
 
-    public static SegmentReader<ReadonlyTSDataHeader> readTSDataHeader(GCCloseable<FileChannel> file, long offset) {
-        LOG.log(Level.FINEST, "new ReadonlyTSDataHeader segment at {0}", offset);
-        return new FileChannelSegmentReader<>(tsdata::new, file, new FilePos(offset, TSDATA_HDR_LEN), false)
-                .map(tsd -> new ReadonlyTSDataHeader(offset, tsd))
+    public static SegmentReader<ReadonlyTSDataHeader> readTSDataHeader(GCCloseable<FileChannel> file, FilePos pos) {
+        LOG.log(Level.FINEST, "new ReadonlyTSDataHeader segment at {0}", pos);
+        return new FileChannelSegmentReader<>(tsdata::new, file, pos, false)
+                .map(ReadonlyTSDataHeader::new)
                 .cache();
     }
 
@@ -134,11 +130,12 @@ public class ReadOnlyState implements State {
     }
 
     public static List<SegmentReader<TimeSeriesCollection>> calculateTimeSeries(GCCloseable<FileChannel> file, boolean compressed, List<SegmentReader<ReadonlyTSDataHeader>> tsdataList, SegmentReader<DictionaryDelta> dictionary) {
+        final FileChannelSegmentReader.Factory segmentFactory = new FileChannelSegmentReader.Factory(file, compressed);
         ArrayList<SegmentReader<TimeSeriesCollection>> result = new ArrayList<>();
         for (SegmentReader<ReadonlyTSDataHeader> tsdata : tsdataList) {
             result.add(tsdata
                     .map(tsdHeader -> {
-                        final TimeSeriesCollection tsc = new ListTSC(tsdHeader.getTimestamp(), tsdHeader.recordsDecoder(file, compressed), dictionary);
+                        final TimeSeriesCollection tsc = new ListTSC(tsdHeader.getTimestamp(), tsdHeader.recordsDecoder(file, compressed), dictionary, segmentFactory);
                         return tsc;
                     })
                     .share());

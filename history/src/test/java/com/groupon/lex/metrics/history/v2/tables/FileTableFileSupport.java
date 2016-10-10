@@ -60,4 +60,6 @@ public class FileTableFileSupport implements FileSupport.Writer {
     public short getMajor() { return (short)2; }
     @Override
     public short getMinor() { return (short)0; }
+    @Override
+    public boolean isEmptyAllowed() { return false; }
 }

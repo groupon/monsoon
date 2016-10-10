@@ -48,8 +48,6 @@ import java.util.stream.Collectors;
 public class Util {
     /** Describe the length of the version 3 header. */
     public static final int HDR_3_LEN;
-    /** Describe the length of a tsdata record header. */
-    public static final int TSDATA_HDR_LEN;
     /** Number of bytes used by mime header + version 3 header + crc. */
     public static final int ALL_HDR_CRC_LEN;
 
@@ -63,15 +61,6 @@ public class Util {
             sample.flags = 0;
             sample.reserved = 0;
             HDR_3_LEN = (int)xdrSize(sample);
-        }
-
-        {
-            tsdata sample = new tsdata();
-            sample.ts = ToXdr.timestamp(0);
-            sample.dd_len = 0;
-            sample.r_len = 0;
-            sample.reserved = 0;
-            TSDATA_HDR_LEN = (int)xdrSize(sample);
         }
 
         ALL_HDR_CRC_LEN = MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN;

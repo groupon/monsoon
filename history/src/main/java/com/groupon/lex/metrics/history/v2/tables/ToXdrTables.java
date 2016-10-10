@@ -50,6 +50,7 @@ import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.writeMimeHeader;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter.Writer;
+import com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter;
 import static com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter.CRC_LEN;
 import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
@@ -113,7 +114,7 @@ public class ToXdrTables implements Closeable {
             fileEnd = fd.getOffset();
         }
 
-        try (XdrEncodingFileWriter xdr = new XdrEncodingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(out, 0), HDR_SPACE), ctx.getUseBuffer())) {
+        try (XdrEncodingFileWriter xdr = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(out, 0), HDR_SPACE), 0), ctx.getUseBuffer())) {
             xdr.beginEncoding();
             writeMimeHeader(xdr);
             encodeHeader(bodyPos, fileEnd, ctx).xdrEncode(xdr);

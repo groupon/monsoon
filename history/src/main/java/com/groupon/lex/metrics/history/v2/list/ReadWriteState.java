@@ -31,39 +31,49 @@
  */
 package com.groupon.lex.metrics.history.v2.list;
 
+import com.groupon.lex.metrics.MetricName;
+import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
 import com.groupon.lex.metrics.history.v2.tables.DictionaryDelta;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.ALL_HDR_CRC_LEN;
-import static com.groupon.lex.metrics.history.v2.xdr.Util.TSDATA_HDR_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
 import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.calculateDictionary;
 import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.calculateTimeSeries;
 import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.readAllTSDataHeaders;
 import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.readTSDataHeader;
+import com.groupon.lex.metrics.history.v2.xdr.record;
 import com.groupon.lex.metrics.history.v2.xdr.record_array;
+import com.groupon.lex.metrics.history.v2.xdr.record_metric;
+import com.groupon.lex.metrics.history.v2.xdr.record_metrics;
+import com.groupon.lex.metrics.history.v2.xdr.record_tags;
 import com.groupon.lex.metrics.history.v2.xdr.tsdata;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
 import com.groupon.lex.metrics.history.xdr.Const;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
 import com.groupon.lex.metrics.history.xdr.support.ObjectSequence;
+import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelSegmentReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter.Writer;
 import com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter;
-import static com.groupon.lex.metrics.history.xdr.support.writer.Crc32Writer.CRC_LEN;
 import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.singletonList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -75,6 +85,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.Setter;
 import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
@@ -98,7 +109,7 @@ public final class ReadWriteState implements State {
     public ReadWriteState(GCCloseable<FileChannel> file, tsfile_header hdr) throws IOException, OncRpcException {
         this.file = file;
         this.hdr = hdr;
-        tsdataHeaders = readAllTSDataHeaders(file, hdr.file_size);
+        tsdataHeaders = readAllTSDataHeaders(file, FromXdr.filePos(hdr.fdt));
         dictionary = calculateDictionary(file, isGzipped(), tsdataHeaders)
                 .cache();
         tsdata = calculateTimeSeries(file, isGzipped(), tsdataHeaders, SegmentReader.ofSupplier(this::getDictionary).flatMap(x -> x));
@@ -173,12 +184,14 @@ public final class ReadWriteState implements State {
         final boolean compressed;
         long recordOffset;
         final DictionaryForWrite newWriterDict;
+        FilePos lastRecord;
         {
             final Lock lock = guard.readLock();
             lock.lock();
             try {
                 compressed = (hdr.flags & header_flags.GZIP) == header_flags.GZIP;
                 recordOffset = hdr.file_size;
+                lastRecord = FromXdr.filePos(hdr.fdt);
                 newWriterDict = writerDictionary.clone();
                 newWriterDict.reset();
             } finally {
@@ -191,20 +204,33 @@ public final class ReadWriteState implements State {
                     newWriterDict.getPathTable().getOffset(),
                     newWriterDict.getTagsTable().getOffset()});
         final ByteBuffer useBuffer = (compressed ? ByteBuffer.allocate(65536) : ByteBuffer.allocateDirect(65536));
+        if (lastRecord.getOffset() == 0) lastRecord = null;  // Empty file.
 
-        /* Encode all headers (which fills the newWriterDict in the process. */
-        final List<EncodedTscHeaderForWrite> headers = tscList.stream()
-                .sorted()
-                .map(tsc -> new EncodedTscHeaderForWrite(tsc, newWriterDict))
-                .collect(Collectors.toList());
-        LOG.log(Level.FINER, "encoded {0} headers", headers);
-        /* First header will write dictionary delta. */
-        if (!newWriterDict.isEmpty())
-            headers.get(0).setNewWriterDict(newWriterDict);
+        final List<FilePos> headers = new ArrayList<>(tscList.size());
+        final List<EncodedTscHeaderForWrite> writeHeaders;
+        try (FileChannelWriter fd = new FileChannelWriter(this.file.get(), recordOffset)) {
+            {
+                final Writer writer = new Writer(fd, compressed, useBuffer);
 
-        /* Write all headers (fills in hdr.recordOffset from argument). */
-        for (EncodedTscHeaderForWrite tscHdr : headers)
-            recordOffset = tscHdr.write(file.get(), recordOffset, compressed, useBuffer);
+                /* Write the contents of each collection. */
+                writeHeaders = new ArrayList<>(tscList.size());
+                for (TimeSeriesCollection tsc : tscList)
+                    writeHeaders.add(writeTSC(writer, tsc, newWriterDict));
+
+                /* First header owns reference to dictionary delta. */
+                if (!newWriterDict.isEmpty())
+                    writeHeaders.get(0).setNewWriterDict(Optional.of(writer.write(newWriterDict.encode())));
+            }
+
+            /* Write the headers. */
+            for (EncodedTscHeaderForWrite header : writeHeaders) {
+                header.setPreviousTscHeader(Optional.ofNullable(lastRecord));
+                lastRecord = header.write(fd, useBuffer);
+                headers.add(lastRecord);
+            }
+
+            recordOffset = fd.getOffset();  // New file end.
+        }
 
         /* Prepare new dictionary for installation. */
         final DictionaryDelta newDictionary;
@@ -221,7 +247,7 @@ public final class ReadWriteState implements State {
          * Prepare updated file header.
          */
 
-        final tsfile_header hdr = updateHeaderData(headers);
+        final tsfile_header hdr = updateHeaderData(writeHeaders);
 
         /*
          * Update shared datastructures.
@@ -236,6 +262,7 @@ public final class ReadWriteState implements State {
              * would pretend nothing was written.
              */
             hdr.file_size = recordOffset;
+            hdr.fdt = ToXdr.filePos(lastRecord);
             writeHeader(hdr, useBuffer);
             this.hdr = hdr;
 
@@ -244,8 +271,7 @@ public final class ReadWriteState implements State {
              */
 
             final List<SegmentReader<ReadonlyTSDataHeader>> newTsdataHeaders = headers.stream()
-                    .mapToLong(EncodedTscHeaderForWrite::getRecordOffset)
-                    .mapToObj(offset -> readTSDataHeader(file, offset))
+                    .map(offset -> readTSDataHeader(file, offset))
                     .collect(Collectors.toList());
 
             tsdataHeaders.addAll(newTsdataHeaders);
@@ -260,7 +286,7 @@ public final class ReadWriteState implements State {
                                     final SegmentReader<DictionaryDelta> dictSegment = SegmentReader.ofSupplier(this::getDictionary)
                                             .flatMap(Function.identity());
                                     final SegmentReader<record_array> recordsSegment = tsdHeader.recordsDecoder(file, compressed);
-                                    final TimeSeriesCollection newTsc = new ListTSC(tsdHeader.getTimestamp(), recordsSegment, dictSegment);
+                                    final TimeSeriesCollection newTsc = new ListTSC(tsdHeader.getTimestamp(), recordsSegment, dictSegment, new FileChannelSegmentReader.Factory(file, compressed));
                                     return newTsc;
                                 })
                                 .share();
@@ -339,62 +365,70 @@ public final class ReadWriteState implements State {
         return doReadLocked(() -> tsdata.get(index));
     }
 
+    private static EncodedTscHeaderForWrite writeTSC(Writer writer, TimeSeriesCollection tsc, DictionaryForWrite dict) throws IOException, OncRpcException {
+        final List<record> recordList = new ArrayList<>();
+        for (SimpleGroupPath path : tsc.getGroupPaths()) {
+            record r = new record();
+            r.path_ref = dict.getPathTable().getOrCreate(path.getPath());
+            r.tags = writeTSCTags(writer, path, tsc, dict);
+            recordList.add(r);
+        }
+        record_array ra = new record_array(recordList.toArray(new record[0]));
+
+        final FilePos pos = writer.write(ra);
+        return new EncodedTscHeaderForWrite(tsc.getTimestamp(), pos, dict);
+    }
+
+    private static record_tags[] writeTSCTags(Writer writer, SimpleGroupPath path, TimeSeriesCollection tsc, DictionaryForWrite dict) throws IOException, OncRpcException {
+        final List<record_tags> recordList = new ArrayList<>();
+        for (TimeSeriesValue tsv : tsc.getTSValue(path).stream().collect(Collectors.toList())) {
+            record_tags rt = new record_tags();
+            rt.tag_ref = dict.getTagsTable().getOrCreate(tsv.getTags());
+            rt.pos = ToXdr.filePos(writeMetrics(writer, tsv.getMetrics(), dict));
+            recordList.add(rt);
+        }
+        return recordList.toArray(new record_tags[0]);
+    }
+
+    private static FilePos writeMetrics(Writer writer, Map<MetricName, MetricValue> metrics, DictionaryForWrite dict) throws IOException, OncRpcException {
+        record_metrics rma = new record_metrics(metrics.entrySet().stream()
+                .map(metricEntry -> {
+                    record_metric rm = new record_metric();
+                    rm.path_ref = dict.getPathTable().getOrCreate(metricEntry.getKey().getPath());
+                    rm.v = ToXdr.metricValue(metricEntry.getValue(), dict.getStringTable()::getOrCreate);
+                    return rm;
+                })
+                .toArray(record_metric[]::new));
+        return writer.write(rma);
+    }
+
     private static class EncodedTscHeaderForWrite {
-        private static final int HEADER_BYTES = TSDATA_HDR_LEN + CRC_LEN;
         @Getter
         @Setter
-        private DictionaryForWrite newWriterDict;  // May be null.
+        private Optional<FilePos> previousTscHeader = Optional.empty();
+        @Getter
+        @Setter
+        private Optional<FilePos> newWriterDict = Optional.empty();
         @Getter
         private final DateTime timestamp;
-        private final record_array encodedTsc;
-        @Getter
-        private long recordOffset = -1;
+        private final FilePos encodedTsc;
 
-        public EncodedTscHeaderForWrite(TimeSeriesCollection tsc, DictionaryForWrite dict) {
-            newWriterDict = null;
-            timestamp = tsc.getTimestamp();
-            encodedTsc = ToXdr.timeSeriesCollection(tsc, dict);
+        public EncodedTscHeaderForWrite(@NonNull DateTime ts, @NonNull FilePos encodedTsc, @NonNull DictionaryForWrite dict) {
+            timestamp = ts;
+            this.encodedTsc = encodedTsc;
         }
 
-        public long write(FileChannel file, long recordOffset, boolean compressed, ByteBuffer useBuffer) throws IOException, OncRpcException {
-            this.recordOffset = recordOffset;
-            final long newFileEnd;
+        public FilePos write(FileChannelWriter fd, ByteBuffer useBuffer) throws IOException, OncRpcException {
             final tsdata tscHdr = new tsdata();
             tscHdr.reserved = 0;
+            tscHdr.dict = newWriterDict.map(ToXdr::filePos).orElse(null);
+            tscHdr.previous = previousTscHeader.map(ToXdr::filePos).orElse(null);
             tscHdr.ts = ToXdr.timestamp(timestamp);
+            tscHdr.records = ToXdr.filePos(encodedTsc);
 
-            final long recordEnd = recordOffset + HEADER_BYTES;
-            try (FileChannelWriter fileWriter = new FileChannelWriter(file, recordEnd)) {
-                LOG.log(Level.FINEST, "file offset {0}", fileWriter.getOffset());
-                final Writer writer = new Writer(fileWriter, compressed, useBuffer);
-                if (newWriterDict == null) {
-                    LOG.log(Level.FINEST, "dictionary absent -> not writing delta");
-                    tscHdr.dd_len = 0;
-                } else {
-                    FilePos pos = writer.write(newWriterDict.encode());
-                    tscHdr.dd_len = pos.getLen();
-                    LOG.log(Level.FINEST, "dictionary present, encoded at position {0}", pos);
-                }
-
-                {
-                    LOG.log(Level.FINEST, "file offset {0}", fileWriter.getOffset());
-                    FilePos pos = writer.write(encodedTsc);
-                    tscHdr.r_len = pos.getLen();
-                    LOG.log(Level.FINEST, "records encoded at position {0}", pos);
-                }
-
-                newFileEnd = fileWriter.getOffset();
-                LOG.log(Level.FINEST, "payload ends at {0}", newFileEnd);
-            }
-
-            try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(file, recordOffset), HEADER_BYTES), 4), TSDATA_HDR_LEN)) {
-                writer.beginEncoding();
-                tscHdr.xdrEncode(writer);
-                writer.endEncoding();
-                LOG.log(Level.FINEST, "tsdata header written at {0}", recordOffset);
-            }
-
-            return newFileEnd;
+            FilePos pos = new Writer(fd, false, useBuffer).write(tscHdr);
+            LOG.log(Level.FINEST, "tsdata header written at {0}", pos);
+            return pos;
         }
     }
 }

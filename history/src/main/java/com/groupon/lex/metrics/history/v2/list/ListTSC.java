@@ -42,7 +42,9 @@ import com.groupon.lex.metrics.history.v2.xdr.record_metrics;
 import com.groupon.lex.metrics.history.v2.xdr.record_tags;
 import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.history.xdr.support.ImmutableTimeSeriesValue;
+import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelSegmentReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
+import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.AbstractTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
@@ -50,12 +52,12 @@ import gnu.trove.map.hash.THashMap;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
-import static java.util.Collections.unmodifiableMap;
+import static java.util.Collections.unmodifiableSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -67,7 +69,7 @@ import org.joda.time.DateTime;
 public class ListTSC extends AbstractTimeSeriesCollection {
     @Getter
     private final DateTime timestamp;
-    private final SegmentReader<Map<GroupName, TimeSeriesValue>> data;
+    private final SegmentReader<Map<GroupName, SegmentReader<TimeSeriesValue>>> data;
 
     private static <T> BinaryOperator<T> throwing_merger_() {
         return (x, y) -> { throw new IllegalStateException("duplicate key " + x); };
@@ -78,16 +80,16 @@ public class ListTSC extends AbstractTimeSeriesCollection {
         return () -> new THashMap<K, V>(1, 1);
     }
 
-    public ListTSC(DateTime ts, SegmentReader<record_array> init, SegmentReader<DictionaryDelta> dict) {
+    public ListTSC(DateTime ts, SegmentReader<record_array> init, SegmentReader<DictionaryDelta> dict, FileChannelSegmentReader.Factory segmentFactory) {
         timestamp = ts;
-        data = init.map(ra -> new RecordArray(timestamp, ra))
+        data = init.map(ra -> new RecordArray(timestamp, ra, segmentFactory))
                 .combine(dict, RecordArray::mapToTSData)
                 .cache();
     }
 
-    private Map<GroupName, TimeSeriesValue> getData() {
+    private <T> T decode(SegmentReader<T> sr) {
         try {
-            return data.decode();
+            return sr.decode();
         } catch (IOException | OncRpcException ex) {
             throw new DecodingException("unable to extract metrics for " + timestamp, ex);
         }
@@ -95,61 +97,67 @@ public class ListTSC extends AbstractTimeSeriesCollection {
 
     @Override
     public boolean isEmpty() {
-        return getData().isEmpty();
+        return decode(data).isEmpty();
     }
 
     @Override
     public Set<GroupName> getGroups() {
-        return getData().keySet();
+        return unmodifiableSet(decode(data).keySet());
     }
 
     @Override
     public Set<SimpleGroupPath> getGroupPaths() {
-        return getData().keySet().stream()
+        return decode(data).keySet().stream()
                 .map(GroupName::getPath)
                 .collect(Collectors.toSet());
     }
 
     @Override
     public Collection<TimeSeriesValue> getTSValues() {
-        return getData().values();
+        return decode(data.map(Map::values)).stream()
+                .map(this::decode)
+                .collect(Collectors.toList());
     }
 
     @Override
     public TimeSeriesValueSet getTSValue(SimpleGroupPath name) {
-        return new TimeSeriesValueSet(getData().values().stream()
-                .filter(tsv -> tsv.getGroup().getPath().equals(name)));
+        return new TimeSeriesValueSet(decode(data).entrySet().stream()
+                .filter(entry -> Objects.equals(entry.getKey().getPath(), name))
+                .map(Map.Entry::getValue)
+                .map(this::decode));
     }
 
     @Override
     public Optional<TimeSeriesValue> get(GroupName name) {
-        return Optional.ofNullable(getData().get(name));
+        return Optional.ofNullable(decode(data).get(name))
+                .map(this::decode);
     }
 
     @RequiredArgsConstructor
     private static class RecordArray {
         private final DateTime ts;
         private final record_array ra;
+        private final FileChannelSegmentReader.Factory segmentFactory;
 
-        public Map<GroupName, TimeSeriesValue> mapToTSData(DictionaryDelta dictionary) {
-            return unmodifiableMap(Arrays.stream(ra.value)
-                    .map(r -> new PathVal(SimpleGroupPath.valueOf(dictionary.getPath(r.path_ref)), r.tags))
-                    .flatMap(pv -> pv.mapToGroups(dictionary))
-                    .map(gv -> gv.mapToTsv(ts, dictionary))
-                    .collect(Collectors.toMap(TimeSeriesValue::getGroup, Function.identity(), throwing_merger_(), hashmap_constructor_())));
+        public Map<GroupName, SegmentReader<TimeSeriesValue>> mapToTSData(DictionaryDelta dictionary) {
+            return Arrays.stream(ra.value)
+                    .flatMap(r -> {
+                        final SimpleGroupPath path = SimpleGroupPath.valueOf(dictionary.getPath(r.path_ref));
+                        return mapTags(path, r.tags, dictionary);
+                    })
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         }
-    }
 
-    @RequiredArgsConstructor
-    private static class PathVal {
-        private final SimpleGroupPath path;
-        private final record_tags[] tagMap;
-
-        public Stream<GroupVal> mapToGroups(DictionaryDelta dict) {
-            return Arrays.stream(tagMap)
-                    .map(r -> {
-                        final Tags tags = dict.getTags(r.tag_ref);
-                        return new GroupVal(GroupName.valueOf(path, tags), r.metrics);
+        private Stream<Map.Entry<GroupName, SegmentReader<TimeSeriesValue>>> mapTags(SimpleGroupPath path, record_tags rta[], DictionaryDelta dictionary) {
+            return Arrays.stream(rta)
+                    .map(rt -> {
+                        final Tags tags = dictionary.getTags(rt.tag_ref);
+                        final GroupName group = GroupName.valueOf(path, tags);
+                        final SegmentReader<TimeSeriesValue> tsv = segmentFactory.get(record_metrics::new, FromXdr.filePos(rt.pos))
+                                .map(rm -> new GroupVal(group, rm))
+                                .map(gv -> gv.mapToTsv(ts, dictionary))
+                                .cache();
+                        return SimpleMapEntry.create(group, tsv);
                     });
         }
     }
@@ -157,13 +165,13 @@ public class ListTSC extends AbstractTimeSeriesCollection {
     @RequiredArgsConstructor
     private static class GroupVal {
         private final GroupName group;
-        private final record_metrics[] metrics;
+        private final record_metrics metrics;
 
         public TimeSeriesValue mapToTsv(DateTime ts, DictionaryDelta dict) {
             return new ImmutableTimeSeriesValue(
                     ts,
                     group,
-                    Arrays.stream(metrics),
+                    Arrays.stream(metrics.value),
                     r -> MetricName.valueOf(dict.getPath(r.path_ref)),
                     r -> FromXdr.metricValue(r.v, dict::getString));
         }

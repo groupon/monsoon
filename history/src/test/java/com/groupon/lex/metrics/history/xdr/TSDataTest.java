@@ -242,12 +242,20 @@ public class TSDataTest {
 
     @Test
     public void is_empty() throws Exception {
+        if (file_support.isEmptyAllowed()) {  // Cannot execute test on non-empty files.
+            file_support.create_file(tmpfile, EMPTY_LIST);
+
+            final TSData fd = TSData.readonly(tmpfile);
+
+            assertTrue(fd.isEmpty());
+            assertEquals(0, fd.size());
+        }
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void is_empty_not_allowed() throws Exception {
+        if (file_support.isEmptyAllowed()) throw new IllegalStateException("this test only works for files that may not be empty");
         file_support.create_file(tmpfile, EMPTY_LIST);
-
-        final TSData fd = TSData.readonly(tmpfile);
-
-        assertTrue(fd.isEmpty());
-        assertEquals(0, fd.size());
     }
 
     @Test

@@ -75,13 +75,14 @@ case EMPTY:
     /* skip */
 };
 
-struct record_metrics {
+struct record_metric {
     int path_ref;
     metric_value v;
 };
+typedef record_metric record_metrics<>;
 struct record_tags {
     int tag_ref;
-    record_metrics metrics<>;
+    file_segment pos;  /* reference record_metrics */
 };
 struct record {
     int path_ref;
@@ -117,12 +118,15 @@ struct dictionary_delta {
  * - crc32 (4 bytes, validates this record)
  * - dictionary delta (segment, dd_len bytes, omitted if dd_len=0)
  * - record_array (segment, r_len bytes)
+ *
+ * This struct is not compressed.
  */
 struct tsdata {
     timestamp_msec ts;
-    hyper dd_len;
-    hyper r_len;
-    int reserved;  // Pads to multiple of 8 bytes, once CRC following this is considered.
+    file_segment *previous;  /* references predecessor delta */
+    file_segment *dict;  /* references dictionary delta */
+    file_segment records;  /* references record_array */
+    int reserved;  /* Pads to multiple of 8 bytes, once CRC following this is considered. */
 };
 
 struct file_data_tables {
@@ -226,5 +230,8 @@ struct tsfile_header {
     int flags;
     int reserved;  /* reserved for future use */
     hyper file_size;  /* file size */
-    file_segment fdt;  /* file data tables (only if tables file) */
+    file_segment fdt;  /*
+                        * file data tables (only if tables file)
+                        * points at last list tsdata (only if list file)
+                        */
 };

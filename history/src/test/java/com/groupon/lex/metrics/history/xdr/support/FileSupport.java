@@ -44,6 +44,7 @@ public class FileSupport {
         public void create_file(Releaseable<FileChannel> fd, Collection<? extends TimeSeriesCollection> tsdata, boolean compress) throws IOException;
         public short getMajor();
         public short getMinor();
+        public default boolean isEmptyAllowed() { return true; }
     }
 
     public static final Writer NO_WRITER = new Writer() {
@@ -71,6 +72,7 @@ public class FileSupport {
 
     public short getMajor() { return writer.getMajor(); }
     public short getMinor() { return writer.getMinor(); }
+    public boolean isEmptyAllowed() { return writer.isEmptyAllowed(); }
 
     /** Create a file. */
     public void create_file(Path file, Collection<? extends TimeSeriesCollection> tsdata) throws IOException {
