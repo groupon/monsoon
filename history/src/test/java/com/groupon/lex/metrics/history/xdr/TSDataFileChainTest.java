@@ -313,5 +313,6 @@ public class TSDataFileChainTest {
 
     private void fill_(int count) {
         create_tsdata_().limit(count).forEachOrdered(fd::add);
+        fd.waitPendingTasks();
     }
 }
