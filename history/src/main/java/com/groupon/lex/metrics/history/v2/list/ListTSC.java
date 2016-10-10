@@ -83,10 +83,10 @@ public class ListTSC extends AbstractTimeSeriesCollection {
         return () -> new THashMap<>(1, 1);
     }
 
-    public ListTSC(DateTime ts, SegmentReader<record_array> init, SegmentReader<DictionaryDelta> dict, FileChannelSegmentReader.Factory segmentFactory) {
+    public ListTSC(DateTime ts, SegmentReader<record_array> init, SegmentReader<DictionaryDelta> dictSegment, FileChannelSegmentReader.Factory segmentFactory) {
         timestamp = ts;
         data = init.map(ra -> new RecordArray(timestamp, ra, segmentFactory))
-                .combine(dict, RecordArray::mapToTSData)
+                .combine(dictSegment, (ra, dict) -> ra.mapToTSData(dict, dictSegment))
                 .cache();
     }
 
@@ -139,31 +139,36 @@ public class ListTSC extends AbstractTimeSeriesCollection {
         private final record_array ra;
         private final FileChannelSegmentReader.Factory segmentFactory;
 
-        public Map<GroupName, TimeSeriesValue> mapToTSData(DictionaryDelta dictionary) {
+        public Map<GroupName, TimeSeriesValue> mapToTSData(DictionaryDelta dictionary, SegmentReader<DictionaryDelta> dictSegment) {
             return Arrays.stream(ra.value)
                     .flatMap(r -> {
                         final SimpleGroupPath path = SimpleGroupPath.valueOf(dictionary.getPath(r.path_ref));
-                        return mapTags(path, r.tags, dictionary);
+                        return mapTags(path, r.tags, dictionary, dictSegment);
                     })
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, throwing_merger_(), hashmap_constructor_()));
         }
 
-        private Stream<Map.Entry<GroupName, TimeSeriesValue>> mapTags(SimpleGroupPath path, record_tags rta[], DictionaryDelta dictionary) {
+        private Stream<Map.Entry<GroupName, TimeSeriesValue>> mapTags(SimpleGroupPath path, record_tags rta[], DictionaryDelta dictionary, SegmentReader<DictionaryDelta> dictSegment) {
             return Arrays.stream(rta)
                     .map(rt -> {
                         final Tags tags = dictionary.getTags(rt.tag_ref);
                         final GroupName group = GroupName.valueOf(path, tags);
-                        final TimeSeriesValue tsv = new ListTimeSeriesValue(
-                                ts,
-                                group,
-                                segmentFactory.get(record_metrics::new, FromXdr.filePos(rt.pos))
-                                        .map(metrics -> {
-                                            return Arrays.stream(metrics.value)
-                                                    .collect(Collectors.toMap(r -> MetricName.valueOf(dictionary.getPath(r.path_ref)), r -> FromXdr.metricValue(r.v, dictionary::getString), throwing_merger_(), hashmap_constructor_()));
-                                        })
-                                        .cache());
-                        return SimpleMapEntry.create(group, tsv);
+                        return SimpleMapEntry.create(group, createTsv(ts, group, segmentFactory.get(record_metrics::new, FromXdr.filePos(rt.pos)), dictSegment));
                     });
+        }
+
+        private static TimeSeriesValue createTsv(DateTime ts, GroupName group, SegmentReader<record_metrics> rmSegment, SegmentReader<DictionaryDelta> dictSegment) {
+            return new ListTimeSeriesValue(
+                    ts,
+                    group,
+                    rmSegment
+                            .combine(
+                                    dictSegment,  // Using dictionary segment, to allow dictionary to be released by GC.
+                                    (metrics, dict) -> {
+                                        return Arrays.stream(metrics.value)
+                                                .collect(Collectors.toMap(r -> MetricName.valueOf(dict.getPath(r.path_ref)), r -> FromXdr.metricValue(r.v, dict::getString), throwing_merger_(), hashmap_constructor_()));
+                                    })
+                                    .cache());
         }
     }
 
