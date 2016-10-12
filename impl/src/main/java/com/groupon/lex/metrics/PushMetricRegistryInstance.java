@@ -37,7 +37,6 @@ import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.timeseries.Alert;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPairInstance;
 import static java.util.Collections.unmodifiableMap;
 import java.util.HashMap;
@@ -106,7 +105,7 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
             }
 
             @Override
-            public TimeSeriesCollectionPair tsdata() {
+            public MutableTimeSeriesCollectionPair tsdata() {
                 return data_;
             }
 

@@ -31,7 +31,7 @@
  */
 package com.groupon.lex.metrics.history;
 
-import com.groupon.lex.metrics.timeseries.BackRefTimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.EmptyTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.InterpolatedTSC;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.util.ArrayList;
@@ -61,7 +61,7 @@ public class WindowedTSCIteratorTest {
         collections = new ArrayList<>();
         expected = new ArrayList<>();
         for (int i = 0; i < 4; ++i)
-            collections.add(new BackRefTimeSeriesCollection(ts.plus(Duration.standardHours(i))));
+            collections.add(new EmptyTimeSeriesCollection(ts.plus(Duration.standardHours(i))));
 
         for (int i = 0; i < collections.size(); ++i) {
             TimeSeriesCollection c = collections.get(i);

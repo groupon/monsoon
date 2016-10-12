@@ -18,7 +18,7 @@ import org.joda.time.DateTime;
  */
 public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
     private static final Logger LOG = Logger.getLogger(AbstractTSCPair.class.getName());
-    private List<BackRefTimeSeriesCollection> previous_;
+    private List<TimeSeriesCollection> previous_;
 
     protected AbstractTSCPair() {
         previous_ = new ArrayList<>();
@@ -63,10 +63,10 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
         }
 
         for (TimeSeriesCollection tsc : filtered
-                .sorted(Comparator.comparing(TimeSeriesCollection::getTimestamp))
+                .sorted()
                 .distinct()
                 .collect(Collectors.toList())) {
-            previous_.add(0, new BackRefTimeSeriesCollection(tsc.getTimestamp(), tsc.getTSValues()));
+            previous_.add(0, tsc);
         }
         LOG.log(Level.INFO, "recovered {0} scrapes from history", previous_.size());
 
@@ -82,7 +82,7 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
     }
 
     protected final void update(TimeSeriesCollection tsc, ExpressionLookBack lookback, Runnable doBeforeValidation) {
-        previous_.add(0, new BackRefTimeSeriesCollection(tsc));
+        previous_.add(0, tsc);
         apply_lookback_(lookback);
         doBeforeValidation.run();
 
@@ -90,7 +90,7 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
     }
 
     private void apply_lookback_(ExpressionLookBack lookback) {
-        final List<BackRefTimeSeriesCollection> suggested_previous = lookback.filter(new ForwardIterator<>(unmodifiableList(previous_).iterator()))
+        final List<TimeSeriesCollection> suggested_previous = lookback.filter(new ForwardIterator<>(unmodifiableList(previous_).iterator()))
                 .distinct()
                 .sorted(Comparator.comparing(TimeSeriesCollection::getTimestamp).reversed())
                 .collect(Collectors.toList());

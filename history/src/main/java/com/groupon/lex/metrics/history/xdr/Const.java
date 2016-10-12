@@ -21,8 +21,9 @@ public class Const {
     public static byte[] MAGIC = new byte[]{  17,  19,  23,  29,
                                              'M', 'O', 'N', '-',
                                              's', 'o', 'o', 'n' };  // 12 chars
-    public static short MAJOR = 1;
-    public static short MINOR = 0;
+    public static final int MIME_HEADER_LEN = 16;  // Mime header is 16 bytes.
+    public static final short MAJOR = 2;
+    public static final short MINOR = 0;
 
     public static int version_from_majmin(short maj, short min) {
         if (maj < 0 || min < 0) throw new IllegalArgumentException("Java needs unsigned data types!");
@@ -50,8 +51,10 @@ public class Const {
         NEW_MINOR(0, 1),
         /** File is written with newer major version. */
         NEW_MAJOR(1, 1),
-        /** File is not a valid tsdata file. */
-        INVALID(Integer.MAX_VALUE, Integer.MAX_VALUE);
+        /** File is not a valid tsdata file, because magic doesn't match. */
+        INVALID_MAGIC(Integer.MAX_VALUE, Integer.MAX_VALUE),
+        /** File is not a valid tsdata file, because version number is negative. */
+        INVALID_NEG_VERSION(Integer.MAX_VALUE, Integer.MAX_VALUE);
 
         private final int same_major_;
         private final int same_minor_;
@@ -84,8 +87,8 @@ public class Const {
     }
 
     public static Validation validateHeader(tsfile_mimeheader hdr) {
-        if (!Arrays.equals(MAGIC, hdr.magic)) return Validation.INVALID;
-        if (hdr.version_number < 0) return Validation.INVALID;
+        if (!Arrays.equals(MAGIC, hdr.magic)) return Validation.INVALID_MAGIC;
+        if (hdr.version_number < 0) return Validation.INVALID_NEG_VERSION;
         int maj_cmp = Short.compare(version_major(hdr.version_number), MAJOR);
         int min_cmp = Short.compare(version_minor(hdr.version_number), MINOR);
         if (maj_cmp != 0) return (maj_cmp < 0 ? Validation.OLD_MAJOR : Validation.NEW_MAJOR);
@@ -95,13 +98,13 @@ public class Const {
 
     public static int validateHeaderOrThrow(tsfile_mimeheader hdr) throws IOException {
         if (!validateHeader(hdr).isReadable())
-            throw new IOException("Can't read this file, header validation yields " + validateHeader(hdr).name());
+            throw new IOException("Can't read this file, header validation yields " + validateHeader(hdr).name() + "(" + versionStr(hdr.version_number) + ")");
         return hdr.version_number;
     }
 
     public static boolean validateHeaderOrThrowForWrite(tsfile_mimeheader hdr) throws IOException {
         if (!validateHeader(hdr).isAcceptable() || !isUpgradable(hdr.version_number))
-            throw new IOException("Can't read this file, header validation yields " + validateHeader(hdr).name());
+            throw new IOException("Can't read this file, header validation yields " + validateHeader(hdr).name() + "(" + versionStr(hdr.version_number) + ")");
         return needsUpgrade(hdr.version_number);
     }
 
@@ -113,10 +116,34 @@ public class Const {
         return validateHeaderOrThrowForWrite(new tsfile_mimeheader(decoder));
     }
 
-    public static void writeMimeHeader(XdrEncodingStream encoder) throws IOException, OncRpcException {
+    public static void writeMimeHeader(XdrEncodingStream encoder, short major, short minor) throws IOException, OncRpcException {
         tsfile_mimeheader hdr = new tsfile_mimeheader();
         hdr.magic = MAGIC;
-        hdr.version_number = version_from_majmin(MAJOR, MINOR);
+        hdr.version_number = version_from_majmin(major, minor);
         hdr.xdrEncode(encoder);
+    }
+
+    public static void writeMimeHeader(XdrEncodingStream encoder) throws IOException, OncRpcException {
+        writeMimeHeader(encoder, MAJOR, MINOR);
+    }
+
+    private static String versionStr(int version) {
+        int major = version_major(version);
+        int minor = version_minor(version);
+        major &= 0xffff;
+        minor &= 0xffff;
+        return "v" + major + "." + minor;
+    }
+
+    private static String mimeHexdump(byte data[]) {
+        if (data.length == 0) return "(no data)";
+
+        String result = new String();
+        for (byte b : data) {
+            int v = b;
+            v &= 0xff;
+            result += " " + Integer.toHexString(v);
+        }
+        return result.substring(1);
     }
 }

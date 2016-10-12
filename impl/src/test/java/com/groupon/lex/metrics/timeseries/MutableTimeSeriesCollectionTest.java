@@ -40,14 +40,12 @@ import static java.util.Collections.singletonMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import static org.hamcrest.CoreMatchers.hasItem;
-import static org.hamcrest.CoreMatchers.not;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
@@ -120,7 +118,7 @@ public class MutableTimeSeriesCollectionTest {
 
     @Test
     public void add_metric_to_nonexistant_group() {
-        TimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
+        MutableTimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
         ts_data.add(absent_value);
 
         assertThat(ts_data.getTSValue(absent_value.getGroup().getPath()).stream().collect(Collectors.toList()),
@@ -131,7 +129,7 @@ public class MutableTimeSeriesCollectionTest {
 
     @Test
     public void overwrite_existing_group() {
-        TimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
+        MutableTimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
         ts_data.add(new MutableTimeSeriesValue(t0, GroupName.valueOf(group_name), singletonMap(MetricName.valueOf("foo"), MetricValue.fromStrValue("bar"))));
 
         assertThat(ts_data.getTSValue(group_name).stream().collect(Collectors.toList()),
@@ -140,7 +138,7 @@ public class MutableTimeSeriesCollectionTest {
 
     @Test
     public void add_metric() {
-        TimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
+        MutableTimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
         ts_data.addMetric(GroupName.valueOf(group_name), MetricName.valueOf("foo"), MetricValue.fromStrValue("bar"));
         TimeSeriesValueSet group = ts_data.getTSValue(group_name);
 
@@ -155,7 +153,7 @@ public class MutableTimeSeriesCollectionTest {
 
     @Test
     public void rename_group() {
-        TimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
+        MutableTimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
         final TimeSeriesValue EXPECT_TS_AFTER_RENAME = new MutableTimeSeriesValue(t0_ts, GroupName.valueOf("post", "rename"), singletonMap(ts_metric_value__name, ts_metric_value__value));
 
         ts_data.renameGroup(GroupName.valueOf(group_name), GroupName.valueOf("post", "rename"));
@@ -187,20 +185,5 @@ public class MutableTimeSeriesCollectionTest {
         assertNotEquals(ts_data, other_data);
         assertFalse(ts_data.equals(null));
         assertFalse(ts_data.equals(new Object()));
-    }
-
-    @Test
-    public void clone_tsdata() {
-        TimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
-        TimeSeriesCollection clone = ts_data.clone();
-
-        assertNotSame(ts_data, clone);
-        assertEquals(ts_data, clone);
-
-        // Clone and original are indepent with respect to modifications.
-        ts_data.add(absent_value);
-        assertThat(ts_data.getGroups(), hasItem(absent_value.getGroup()));
-        assertThat(clone.getGroups(), not(hasItem(absent_value.getGroup())));
-        assertNotEquals(ts_data, clone);
     }
 }

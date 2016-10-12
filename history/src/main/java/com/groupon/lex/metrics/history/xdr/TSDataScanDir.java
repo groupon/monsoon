@@ -16,6 +16,7 @@ import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.Getter;
 import org.joda.time.DateTime;
 
 /**
@@ -31,9 +32,11 @@ public class TSDataScanDir {
         private final DateTime begin_, end_;
         private final Path filename_;
         private final long file_size_;
-        private final boolean is_gzipped_;
+        private final boolean singleRecordSupported;
+        @Getter
+        private final boolean optimized;
 
-        private MetaData(Path filename, DateTime begin, DateTime end, short version_major, short version_minor, long file_size, boolean is_gzipped) {
+        private MetaData(Path filename, DateTime begin, DateTime end, short version_major, short version_minor, long file_size, boolean singleRecordSupported, boolean optimized) {
             filename_ = requireNonNull(filename);
             begin_ = requireNonNull(begin);
             end_ = requireNonNull(end);
@@ -44,13 +47,14 @@ public class TSDataScanDir {
             if (file_size < 0)
                 throw new IllegalArgumentException("negative file size is not supported");
             file_size_ = file_size;
-            is_gzipped_ = is_gzipped;
+            this.singleRecordSupported = singleRecordSupported;
+            this.optimized = optimized;
         }
 
         public static Optional<MetaData> fromFile(Path filename) {
             try {
                 final TSData fd = TSData.readonly(requireNonNull(filename));
-                return Optional.of(new MetaData(filename, fd.getBegin(), fd.getEnd(), fd.getMajor(), fd.getMinor(), fd.getFileSize(), fd.isGzipped()));
+                return Optional.of(new MetaData(filename, fd.getBegin(), fd.getEnd(), fd.getMajor(), fd.getMinor(), fd.getFileSize(), fd.canAddSingleRecord(), fd.isOptimized()));
             } catch (IOException ex) {
                 return Optional.empty();
             }
@@ -68,8 +72,8 @@ public class TSDataScanDir {
         public short getVersionMinor() { return version_minor_; }
         /** The size of the file. */
         public long getFileSize() { return file_size_; }
-        /** True if the file is compressed. */
-        public boolean isGzipped() { return is_gzipped_; }
+        /** If the file supports adding records one at a time. */
+        public boolean canAddSingleRecord() { return singleRecordSupported; }
 
         /**
          * Check if the file is upgradable to the latest version
@@ -83,7 +87,7 @@ public class TSDataScanDir {
          * @return True if the file version can be set to the latest version, false otherwise.
          */
         public boolean isUpgradable() {
-            return !isGzipped() && Const.isUpgradable(getVersionMajor(), getVersionMinor());
+            return canAddSingleRecord() && Const.isUpgradable(getVersionMajor(), getVersionMinor());
         }
 
         @Override
@@ -121,7 +125,10 @@ public class TSDataScanDir {
             if (!Objects.equals(this.filename_, other.filename_)) {
                 return false;
             }
-            if (!Objects.equals(this.is_gzipped_, other.is_gzipped_)) {
+            if (!Objects.equals(this.singleRecordSupported, other.singleRecordSupported)) {
+                return false;
+            }
+            if (!Objects.equals(this.optimized, other.optimized)) {
                 return false;
             }
             return true;

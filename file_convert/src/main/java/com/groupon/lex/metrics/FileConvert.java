@@ -23,6 +23,9 @@ public class FileConvert {
     @Option(name="-h", usage="print usage instructions")
     private boolean help = false;
 
+    @Option(name="-v", usage="verbose")
+    private boolean verbose = false;
+
     @Argument(metaVar="/src/dir", usage="path: which dir contains source files", index=0)
     private String srcdir;
 
@@ -59,6 +62,10 @@ public class FileConvert {
             /* UNREACHABLE */
         }
 
+        // If verbose mode is requested, dial up the log spam.
+        if (verbose)
+            Logger.getLogger("com.groupon.lex").setLevel(Level.INFO);
+
         // If there are no files, comlain with a non-zero exit code.
         if (srcdir == null || dstdir == null)
             System.exit(EX_USAGE);
@@ -72,6 +79,10 @@ public class FileConvert {
         final DirCollectHistory dst = new DirCollectHistory(dstdir_path_);
         BufferedIterator.stream(ForkJoinPool.commonPool(), src.stream())
                 .forEach(dst::add);
+
+        // Wait for pending optimization to finish.
+        src.waitPendingTasks();
+        dst.waitPendingTasks();
     }
 
     public static void main(String[] args) {

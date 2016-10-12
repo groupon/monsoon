@@ -1,14 +1,10 @@
 package com.groupon.lex.metrics.history;
 
-import com.groupon.lex.metrics.history.xdr.MmapReadonlyTSDataFile;
-import com.groupon.lex.metrics.history.xdr.UnmappedReadonlyTSDataFile;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Collection;
 import static java.util.Collections.reverse;
 import java.util.HashSet;
@@ -36,9 +32,6 @@ import org.joda.time.DateTime;
  * @author ariane
  */
 public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory {
-    public final static int MIN_MMAP_FILESIZE =  0 * 1024 * 1024;
-    public final static int MAX_MMAP_FILESIZE = 32 * 1024 * 1024;
-
     /** Get the lowest timestamp covered by this TSData series. */
     public DateTime getBegin();
     /** Get the highest timestamp covered by this TSData series. */
@@ -49,8 +42,10 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
     public short getMajor();
     /** Returns the minor version of the TSData file.  Note that this is the file-data version, not the application version. */
     public short getMinor();
-    /** Returns true if the file is compressed. */
-    public boolean isGzipped();
+    /** Returns true if the file is suitable for adding single records at a time. */
+    public boolean canAddSingleRecord();
+    /** Returns true if the file is optimized for access by (GroupPath, Tags, MetricName) tuple. */
+    public boolean isOptimized();
 
     /**
      * Returns an iterator for this TSData.
@@ -154,14 +149,7 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
         final Logger LOG = Logger.getLogger(TSData.class.getName());
         LOG.log(Level.INFO, "opening {0}", file);
 
-        final long fd_siz = Files.size(file);
-        if (fd_siz >= MIN_MMAP_FILESIZE && fd_siz <= MAX_MMAP_FILESIZE) {
-            try (FileChannel fd = FileChannel.open(file, StandardOpenOption.READ)) {
-                return new MmapReadonlyTSDataFile(fd.map(FileChannel.MapMode.READ_ONLY, 0, fd_siz));
-            }
-        } else {
-            return UnmappedReadonlyTSDataFile.open(file);
-        }
+        return TSDataVersionDispatch.open(file);
     }
 
     /** Return the file channel used to read this file, if it is available. */

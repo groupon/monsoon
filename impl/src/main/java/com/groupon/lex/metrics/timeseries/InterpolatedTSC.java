@@ -43,7 +43,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Collections.unmodifiableMap;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
@@ -104,38 +103,6 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
     }
 
     @Override
-    public TimeSeriesCollection add(TimeSeriesValue tsv) {
-        current.add(tsv);
-        interpolatedTsvMap.remove(tsv.getGroup());
-        return this;
-    }
-
-    @Override
-    public TimeSeriesCollection renameGroup(GroupName oldname, GroupName newname) {
-        final TimeSeriesValue interpolated = interpolatedTsvMap.get(oldname);
-        if (interpolated != null) {
-            current.add(interpolated);
-            interpolatedTsvMap.remove(oldname);
-        }
-        current.renameGroup(oldname, newname);
-        interpolatedTsvMap.remove(newname);
-        return this;
-    }
-
-    @Override
-    public TimeSeriesCollection addMetrics(GroupName group, Map<MetricName, MetricValue> metrics) {
-        final TimeSeriesValue interpolated = interpolatedTsvMap.get(group);
-        if (interpolated != null) {
-            metrics = new HashMap<>(metrics);
-            metrics.putAll(interpolated.getMetrics());
-        }
-        current.addMetrics(group, metrics);
-        if (interpolated != null)
-            interpolatedTsvMap.remove(group);
-        return this;
-    }
-
-    @Override
     public DateTime getTimestamp() {
         return current.getTimestamp();
     }
@@ -182,14 +149,6 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
         final TimeSeriesValue interpolated = interpolatedTsvMap.get(name);
         if (interpolated != null) return Optional.of(interpolated);
         return current.get(name);
-    }
-
-    @Override
-    public InterpolatedTSC clone() {
-        final TimeSeriesCollection currentClone = current.clone();
-        if (currentClone == current) return this;
-
-        return new InterpolatedTSC(currentClone, backward, forward);
     }
 
     /**

@@ -33,9 +33,11 @@ package com.groupon.lex.metrics.config;
 
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.MutableTimeSeriesCollectionPair;
 import com.groupon.lex.metrics.expression.GroupExpression;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
+import com.groupon.lex.metrics.timeseries.MutableTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesTransformer;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
@@ -71,8 +73,8 @@ public class ResolvedConstantStatement implements RuleStatement {
 
     public Map<NameResolver, MetricValue> getMetrics() { return metrics_; }
 
-    private TimeSeriesCollection transform_(Context ctx) {
-        final TimeSeriesCollection ts_data = ctx.getTSData().getCurrentCollection();
+    private TimeSeriesCollection transform_(Context<MutableTimeSeriesCollectionPair> ctx) {
+        final MutableTimeSeriesCollection ts_data = ctx.getTSData().getCurrentCollection();
         final Map<MetricName, MetricValue> metrics = metrics_.entrySet().stream()
                 .map(name_value -> {
                     return name_value.getKey().apply(ctx).map(name -> SimpleMapEntry.create(name, name_value.getValue()));
@@ -90,7 +92,7 @@ public class ResolvedConstantStatement implements RuleStatement {
     public TimeSeriesTransformer get() {
         return new TimeSeriesTransformer() {
             @Override
-            public void transform(Context ctx) {
+            public void transform(Context<MutableTimeSeriesCollectionPair> ctx) {
                 transform_(ctx);
             }
 

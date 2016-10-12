@@ -22,7 +22,7 @@ public class IdentifierMetricSelector implements TimeSeriesMetricExpression {
     public Collection<TimeSeriesMetricExpression> getChildren() { return Collections.EMPTY_LIST; }
 
     @Override
-    public TimeSeriesMetricDeltaSet apply(Context ctx) {
+    public TimeSeriesMetricDeltaSet apply(Context<?> ctx) {
         return ctx.getMetricFromIdentifier(identifier_)
                 .orElseGet(TimeSeriesMetricDeltaSet::new);
     }

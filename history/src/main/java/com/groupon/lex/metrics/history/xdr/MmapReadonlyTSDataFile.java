@@ -113,8 +113,6 @@ public final class MmapReadonlyTSDataFile implements TSData {
     }
 
     @Override
-    public boolean isGzipped() { return is_gzippped_; }
-    @Override
     public DateTime getBegin() { return begin_; }
     @Override
     public DateTime getEnd() { return end_; }
@@ -124,6 +122,10 @@ public final class MmapReadonlyTSDataFile implements TSData {
     public short getMinor() { return version_minor(version_); }
     @Override
     public long getFileSize() { return data_.limit(); }
+    @Override
+    public boolean canAddSingleRecord() { return !is_gzippped_; }
+    @Override
+    public boolean isOptimized() { return false; }
     private ByteBuffer getReadonlyData() { return data_.asReadOnlyBuffer(); }
 
     @Override

@@ -15,4 +15,27 @@ import java.nio.ByteBuffer;
 public interface BufferSupplier {
     public void load(ByteBuffer buf) throws IOException;
     public boolean atEof() throws IOException;
+
+    public static BufferSupplier singleBuffer(ByteBuffer view) {
+        return new BufferSupplier() {
+            @Override
+            public void load(ByteBuffer buf) throws IOException {
+                if (view.hasRemaining() && buf.hasRemaining()) {
+                    if (view.remaining() <= buf.remaining()) {
+                        buf.put(view);
+                    } else {
+                        final ByteBuffer tmp = view.duplicate();
+                        tmp.limit(tmp.position() + buf.remaining());
+                        view.position(view.position() + tmp.remaining());
+                        buf.put(tmp);
+                    }
+                }
+            }
+
+            @Override
+            public boolean atEof() throws IOException {
+                return !view.hasRemaining();
+            }
+        };
+    }
 }

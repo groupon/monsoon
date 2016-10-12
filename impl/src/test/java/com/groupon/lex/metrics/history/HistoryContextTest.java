@@ -70,7 +70,7 @@ public class HistoryContextTest {
     public void previous_is_remembered() {
         final List<TimeSeriesCollection> visited = HistoryContext
                 .stream(input, ExpressionLookBack.EMPTY)
-                .map(ctx -> ctx.getTSData().getPreviousCollection().clone())
+                .map(ctx -> ctx.getTSData().getPreviousCollection())
                 .collect(Collectors.toList());
         LOG.log(Level.INFO, "visited={0}", visited);
 

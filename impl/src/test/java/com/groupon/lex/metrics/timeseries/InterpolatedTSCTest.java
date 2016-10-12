@@ -86,8 +86,8 @@ public class InterpolatedTSCTest {
         when(pastValue.findMetric(Mockito.any())).thenCallRealMethod();
         when(futureValue.findMetric(Mockito.any())).thenCallRealMethod();
 
-        past = new BackRefTimeSeriesCollection(pastDate, singletonList(pastValue));
-        future = new BackRefTimeSeriesCollection(futureDate, singletonList(futureValue));
+        past = new SimpleTimeSeriesCollection(pastDate, singletonList(pastValue));
+        future = new SimpleTimeSeriesCollection(futureDate, singletonList(futureValue));
     }
 
     @Test
@@ -95,7 +95,7 @@ public class InterpolatedTSCTest {
         when(pastValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromBoolean(false)));
         when(futureValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromBoolean(true)));
 
-        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new BackRefTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
+        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new EmptyTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
 
         assertTrue(interpolatedTSC.get(TESTGROUP).isPresent());
         assertEquals(TESTGROUP, interpolatedTSC.get(TESTGROUP).get().getGroup());
@@ -108,7 +108,7 @@ public class InterpolatedTSCTest {
         when(pastValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromIntValue(4)));
         when(futureValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromIntValue(8)));
 
-        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new BackRefTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
+        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new EmptyTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
 
         assertTrue(interpolatedTSC.get(TESTGROUP).isPresent());
         assertEquals(TESTGROUP, interpolatedTSC.get(TESTGROUP).get().getGroup());
@@ -121,7 +121,7 @@ public class InterpolatedTSCTest {
         when(pastValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromDblValue(4.9)));
         when(futureValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromDblValue(8.9)));
 
-        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new BackRefTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
+        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new EmptyTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
 
         assertTrue(interpolatedTSC.get(TESTGROUP).isPresent());
         assertEquals(TESTGROUP, interpolatedTSC.get(TESTGROUP).get().getGroup());
@@ -134,7 +134,7 @@ public class InterpolatedTSCTest {
         when(pastValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromStrValue("foo")));
         when(futureValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromStrValue("bar")));
 
-        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new BackRefTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
+        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new EmptyTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
 
         assertTrue(interpolatedTSC.get(TESTGROUP).isPresent());
         assertEquals(TESTGROUP, interpolatedTSC.get(TESTGROUP).get().getGroup());
@@ -147,7 +147,7 @@ public class InterpolatedTSCTest {
         when(pastValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromHistValue(new Histogram(new RangeWithCount(0, 10, 4)))));
         when(futureValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromHistValue(new Histogram(new RangeWithCount(0, 10, 8)))));
 
-        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new BackRefTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
+        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new EmptyTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
 
         assertTrue(interpolatedTSC.get(TESTGROUP).isPresent());
         assertEquals(TESTGROUP, interpolatedTSC.get(TESTGROUP).get().getGroup());
@@ -157,7 +157,7 @@ public class InterpolatedTSCTest {
 
     @Test
     public void namesFromBothArePresent() {
-        BackRefTimeSeriesCollection present = new BackRefTimeSeriesCollection(midDate, singletonList(new MutableTimeSeriesValue(midDate, GroupName.valueOf("mid", "point"))));
+        TimeSeriesCollection present = new SimpleTimeSeriesCollection(midDate, singletonList(new MutableTimeSeriesValue(midDate, GroupName.valueOf("mid", "point"))));
         InterpolatedTSC interpolatedTSC = new InterpolatedTSC(present, singletonList(past), singletonList(future));
 
         assertThat(interpolatedTSC.getGroups(),
@@ -168,7 +168,7 @@ public class InterpolatedTSCTest {
 
     @Test
     public void presentOverridesInterpolation() {
-        BackRefTimeSeriesCollection present = new BackRefTimeSeriesCollection(midDate, singletonList(presentValue));
+        TimeSeriesCollection present = new SimpleTimeSeriesCollection(midDate, singletonList(presentValue));
         InterpolatedTSC interpolatedTSC = new InterpolatedTSC(present, singletonList(past), singletonList(future));
 
         assertThat(interpolatedTSC.getGroups(),
@@ -180,22 +180,22 @@ public class InterpolatedTSCTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void throwsIfPresentTooOld() {
-        new InterpolatedTSC(new BackRefTimeSeriesCollection(pastDate.minus(Duration.standardDays(1))), singletonList(past), singletonList(future));
+        new InterpolatedTSC(new EmptyTimeSeriesCollection(pastDate.minus(Duration.standardDays(1))), singletonList(past), singletonList(future));
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void throwsIfPresentTooNew() {
-        new InterpolatedTSC(new BackRefTimeSeriesCollection(futureDate.plus(Duration.standardDays(1))), singletonList(past), singletonList(future));
+        new InterpolatedTSC(new EmptyTimeSeriesCollection(futureDate.plus(Duration.standardDays(1))), singletonList(past), singletonList(future));
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void throwsIfPastMisordered() {
-        new InterpolatedTSC(new BackRefTimeSeriesCollection(futureDate.plus(Duration.standardDays(1))), Arrays.asList(past, future), EMPTY_LIST);
+        new InterpolatedTSC(new EmptyTimeSeriesCollection(futureDate.plus(Duration.standardDays(1))), Arrays.asList(past, future), EMPTY_LIST);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void throwsIfFutureMisordered() {
-        new InterpolatedTSC(new BackRefTimeSeriesCollection(pastDate.minus(Duration.standardDays(1))), EMPTY_LIST, Arrays.asList(future, past));
+        new InterpolatedTSC(new EmptyTimeSeriesCollection(pastDate.minus(Duration.standardDays(1))), EMPTY_LIST, Arrays.asList(future, past));
     }
 
     @Test
@@ -203,8 +203,8 @@ public class InterpolatedTSCTest {
         when(pastValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromIntValue(4)));
         when(futureValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromIntValue(8)));
 
-        final BackRefTimeSeriesCollection expected = new BackRefTimeSeriesCollection(midDate, singletonList(new MutableTimeSeriesValue(midDate, TESTGROUP, singletonMap(TESTMETRIC, MetricValue.fromDblValue(5)))));
-        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new BackRefTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
+        final TimeSeriesCollection expected = new SimpleTimeSeriesCollection(midDate, singletonList(new MutableTimeSeriesValue(midDate, TESTGROUP, singletonMap(TESTMETRIC, MetricValue.fromDblValue(5)))));
+        InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new EmptyTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
 
         assertEquals(expected.hashCode(), interpolatedTSC.hashCode());
         assertTrue(interpolatedTSC.equals(expected));

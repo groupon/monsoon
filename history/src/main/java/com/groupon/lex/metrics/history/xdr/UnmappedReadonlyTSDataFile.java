@@ -97,7 +97,9 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
     }
 
     @Override
-    public boolean isGzipped() { return is_gzipped_; }
+    public boolean canAddSingleRecord() { return !is_gzipped_; }
+    @Override
+    public boolean isOptimized() { return false; }
 
     private class UnmappedBufferSupplier implements BufferSupplier {
         private long offset_;

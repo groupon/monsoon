@@ -33,6 +33,7 @@ package com.groupon.lex.metrics.config.impl;
 
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.MutableTimeSeriesCollectionPair;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.expression.GroupExpression;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
@@ -77,7 +78,7 @@ public class SetTag implements TimeSeriesTransformer {
     }
 
     @Override
-    public void transform(Context ctx) {
+    public void transform(Context<MutableTimeSeriesCollectionPair> ctx) {
         final TimeSeriesValueSet group_name = getGroup().getTSDelta(ctx);
         final List<GroupName> origin = group_name.stream()
                 .map(TimeSeriesValue::getGroup)

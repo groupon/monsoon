@@ -10,8 +10,9 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
-import com.groupon.lex.metrics.history.xdr.support.FileTimeSeriesCollection;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.util.Arrays;
 import java.util.Map;
@@ -117,10 +118,10 @@ public class FromXdr {
         }
     }
 
-    public FileTimeSeriesCollection data(tsfile_data data) {
+    public TimeSeriesCollection data(tsfile_data data) {
         final DateTime ts = timestamp(data.ts);
         Optional.ofNullable(data.dd).ifPresent(this::update_dict_);
-        return new FileTimeSeriesCollection(
+        return new SimpleTimeSeriesCollection(
                 ts,
                 Arrays.stream(data.records).map(record -> decode_record_(ts, record)));
     }

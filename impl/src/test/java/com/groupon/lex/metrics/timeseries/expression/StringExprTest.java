@@ -46,11 +46,11 @@ import org.junit.Test;
  * @author ariane
  */
 public class StringExprTest {
-    private Context ctx;
+    private Context<?> ctx;
 
     @Before
     public void setup() {
-        ctx = new SimpleContext(new TimeSeriesCollectionPairInstance(DateTime.now(DateTimeZone.UTC)), (Alert alert) -> {});
+        ctx = new SimpleContext<>(new TimeSeriesCollectionPairInstance(DateTime.now(DateTimeZone.UTC)), (Alert alert) -> {});
     }
 
     @Test

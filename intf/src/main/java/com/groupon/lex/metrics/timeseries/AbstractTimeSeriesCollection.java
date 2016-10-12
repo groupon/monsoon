@@ -57,9 +57,6 @@ public abstract class AbstractTimeSeriesCollection implements TimeSeriesCollecti
     }
 
     @Override
-    public abstract TimeSeriesCollection clone();
-
-    @Override
     public String toString() {
         String className = getClass().getSimpleName();
         if (className.isEmpty())

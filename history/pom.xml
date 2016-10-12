@@ -83,6 +83,7 @@
                                 <mkdir dir="${project.build.directory}/generated-sources/rpc/com/groupon/lex/metrics/history/xdr" />
                                 <mkdir dir="${project.build.directory}/generated-sources/rpc/com/groupon/lex/metrics/history/v0/xdr" />
                                 <mkdir dir="${project.build.directory}/generated-sources/rpc/com/groupon/lex/metrics/history/v1/xdr" />
+                                <mkdir dir="${project.build.directory}/generated-sources/rpc/com/groupon/lex/metrics/history/v2/xdr" />
                             </tasks>
                         </configuration>
                         <goals>
@@ -167,6 +168,31 @@
                                 <argument>-noclient</argument>
                                 <argument>-noserver</argument>
                                 <argument>${project.basedir}/src/main/xdr/tsdata_1_0.x</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>generate XDR encoder/decoder for history files 2.0</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>org.acplt.oncrpc.apps.jrpcgen.jrpcgen</mainClass>
+                            <includePluginDependencies>true</includePluginDependencies>
+                            <includeProjectDependencies>false</includeProjectDependencies>
+                            <classpathScope>system</classpathScope>
+                            <executableDependency>
+                                <groupId>org.acplt.remotetea</groupId>
+                                <artifactId>remotetea-jrpcgen</artifactId>
+                            </executableDependency>
+                            <arguments>
+                                <argument>-d</argument><argument>${project.build.directory}/generated-sources/rpc/com/groupon/lex/metrics/history/v2/xdr</argument>
+                                <argument>-p</argument><argument>com.groupon.lex.metrics.history.v2.xdr</argument>
+                                <argument>-nobackup</argument>
+                                <argument>-noclient</argument>
+                                <argument>-noserver</argument>
+                                <argument>${project.basedir}/src/main/xdr/tsdata_2_0.x</argument>
                             </arguments>
                         </configuration>
                     </execution>

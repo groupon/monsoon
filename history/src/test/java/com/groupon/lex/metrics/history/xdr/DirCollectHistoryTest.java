@@ -8,6 +8,7 @@ package com.groupon.lex.metrics.history.xdr;
 import static com.groupon.lex.metrics.history.xdr.TSDataFileChainTest.CHAIN_WIDTH;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.history.xdr.support.StreamedCollection;
+import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -31,9 +32,10 @@ import org.junit.Test;
  * @author ariane
  */
 public class DirCollectHistoryTest {
+    private static final Logger LOG = Logger.getLogger(DirCollectHistoryTest.class.getName());
     private static final long LIMIT = 4l * 1024 * 1024;
     private static final long MAX_FILESIZE = 1l * 1024 * 1024;
-    private final FileSupport file_support = new FileSupport(Const.MAJOR, Const.MINOR);
+    private final FileSupport file_support = new FileSupport(FileSupport.NO_WRITER, false);
     private Path tmpdir;
     private DirCollectHistory hist;
 
@@ -61,17 +63,23 @@ public class DirCollectHistoryTest {
 
     @Test
     public void size_stays_below_threshold() throws Exception {
-        final Iterator<TimeSeriesCollection> iter = create_tsdata_().iterator();
+        LOG.log(Level.SEVERE, "starting test");
+        final Iterator<TimeSeriesCollection> iter = BufferedIterator.iterator(create_tsdata_().iterator());
         // First, grow until 90%, to get an estimate of file size usage.
         int count_until_90_percent = 0;
         while (getTmpdirSize() < 9 * LIMIT / 10) {
             ++count_until_90_percent;
+            LOG.log(Level.SEVERE, "about to add " + count_until_90_percent + "th element");
+
+            long t0 = System.currentTimeMillis();
             hist.add(iter.next());
+            LOG.log(Level.SEVERE, "added " + count_until_90_percent + " collections, last add took " + (System.currentTimeMillis() - t0) + " msec");
         }
         System.out.println("90% threshold = " + count_until_90_percent);
         // Secondly, add the same amount again.
         for (int i = 0; i < count_until_90_percent; ++i) {
             hist.add(iter.next());
+            hist.waitPendingTasks();
             assertThat(getTmpdirSize(), Matchers.lessThanOrEqualTo(LIMIT));
         }
     }

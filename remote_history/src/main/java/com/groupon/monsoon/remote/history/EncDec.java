@@ -44,6 +44,7 @@ import com.groupon.lex.metrics.config.ParserSupport;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
@@ -195,17 +196,17 @@ public class EncDec {
         return result;
     }
 
-    private static RpcTimeSeriesCollection decodeTSC(ActiveDict dict, timeseries_collection tsc) {
+    private static TimeSeriesCollection decodeTSC(ActiveDict dict, timeseries_collection tsc) {
         final DateTime ts = decodeTimestamp(tsc.ts);
         if (tsc.dd != null) dict.apply(tsc.dd);
-        return new RpcTimeSeriesCollection(ts, Arrays.stream(tsc.records).map(tsv -> decodeTSV(dict, ts, tsv)));
+        return new SimpleTimeSeriesCollection(ts, Arrays.stream(tsc.records).map(tsv -> decodeTSV(dict, ts, tsv)));
     }
 
     public static timeseries_collection encodeTSC(TimeSeriesCollection tsc) {
         return encodeTSC(new ActiveDict(), tsc);
     }
 
-    public static RpcTimeSeriesCollection decodeTSC(timeseries_collection tsc) {
+    public static TimeSeriesCollection decodeTSC(timeseries_collection tsc) {
         return decodeTSC(new ActiveDict(), tsc);
     }
 

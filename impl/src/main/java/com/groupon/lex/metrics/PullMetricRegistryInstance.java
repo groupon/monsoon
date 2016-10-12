@@ -33,7 +33,6 @@ package com.groupon.lex.metrics;
 
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.timeseries.Alert;
-import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPairInstance;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -59,7 +58,7 @@ public class PullMetricRegistryInstance extends MetricRegistryInstance {
             }
 
             @Override
-            public TimeSeriesCollectionPair tsdata() {
+            public MutableTimeSeriesCollectionPair tsdata() {
                 return tsdata;
             }
 
