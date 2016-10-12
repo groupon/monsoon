@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.lib.sequence;
 
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
@@ -71,6 +72,11 @@ public class MappingObjectSequence<T, R> implements ObjectSequence<R> {
     }
 
     @Override
+    public <C extends Comparable<? super C>> Comparator<C> getComparator() {
+        return sorted ? underlying.getComparator() : null;
+    }
+
+    @Override
     public Iterator<R> iterator() {
         return new IteratorImpl<>(underlying.iterator(), fn);
     }
@@ -92,15 +98,19 @@ public class MappingObjectSequence<T, R> implements ObjectSequence<R> {
 
     @Override
     public MappingObjectSequence<T, R> limit(int n) {
-        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
-        if (n == size()) return this;
+        if (n < 0 || n > size())
+            throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == size())
+            return this;
         return new MappingObjectSequence<>(underlying.limit(n), fn, sorted, nonnull, distinct);
     }
 
     @Override
     public MappingObjectSequence<T, R> skip(int n) {
-        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
-        if (n == 0) return this;
+        if (n < 0 || n > size())
+            throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == 0)
+            return this;
         return new MappingObjectSequence<>(underlying.skip(n), fn, sorted, nonnull, distinct);
     }
 
@@ -130,9 +140,14 @@ public class MappingObjectSequence<T, R> implements ObjectSequence<R> {
         private final Function<? super T, ? extends R> fn;
 
         @Override
-        public boolean hasNext() { return underlying.hasNext(); }
+        public boolean hasNext() {
+            return underlying.hasNext();
+        }
+
         @Override
-        public R next() { return fn.apply(underlying.next()); }
+        public R next() {
+            return fn.apply(underlying.next());
+        }
     }
 
     @AllArgsConstructor
@@ -154,7 +169,8 @@ public class MappingObjectSequence<T, R> implements ObjectSequence<R> {
         @Override
         public Spliterator<R> trySplit() {
             Spliterator<T> underlyingSplit = underlying.trySplit();
-            if (underlyingSplit == null) return null;
+            if (underlyingSplit == null)
+                return null;
             return new SpliteratorImpl<>(underlyingSplit, fn, characteristics);
         }
 
@@ -166,6 +182,13 @@ public class MappingObjectSequence<T, R> implements ObjectSequence<R> {
         @Override
         public int characteristics() {
             return characteristics;
+        }
+
+        @Override
+        public Comparator<? super R> getComparator() {
+            if (!hasCharacteristics(Spliterator.SORTED))
+                throw new IllegalStateException();
+            return (Comparator<? super R>) underlying.getComparator();
         }
     }
 }

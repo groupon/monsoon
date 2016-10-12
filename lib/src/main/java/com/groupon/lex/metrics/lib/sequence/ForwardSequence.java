@@ -46,16 +46,21 @@ import lombok.Value;
  */
 @Value
 public class ForwardSequence implements Sequence {
-    public static int SPLITERATOR_CHARACTERISTICS = Spliterator.ORDERED |
-            Spliterator.SORTED |
-            Spliterator.SIZED |
-            Spliterator.SUBSIZED |
-            Spliterator.DISTINCT |
-            Spliterator.IMMUTABLE |
-            Spliterator.NONNULL;
+    public static int SPLITERATOR_CHARACTERISTICS = Spliterator.ORDERED
+            | Spliterator.SORTED
+            | Spliterator.SIZED
+            | Spliterator.SUBSIZED
+            | Spliterator.DISTINCT
+            | Spliterator.IMMUTABLE
+            | Spliterator.NONNULL;
 
     private final int begin, end;
-    
+
+    @Override
+    public <C extends Comparable<? super C>> Comparator<C> getComparator() {
+        return Comparator.naturalOrder();
+    }
+
     @Override
     public int get(int n) {
         if (n < 0 || n >= size())
@@ -65,15 +70,19 @@ public class ForwardSequence implements Sequence {
 
     @Override
     public ForwardSequence limit(int n) {
-        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
-        if (n == size()) return this;
+        if (n < 0 || n > size())
+            throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == size())
+            return this;
         return new ForwardSequence(begin, begin + n);
     }
 
     @Override
     public ForwardSequence skip(int n) {
-        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
-        if (n == 0) return this;
+        if (n < 0 || n > size())
+            throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == 0)
+            return this;
         return new ForwardSequence(begin + n, end);
     }
 
@@ -113,10 +122,14 @@ public class ForwardSequence implements Sequence {
         private final int end;
 
         @Override
-        public boolean hasNext() { return begin < end; }
+        public boolean hasNext() {
+            return begin < end;
+        }
+
         @Override
         public Integer next() {
-            if (begin >= end) throw new NoSuchElementException();
+            if (begin >= end)
+                throw new NoSuchElementException();
             return begin++;
         }
     }
@@ -128,20 +141,23 @@ public class ForwardSequence implements Sequence {
 
         @Override
         public boolean tryAdvance(IntConsumer action) {
-            if (begin >= end) return false;
+            if (begin >= end)
+                return false;
             action.accept(begin++);
             return true;
         }
 
         @Override
         public void forEachRemaining(IntConsumer action) {
-            for (int i = begin; i < end; ++i) action.accept(i);
+            for (int i = begin; i < end; ++i)
+                action.accept(i);
             begin = end;
         }
 
         @Override
         public Spliterator.OfInt trySplit() {
-            if (begin >= end || end - begin < 2) return null;
+            if (begin >= end || end - begin < 2)
+                return null;
 
             final int split = begin + (end - begin) / 2;
             final int rvBegin = begin;
@@ -160,6 +176,8 @@ public class ForwardSequence implements Sequence {
         }
 
         @Override
-        public Comparator<Integer> getComparator() { return null; }
+        public Comparator<Integer> getComparator() {
+            return null;
+        }
     };
 }
