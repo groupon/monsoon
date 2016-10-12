@@ -72,11 +72,12 @@ public class FromXdr {
                 .map(he -> new Histogram.RangeWithCount(he.floor, he.ceil, he.events)));
     }
 
-    public static long[] timestamp_delta(long begin, timestamp_delta tsd) {
-        long[] result = new long[tsd.value.length];
-        for (int i = 0; i < tsd.value.length; ++i) {
-            begin += tsd.value[i];
-            result[i] = begin;
+    public static long[] timestamp_delta(timestamp_delta tsd) {
+        long[] result = new long[tsd.delta.length + 1];
+        long begin = result[0] = tsd.first;
+        for (int i = 0; i < tsd.delta.length; ++i) {
+            begin += tsd.delta[i];
+            result[i + 1] = begin;
         }
         return result;
     }

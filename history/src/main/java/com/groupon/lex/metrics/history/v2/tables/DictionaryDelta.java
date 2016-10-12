@@ -39,8 +39,8 @@ import com.groupon.lex.metrics.history.v2.xdr.path_dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.strval_dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.tag_dictionary_delta;
 import com.groupon.lex.metrics.history.xdr.support.DecodingException;
-import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
+import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -104,13 +104,22 @@ public class DictionaryDelta {
         tagsTable = unmodifiableList(decode(tagsRefOffset, input.tdd, (parent == null ? null : parent.tagsTable), this::getString));
     }
 
-    public int getStringRefEnd() { return stringRefOffset + stringTable.size(); }
-    public int getPathRefEnd() { return pathRefOffset + pathTable.size(); }
-    public int getTagsRefEnd() { return tagsRefOffset + tagsTable.size(); }
+    public int getStringRefEnd() {
+        return stringRefOffset + stringTable.size();
+    }
+
+    public int getPathRefEnd() {
+        return pathRefOffset + pathTable.size();
+    }
+
+    public int getTagsRefEnd() {
+        return tagsRefOffset + tagsTable.size();
+    }
 
     private static List<String> decode(int offset, strval_dictionary_delta sdd, List<String> parent) {
         final ArrayList<String> stringTable = new ArrayList<>();
-        if (parent != null) stringTable.addAll(parent);
+        if (parent != null)
+            stringTable.addAll(parent);
         if (offset + stringTable.size() != sdd.offset)
             throw new DecodingException("dictionary delta increments do not line up");
 
@@ -123,7 +132,8 @@ public class DictionaryDelta {
 
     private static List<List<String>> decode(int offset, path_dictionary_delta pdd, List<List<String>> parent, IntFunction<String> stringLookup) {
         final ArrayList<List<String>> pathTable = new ArrayList<>();
-        if (parent != null) pathTable.addAll(parent);
+        if (parent != null)
+            pathTable.addAll(parent);
         if (offset + pathTable.size() != pdd.offset)
             throw new DecodingException("dictionary delta increments do not line up");
 
@@ -143,7 +153,8 @@ public class DictionaryDelta {
 
     private static List<Tags> decode(int offset, tag_dictionary_delta tdd, List<Tags> parent, IntFunction<String> stringLookup) {
         final ArrayList<Tags> tagsTable = new ArrayList<>();
-        if (parent != null) tagsTable.addAll(parent);
+        if (parent != null)
+            tagsTable.addAll(parent);
         if (offset + tagsTable.size() != tdd.offset)
             throw new DecodingException("dictionary delta increments do not line up");
 

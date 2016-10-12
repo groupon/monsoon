@@ -45,8 +45,8 @@ import com.groupon.lex.metrics.history.v2.xdr.mt_dbl;
 import com.groupon.lex.metrics.history.v2.xdr.mt_hist;
 import com.groupon.lex.metrics.history.v2.xdr.mt_other;
 import com.groupon.lex.metrics.history.v2.xdr.mt_str;
+import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.history.xdr.support.IntegrityException;
-import java.util.Optional;
 
 public class RTFMetricTable {
     private final MtBoolValues m_bool;
@@ -83,37 +83,37 @@ public class RTFMetricTable {
                 m_other.contains(index);
     }
 
-    public Optional<MetricValue> get(int index) {
+    public MetricValue get(int index) {
         MetricValue mv;
 
         mv = m_bool.get(index);
-        if (mv != null) return Optional.of(mv);
+        if (mv != null) return mv;
 
         mv = m_16bit.get(index);
-        if (mv != null) return Optional.of(mv);
+        if (mv != null) return mv;
 
         mv = m_32bit.get(index);
-        if (mv != null) return Optional.of(mv);
+        if (mv != null) return mv;
 
         mv = m_64bit.get(index);
-        if (mv != null) return Optional.of(mv);
+        if (mv != null) return mv;
 
         mv = m_dbl.get(index);
-        if (mv != null) return Optional.of(mv);
+        if (mv != null) return mv;
 
         mv = m_str.get(index);
-        if (mv != null) return Optional.of(mv);
+        if (mv != null) return mv;
 
         mv = m_hist.get(index);
-        if (mv != null) return Optional.of(mv);
+        if (mv != null) return mv;
 
         mv = m_empty.get(index);
-        if (mv != null) return Optional.of(mv);
+        if (mv != null) return mv;
 
         mv = m_other.get(index);
-        if (mv != null) return Optional.of(mv);
+        if (mv != null) return mv;
 
-        return Optional.empty();
+        throw new DecodingException("requested metric has not value");
     }
 
     public void validate() {

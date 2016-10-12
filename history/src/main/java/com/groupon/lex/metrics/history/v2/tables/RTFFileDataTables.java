@@ -33,133 +33,88 @@ package com.groupon.lex.metrics.history.v2.tables;
 
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.Tags;
-import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
+import com.groupon.lex.metrics.history.v2.xdr.Util;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables;
-import com.groupon.lex.metrics.history.v2.xdr.group_table;
-import com.groupon.lex.metrics.history.v2.xdr.tables_group;
-import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
-import com.groupon.lex.metrics.history.xdr.support.ReverseSequence;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
+import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
+import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
-import java.util.Arrays;
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.unmodifiableMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 import java.util.Spliterator;
-import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NonNull;
 import org.acplt.oncrpc.XdrAble;
 import org.joda.time.DateTime;
 
-@Getter(AccessLevel.PACKAGE)
+@Getter(AccessLevel.PRIVATE)
 public final class RTFFileDataTables {
-    private final long[] timestamps;
-    private final Map<SimpleGroupPath, Map<Tags, SegmentReader<RTFGroupTable>>> groups;
+    private final file_data_tables input;
+    private final ObjectSequence<RTFFileDataTablesBlock> blocks;
+    private final SegmentReader<ObjectSequence<TimeSeriesCollection>> sequence;
 
-    public RTFFileDataTables(file_data_tables input, long begin, SegmentReader.Factory segmentFactory) {
-        this.timestamps = FromXdr.timestamp_delta(begin, input.tsd);
-        this.groups = unmodifiableMap(outerMap(input.tables_data.value, new DictionaryDelta(input.dictionary), segmentFactory));
-    }
-
-    private static Map<SimpleGroupPath, Map<Tags, SegmentReader<RTFGroupTable>>> outerMap(tables_group tgArray[], DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
-        return Arrays.stream(tgArray)
-                .collect(Collectors.toMap(
-                        tg -> SimpleGroupPath.valueOf(dictionary.getPath(tg.group_ref)),
-                        tg -> unmodifiableMap(innerMap(tg, dictionary, segmentFactory))));
-    }
-
-    private static Map<Tags, SegmentReader<RTFGroupTable>> innerMap(tables_group tg, DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
-        return Arrays.stream(tg.tag_tbl)
-                .collect(Collectors.toMap(
-                        tt -> dictionary.getTags(tt.tag_ref),
-                        tt -> segmentFromFilePos(FromXdr.filePos(tt.pos), dictionary, segmentFactory)
-                ));
-    }
-
-    private static SegmentReader<RTFGroupTable> segmentFromFilePos(FilePos fp, DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
-        return segmentFactory.get(group_table::new, fp)
-                .map(gt -> new RTFGroupTable(gt, dictionary, segmentFactory))
-                .peek(RTFGroupTable::validate)
+    public RTFFileDataTables(@NonNull file_data_tables input, @NonNull SegmentReader.Factory<XdrAble> segmentFactory) {
+        this.input = input;
+        this.blocks = new ForwardSequence(0, input.blocks.length)
+                .map(blockIdx -> new RTFFileDataTablesBlock(input.blocks[blockIdx], segmentFactory), true, true, true)
+                .peek(RTFFileDataTablesBlock::validate)
                 .share();
+        this.sequence = SegmentReader.ofSupplier(this::buildSequence)
+                .cache();
     }
 
-    public void validate() {}
+    public void validate() {
+    }
 
-    public int size() { return timestamps.length; }
+    private ObjectSequence<TimeSeriesCollection> buildSequence() {
+        return Util.mergeSequences(blocks.stream().map(block -> block.getTsdata()).toArray(ObjectSequence[]::new));
+    }
+
+    public int size() {
+        return sequence.decodeOrThrow().size();
+    }
 
     public Iterator<TimeSeriesCollection> iterator() {
-        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
-        return new ForwardSequence(0, timestamps.length)
-                .map(fn, true, true, true)
-                .iterator();
+        return sequence.decodeOrThrow().iterator();
     }
 
     public Spliterator<TimeSeriesCollection> spliterator() {
-        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
-        return new ForwardSequence(0, timestamps.length)
-                .map(fn, true, true, true)
-                .spliterator();
+        return sequence.decodeOrThrow().spliterator();
     }
 
     public Stream<TimeSeriesCollection> streamReversed() {
-        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
-        return new ReverseSequence(0, timestamps.length)
-                .map(fn, true, true, true)
-                .stream();
+        return sequence.decodeOrThrow().reverse().stream();
     }
 
     public Stream<TimeSeriesCollection> stream() {
-        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
-        return new ForwardSequence(0, timestamps.length)
-                .map(fn, true, true, true)
-                .stream();
+        return sequence.decodeOrThrow().stream();
     }
 
     public Stream<TimeSeriesCollection> stream(DateTime begin) {
-        int start = Arrays.binarySearch(timestamps, begin.getMillis());
-        if (start < 0) start = -(start + 1);
-
-        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
-        return new ForwardSequence(start, timestamps.length)
-                .map(fn, true, true, true)
-                .stream();
+        ObjectSequence<TimeSeriesCollection> seq = sequence.decodeOrThrow();
+        seq = seq.skip(seq.equalRange((tsc) -> tsc.getTimestamp().compareTo(begin)).getBegin());
+        return seq.stream();
     }
 
     public Stream<TimeSeriesCollection> stream(DateTime begin, DateTime end) {
-        int start = Arrays.binarySearch(timestamps, begin.getMillis());
-        if (start < 0) start = -(start + 1);
-
-        int stop = Arrays.binarySearch(timestamps, end.getMillis());
-        if (stop < 0)
-            stop = -(stop + 1);
-        else
-            stop++;  // stream should include exact match
-
-        final IntFunction<TimeSeriesCollection> fn = index -> new RTFTimeSeriesCollection(index, this);
-        return new ForwardSequence(start, stop)
-                .map(fn, true, true, true)
-                .stream();
+        ObjectSequence<TimeSeriesCollection> seq = sequence.decodeOrThrow();
+        seq = seq.skip(seq.equalRange((tsc) -> tsc.getTimestamp().compareTo(begin)).getBegin());
+        seq = seq.limit(seq.equalRange((tsc -> tsc.getTimestamp().compareTo(end))).getEnd());
+        return seq.stream();
     }
 
-    public Set<SimpleGroupPath> getAllPaths() { return groups.keySet(); }
-    public Set<GroupName> getAllNames() {
-        return groups.entrySet().stream()
-                .flatMap(pathEntry -> {
-                    return pathEntry.getValue().keySet().stream()
-                            .map(tags -> GroupName.valueOf(pathEntry.getKey(), tags));
-                })
+    public Set<SimpleGroupPath> getAllPaths() {
+        return blocks.stream()
+                .flatMap(block -> block.getAllPaths().stream())
                 .collect(Collectors.toSet());
     }
 
-    public SegmentReader<RTFGroupTable> getGroupTable(GroupName group) {
-        return groups.getOrDefault(group.getPath(), emptyMap())
-                .get(group.getTags());
+    public Set<GroupName> getAllNames() {
+        return blocks.stream()
+                .flatMap(block -> block.getAllNames().stream())
+                .collect(Collectors.toSet());
     }
 }

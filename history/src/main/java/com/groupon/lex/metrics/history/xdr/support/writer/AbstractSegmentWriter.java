@@ -75,7 +75,8 @@ public abstract class AbstractSegmentWriter {
 
         private static FileWriter wrapWriter(FileWriter underlying, boolean compress) throws IOException {
             FileWriter result = underlying;
-            if (compress) result = new GzipWriter(result);
+            if (compress)
+                result = new GzipWriter(result);
             return result;
         }
     }

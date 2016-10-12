@@ -37,11 +37,11 @@ import com.groupon.lex.metrics.history.v2.xdr.header_flags;
 import com.groupon.lex.metrics.history.v2.xdr.tsdata;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
-import com.groupon.lex.metrics.history.xdr.support.ObjectSequence;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelSegmentReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.lib.GCCloseable;
+import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
+import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -58,7 +58,9 @@ import org.joda.time.DateTime;
 
 public class ReadOnlyState implements State {
     private static final Logger LOG = Logger.getLogger(ReadOnlyState.class.getName());
-    /** Cached TSData headers. */
+    /**
+     * Cached TSData headers.
+     */
     private final List<SegmentReader<TimeSeriesCollection>> tsdata;
     @Getter
     private final GCCloseable<FileChannel> file;
@@ -98,7 +100,8 @@ public class ReadOnlyState implements State {
 
     public static List<SegmentReader<ReadonlyTSDataHeader>> readAllTSDataHeaders(GCCloseable<FileChannel> file, FilePos recordPos) throws IOException, OncRpcException {
         final ArrayList<SegmentReader<ReadonlyTSDataHeader>> headers = new ArrayList<>();
-        if (recordPos.getOffset() == 0) return headers;  // Empty list.
+        if (recordPos.getOffset() == 0)
+            return headers;  // Empty list.
 
         while (recordPos != null) {
             final SegmentReader<ReadonlyTSDataHeader> tsd = readTSDataHeader(file, recordPos);

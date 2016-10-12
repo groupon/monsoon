@@ -29,16 +29,16 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.history.xdr.support;
+package com.groupon.lex.metrics.lib.sequence;
 
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import lombok.Getter;
@@ -46,63 +46,72 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
-public class ObjectSequence<T> {
+public class IntObjectSequence<T> implements ObjectSequence<T> {
     @NonNull
     private final Sequence underlying;
     @NonNull
-    private final Supplier<? extends IntFunction<? extends T>> fn;
+    private final IntFunction<? extends T> fn;
     @Getter
     private final boolean sorted, nonnull, distinct;
 
+    public T get(int index) {
+        if (index < 0 || index >= size())
+            throw new NoSuchElementException("index " + index + " out of bounds [0.." + size() + ")");
+        return fn.apply(underlying.get(index));
+    }
+
+    @Override
     public Iterator<T> iterator() {
-        return new IteratorImpl<>(underlying.iterator(), fn.get());
+        return new IteratorImpl<>(underlying.iterator(), fn);
     }
 
+    @Override
     public Spliterator<T> spliterator() {
-        return new SpliteratorImpl<>(underlying.spliterator(), fn.get(), spliteratorCharacteristics());
+        return new SpliteratorImpl<>(underlying.spliterator(), fn, spliteratorCharacteristics());
     }
 
+    @Override
     public Stream<T> stream() {
         return StreamSupport.stream(this::spliterator, spliteratorCharacteristics(), false);
     }
 
+    @Override
     public Stream<T> parallelStream() {
         return StreamSupport.stream(this::spliterator, spliteratorCharacteristics(), true);
     }
 
+    @Override
+    public IntObjectSequence<T> limit(int n) {
+        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == size()) return this;
+        return new IntObjectSequence<>(underlying.limit(n), fn, sorted, nonnull, distinct);
+    }
+
+    @Override
+    public IntObjectSequence<T> skip(int n) {
+        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == 0) return this;
+        return new IntObjectSequence<>(underlying.skip(n), fn, sorted, nonnull, distinct);
+    }
+
+    @Override
     public int size() {
         return underlying.size();
     }
 
+    @Override
     public boolean isEmpty() {
         return underlying.isEmpty();
     }
 
-    public Object[] toArray() {
-        return stream().toArray();
+    @Override
+    public IntObjectSequence<T> reverse() {
+        return new IntObjectSequence<>(underlying.reverse(), fn, sorted, nonnull, distinct);
     }
 
-    public <T> T[] toArray(T[] a) {
-        return stream().toArray((size) -> {
-            return (T[])java.lang.reflect.Array.newInstance(a.getClass().getComponentType(), size);
-        });
-    }
-
-    public ObjectSequence<T> reverse() {
-        return new ObjectSequence<>(underlying.reverse(), fn, sorted, nonnull, distinct);
-    }
-
-    public <R> ObjectSequence<R> map(Function<? super T, ? extends R> fn, boolean sorted, boolean nonnull, boolean distinct) {
-        return mapSupplied(() -> fn, sorted, nonnull, distinct);
-    }
-
-    public <R> ObjectSequence<R> mapSupplied(Supplier<? extends Function<? super T, ? extends R>> fn, boolean sorted, boolean nonnull, boolean distinct) {
-        Supplier<? extends IntFunction<? extends R>> combinedFn = () -> {
-            final IntFunction<? extends T> fn1 = this.fn.get();
-            final Function<? super T, ? extends R> fn2 = fn.get();
-            return (i) -> fn2.apply(fn1.apply(i));
-        };
-        return new ObjectSequence<>(underlying, combinedFn, sorted && this.sorted, nonnull && this.nonnull, distinct && this.distinct);
+    @Override
+    public <R> IntObjectSequence<R> map(Function<? super T, ? extends R> fn, boolean sorted, boolean nonnull, boolean distinct) {
+        return new IntObjectSequence<>(underlying, (i) -> fn.apply(this.fn.apply(i)), sorted, nonnull, distinct);
     }
 
     @RequiredArgsConstructor
@@ -162,15 +171,5 @@ public class ObjectSequence<T> {
                 throw new IllegalStateException();
             return (Comparator)underlying.getComparator();
         }
-    }
-
-    private int spliteratorCharacteristics() {
-        return Spliterator.ORDERED |
-                Spliterator.SIZED |
-                Spliterator.SUBSIZED |
-                Spliterator.IMMUTABLE |
-                (sorted ? Spliterator.SORTED : 0) |
-                (distinct ? Spliterator.DISTINCT : 0) |
-                (nonnull ? Spliterator.NONNULL : 0);
     }
 }

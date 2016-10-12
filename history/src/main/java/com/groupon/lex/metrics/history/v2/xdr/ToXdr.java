@@ -39,6 +39,7 @@ import gnu.trove.list.array.TShortArrayList;
 import gnu.trove.set.TLongSet;
 import java.util.Arrays;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -102,21 +103,27 @@ public class ToXdr {
                 .toArray(histogram_entry[]::new));
     }
 
-    public static timestamp_delta timestamp_delta(long begin, long[] timestamps) {
+    public static timestamp_delta timestamp_delta(long[] timestamps) {
         timestamps = Arrays.copyOf(timestamps, timestamps.length);
         Arrays.sort(timestamps);
-        if (timestamps.length >= 1 && timestamps[0] < begin)
-            throw new RuntimeException("encoding error: negative time delta");
+        System.err.println("timestamp_delta encoding of: " + Arrays.stream(timestamps).mapToObj(Long::toString).collect(Collectors.toList()));
 
-        int[] result = new int[timestamps.length];
-        for (int i = 0; i < timestamps.length; ++i) {
+        long begin = timestamps[0];
+        int[] result = new int[timestamps.length - 1];
+        for (int i = 1; i < timestamps.length; ++i) {
             final long delta = timestamps[i] - begin;
             if (delta > Integer.MAX_VALUE)
                 throw new RuntimeException("encoding error: time delta too large");
-            result[i] = (int)delta;
+            result[i - 1] = (int) delta;
             begin = timestamps[i];
         }
-        return new timestamp_delta(result);
+
+        timestamp_delta ts = new timestamp_delta();
+        ts.first = timestamps[0];
+        ts.delta = result;
+
+        System.err.println("timestamp_delta encoded to: first=" + ts.first + "; delta=" + Arrays.stream(ts.delta).mapToObj(Integer::toString).collect(Collectors.toList()));
+        return ts;
     }
 
     public static bitset bitset(boolean bits[]) {
@@ -126,17 +133,18 @@ public class ToXdr {
         int bitsIdx = 0;
         while (bitsIdx < bits.length) {
             int end = bitsIdx;
-            while (end < bits.length && bits[end] == expect) ++end;
+            while (end < bits.length && bits[end] == expect)
+                ++end;
 
             int len = end - bitsIdx;
             while (len > 65535) {
                 bitsIdx += 65535;
                 len -= 65535;
-                resultList.add((short)0xffff);
-                resultList.add((short)0);
+                resultList.add((short) 0xffff);
+                resultList.add((short) 0);
             }
 
-            resultList.add((short)len);
+            resultList.add((short) len);
             bitsIdx += len;
 
             expect = !expect;

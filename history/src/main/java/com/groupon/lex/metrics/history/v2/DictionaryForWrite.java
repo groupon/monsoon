@@ -42,8 +42,8 @@ import com.groupon.lex.metrics.history.v2.xdr.string_val;
 import com.groupon.lex.metrics.history.v2.xdr.strval_dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.tag_dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.tags;
-import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
+import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -69,21 +69,21 @@ public final class DictionaryForWrite implements Cloneable {
                 new ExportMap<>(
                         input.getStringRefEnd(),
                         new ForwardSequence(input.getStringRefOffset(), input.getStringRefEnd())
-                                .map(Integer::valueOf, true, true, true)
-                                .stream()
-                                .collect(Collectors.toMap(idx -> idx, idx -> input.getString(idx)))),
+                        .map(Integer::valueOf, true, true, true)
+                        .stream()
+                        .collect(Collectors.toMap(idx -> idx, idx -> input.getString(idx)))),
                 new ExportMap<>(
                         input.getPathRefEnd(),
                         new ForwardSequence(input.getPathRefOffset(), input.getPathRefEnd())
-                                .map(Integer::valueOf, true, true, true)
-                                .stream()
-                                .collect(Collectors.toMap(idx -> idx, idx -> input.getPath(idx)))),
+                        .map(Integer::valueOf, true, true, true)
+                        .stream()
+                        .collect(Collectors.toMap(idx -> idx, idx -> input.getPath(idx)))),
                 new ExportMap<>(
                         input.getTagsRefEnd(),
                         new ForwardSequence(input.getTagsRefOffset(), input.getTagsRefEnd())
-                                .map(Integer::valueOf, true, true, true)
-                                .stream()
-                                .collect(Collectors.toMap(idx -> idx, idx -> input.getTags(idx))))
+                        .map(Integer::valueOf, true, true, true)
+                        .stream()
+                        .collect(Collectors.toMap(idx -> idx, idx -> input.getTags(idx))))
         );
     }
 
@@ -98,7 +98,8 @@ public final class DictionaryForWrite implements Cloneable {
     /**
      * Reset for the next write cycle.
      *
-     * The next write cycle will exclude any data present in the dictionary, during serialization.
+     * The next write cycle will exclude any data present in the dictionary,
+     * during serialization.
      */
     public void reset() {
         stringTable.reset();

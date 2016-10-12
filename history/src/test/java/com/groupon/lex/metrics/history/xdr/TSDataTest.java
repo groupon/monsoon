@@ -44,10 +44,6 @@ import org.hamcrest.collection.IsIterableContainingInOrder;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -55,7 +51,11 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 /**
  *
@@ -70,14 +70,14 @@ public class TSDataTest {
     @Parameterized.Parameters
     public static Collection<Object[]> parameters() {
         return Arrays.asList(
-                new Object[]{ new FileSupport(new FileSupport0(), false) },
-                new Object[]{ new FileSupport(new FileSupport1(), false) },
-                new Object[]{ new FileSupport(new FileTableFileSupport(), false) },
-                new Object[]{ new FileSupport(new FileListFileSupport(), false) },
-                new Object[]{ new FileSupport(new FileSupport0(), true) },
-                new Object[]{ new FileSupport(new FileSupport1(), true) },
-                new Object[]{ new FileSupport(new FileTableFileSupport(), true) },
-                new Object[]{ new FileSupport(new FileListFileSupport(), true) }
+                new Object[]{new FileSupport(new FileSupport0(), false)},
+                new Object[]{new FileSupport(new FileSupport1(), false)},
+                new Object[]{new FileSupport(new FileTableFileSupport(), false)},
+                new Object[]{new FileSupport(new FileListFileSupport(), false)},
+                new Object[]{new FileSupport(new FileSupport0(), true)},
+                new Object[]{new FileSupport(new FileSupport1(), true)},
+                new Object[]{new FileSupport(new FileTableFileSupport(), true)},
+                new Object[]{new FileSupport(new FileListFileSupport(), true)}
         );
     }
 
@@ -99,10 +99,12 @@ public class TSDataTest {
 
     @Test
     public void read() throws Exception {
-        final List<TimeSeriesCollection> tsdata = create_tsdata_(100).collect(Collectors.toList());
+        final List<TimeSeriesCollection> tsdata = create_tsdata_(3).collect(Collectors.toList());
         file_support.create_file(tmpfile, tsdata);
 
         final TSData fd = TSData.readonly(tmpfile);
+
+        assertEquals(tsdata, fd.stream().collect(Collectors.toList()));
 
         assertEquals(Files.size(tmpfile), fd.getFileSize());
         assertEquals(tsdata.get(0).getTimestamp(), fd.getBegin());
@@ -172,14 +174,14 @@ public class TSDataTest {
         final Histogram hist = new Histogram(Stream.of(new Histogram.RangeWithCount(new Histogram.Range(0, 10), 10d), new Histogram.RangeWithCount(new Histogram.Range(100, 110), 10d)));
 
         return Stream.generate(
-                new Supplier<Integer>(){
-                    private int idx = 0;
+                new Supplier<Integer>() {
+            private int idx = 0;
 
-                    @Override
-                    public Integer get() {
-                        return idx++;
-                    }
-                })
+            @Override
+            public Integer get() {
+                return idx++;
+            }
+        })
                 .map(new Function<Integer, TimeSeriesCollection>() {
                     public TimeSeriesCollection apply(Integer i) {
                         return new SimpleTimeSeriesCollection(now.plusMinutes(i), Stream.of(
@@ -189,7 +191,7 @@ public class TSDataTest {
                                 new MutableTimeSeriesValue(now.plusMinutes(i),
                                         GroupName.valueOf(SimpleGroupPath.valueOf("h", "i", "s", "t", "o", "g", "r", "a", "m")),
                                         singletonMap(MetricName.valueOf("x"), MetricValue.fromHistValue(hist)))
-                                ));
+                        ));
                     }
                 })
                 .limit(count);
@@ -254,7 +256,8 @@ public class TSDataTest {
 
     @Test(expected = IllegalStateException.class)
     public void is_empty_not_allowed() throws Exception {
-        if (file_support.isEmptyAllowed()) throw new IllegalStateException("this test only works for files that may not be empty");
+        if (file_support.isEmptyAllowed())
+            throw new IllegalStateException("this test only works for files that may not be empty");
         file_support.create_file(tmpfile, EMPTY_LIST);
     }
 
@@ -300,7 +303,9 @@ public class TSDataTest {
         final Set<TimeSeriesCollection> result = new HashSet<>();
         final TSData impl = new TSDataMock() {
             @Override
-            public boolean add(TimeSeriesCollection ts) { return result.add(ts); }
+            public boolean add(TimeSeriesCollection ts) {
+                return result.add(ts);
+            }
         };
 
         assertTrue(impl.addAll(tsdata));
@@ -312,7 +317,9 @@ public class TSDataTest {
         final Set<TimeSeriesCollection> result = new HashSet<>(tsdata);
         final TSData impl = new TSDataMock() {
             @Override
-            public boolean add(TimeSeriesCollection ts) { return result.add(ts); }
+            public boolean add(TimeSeriesCollection ts) {
+                return result.add(ts);
+            }
         };
 
         assertFalse(impl.addAll(tsdata));
@@ -324,7 +331,9 @@ public class TSDataTest {
         final Set<TimeSeriesCollection> result = new HashSet<>(tsdata.subList(3, 6));
         final TSData impl = new TSDataMock() {
             @Override
-            public boolean add(TimeSeriesCollection ts) { return result.add(ts); }
+            public boolean add(TimeSeriesCollection ts) {
+                return result.add(ts);
+            }
         };
 
         assertTrue(impl.addAll(tsdata));

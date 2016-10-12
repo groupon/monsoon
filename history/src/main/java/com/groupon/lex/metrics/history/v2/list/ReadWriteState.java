@@ -35,15 +35,15 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
+import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.calculateDictionary;
+import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.calculateTimeSeries;
+import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.readAllTSDataHeaders;
+import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.readTSDataHeader;
 import com.groupon.lex.metrics.history.v2.tables.DictionaryDelta;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.ALL_HDR_CRC_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
-import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.calculateDictionary;
-import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.calculateTimeSeries;
-import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.readAllTSDataHeaders;
-import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.readTSDataHeader;
 import com.groupon.lex.metrics.history.v2.xdr.record;
 import com.groupon.lex.metrics.history.v2.xdr.record_array;
 import com.groupon.lex.metrics.history.v2.xdr.record_metric;
@@ -53,8 +53,6 @@ import com.groupon.lex.metrics.history.v2.xdr.tsdata;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
 import com.groupon.lex.metrics.history.xdr.Const;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
-import com.groupon.lex.metrics.history.xdr.support.ObjectSequence;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelSegmentReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter.Writer;
@@ -63,6 +61,8 @@ import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import com.groupon.lex.metrics.lib.GCCloseable;
+import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
+import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.io.IOException;
@@ -179,7 +179,8 @@ public final class ReadWriteState implements State {
 
     private synchronized void addRecords(Collection<? extends TimeSeriesCollection> tscList) throws IOException, OncRpcException {
         LOG.log(Level.FINER, "adding {0} records", tscList.size());
-        if (tscList.isEmpty()) return;
+        if (tscList.isEmpty())
+            return;
 
         final boolean compressed;
         long recordOffset;
@@ -204,7 +205,8 @@ public final class ReadWriteState implements State {
                     newWriterDict.getPathTable().getOffset(),
                     newWriterDict.getTagsTable().getOffset()});
         final ByteBuffer useBuffer = (compressed ? ByteBuffer.allocate(65536) : ByteBuffer.allocateDirect(65536));
-        if (lastRecord.getOffset() == 0) lastRecord = null;  // Empty file.
+        if (lastRecord.getOffset() == 0)
+            lastRecord = null;  // Empty file.
 
         final List<FilePos> headers = new ArrayList<>(tscList.size());
         final List<EncodedTscHeaderForWrite> writeHeaders;
@@ -246,7 +248,6 @@ public final class ReadWriteState implements State {
         /*
          * Prepare updated file header.
          */
-
         final tsfile_header hdr = updateHeaderData(writeHeaders);
 
         /*
@@ -269,7 +270,6 @@ public final class ReadWriteState implements State {
             /*
              * Update all data structures.
              */
-
             final List<SegmentReader<ReadonlyTSDataHeader>> newTsdataHeaders = headers.stream()
                     .map(offset -> readTSDataHeader(file, offset))
                     .collect(Collectors.toList());
@@ -297,7 +297,9 @@ public final class ReadWriteState implements State {
         }
     }
 
-    /** Update all flags/metadata in header for update. */
+    /**
+     * Update all flags/metadata in header for update.
+     */
     private tsfile_header updateHeaderData(List<EncodedTscHeaderForWrite> headers) {
         // Make copy of header and work on that.
         final tsfile_header hdr = doReadLocked(() -> {
@@ -339,7 +341,8 @@ public final class ReadWriteState implements State {
                             .allMatch(count -> count == 1);
                 }
 
-                if (!distinct) hdr.flags &= ~header_flags.DISTINCT;
+                if (!distinct)
+                    hdr.flags &= ~header_flags.DISTINCT;
             }
         }
 
@@ -353,7 +356,9 @@ public final class ReadWriteState implements State {
         return hdr;
     }
 
-    /** Write current header to file. */
+    /**
+     * Write current header to file.
+     */
     private void writeHeader(tsfile_header hdr, ByteBuffer useBuffer) throws OncRpcException, IOException {
         try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(file.get(), 0), ALL_HDR_CRC_LEN), 4), useBuffer)) {
             Const.writeMimeHeader(writer);

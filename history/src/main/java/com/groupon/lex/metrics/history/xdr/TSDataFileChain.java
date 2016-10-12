@@ -488,8 +488,7 @@ public class TSDataFileChain implements TSData {
         }
 
         try (final ToXdrTables tables = new ToXdrTables()) {
-            for (TimeSeriesCollection tsc : tsdata)
-                tables.add(tsc);
+            tables.addAll(tsdata);
 
             final FileChannel compressed_data;
             final Path new_filename;

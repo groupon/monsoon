@@ -29,7 +29,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.history.xdr.support;
+package com.groupon.lex.metrics.lib.sequence;
 
 import java.util.Comparator;
 import java.util.Iterator;
@@ -55,6 +55,27 @@ public class ForwardSequence implements Sequence {
             Spliterator.NONNULL;
 
     private final int begin, end;
+    
+    @Override
+    public int get(int n) {
+        if (n < 0 || n >= size())
+            throw new NoSuchElementException("index " + n + " out of bounds [0.." + size() + ")");
+        return begin + n;
+    }
+
+    @Override
+    public ForwardSequence limit(int n) {
+        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == size()) return this;
+        return new ForwardSequence(begin, begin + n);
+    }
+
+    @Override
+    public ForwardSequence skip(int n) {
+        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == 0) return this;
+        return new ForwardSequence(begin + n, end);
+    }
 
     @Override
     public Spliterator.OfInt spliterator() {

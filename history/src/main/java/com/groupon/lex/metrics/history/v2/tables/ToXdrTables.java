@@ -39,6 +39,7 @@ import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.createPresenceBitset;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables;
+import com.groupon.lex.metrics.history.v2.xdr.file_data_tables_block;
 import com.groupon.lex.metrics.history.v2.xdr.group_table;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
 import com.groupon.lex.metrics.history.v2.xdr.tables;
@@ -57,45 +58,47 @@ import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.NonNull;
+import lombok.Setter;
 import org.acplt.oncrpc.OncRpcException;
+import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Duration;
 
 /**
  * Stateful writer for table-based file.
  *
  * Table based files have to be written in one go, as they can't be written
  * before all data has been gathered.
+ *
  * @author ariane
  */
 public class ToXdrTables implements Closeable {
     private static final long HDR_SPACE = MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN;
-    private final TLongObjectMap<TimeSeriesCollection> tsdata = new TLongObjectHashMap<>();
-    private final DictionaryForWrite dict = new DictionaryForWrite();
-
-    public void add(TimeSeriesCollection tsc) {
-        tsdata.put(tsc.getTimestamp().toDateTime(DateTimeZone.UTC).getMillis(), tsc);
-    }
+    private static final int MAX_BLOCK_RECORDS = 10000;
+    private final Queue<TimeSeriesCollection> tsdataQueue = new PriorityQueue<>();
 
     public void addAll(Collection<? extends TimeSeriesCollection> tsc) {
-        tsc.forEach(this::add);
+        tsdataQueue.addAll(tsc);
     }
 
     public void write(@NonNull FileChannel out, boolean compress) throws OncRpcException, IOException {
@@ -103,10 +106,12 @@ public class ToXdrTables implements Closeable {
     }
 
     @Override
-    public void close() throws IOException {}
+    public void close() throws IOException {
+    }
 
     private void writeFile(FileChannel out, boolean compress) throws IOException, OncRpcException {
-        if (tsdata.isEmpty()) throw new IllegalStateException("table files may not be empty");
+        if (tsdataQueue.isEmpty())
+            throw new IllegalStateException("table files may not be empty");
         final Context ctx = new Context(out, compress);
 
         final FilePos bodyPos;
@@ -126,15 +131,56 @@ public class ToXdrTables implements Closeable {
 
     private FilePos writeBody(Context ctx) throws IOException, OncRpcException {
         file_data_tables result = new file_data_tables();
-        result.tsd = ToXdr.timestamp_delta(ctx.getBegin(), ctx.getTimestamps());
-        result.tables_data = createTables(ctx);  // Writes dependency data.
-        result.dictionary = dict.encode();
+
+        final List<file_data_tables_block> blocks = new ArrayList<>();
+        while (!tsdataQueue.isEmpty())
+            blocks.add(createBlock(ctx));
+        result.blocks = blocks.toArray(new file_data_tables_block[blocks.size()]);
 
         return ctx.newWriter().write(result);
     }
 
-    private Map<SimpleGroupPath, Set<GroupName>> computeGroupKeys() {
-        return tsdata.valueCollection().stream()
+    private List<TimeSeriesCollection> selectTsdataForBlock() {
+        ArrayList<TimeSeriesCollection> tsdata = new ArrayList<>(Integer.min(tsdataQueue.size(), MAX_BLOCK_RECORDS));
+        DateTime recentTs = tsdataQueue.element().getTimestamp().toDateTime(DateTimeZone.UTC);
+
+        while (tsdata.size() < MAX_BLOCK_RECORDS) {
+            final TimeSeriesCollection tsc = tsdataQueue.peek();
+            if (tsc == null)
+                break;
+
+            Duration tscDelta = new Duration(recentTs, tsc.getTimestamp());
+            if (tscDelta.getMillis() > Integer.MAX_VALUE)
+                break;
+            recentTs = tsc.getTimestamp().toDateTime(DateTimeZone.UTC);
+            tsdata.add(tsc);
+
+            TimeSeriesCollection removed = tsdataQueue.remove();
+            assert (tsc == removed);
+        }
+        tsdata.trimToSize();
+        return tsdata;
+    }
+
+    private file_data_tables_block createBlock(Context ctx) throws IOException, OncRpcException {
+        ctx.setTsdata(selectTsdataForBlock());
+        ctx.setDict(new DictionaryForWrite());
+
+        file_data_tables_block result = new file_data_tables_block();
+        try {
+            result.tables_data = ToXdr.filePos(ctx.newWriter().write(createTables(ctx)));  // Writes dependency data.
+            result.dictionary = ToXdr.filePos(ctx.newWriter().write(ctx.getDict().encode()));  // Must be last.
+            result.tsd = ToXdr.timestamp_delta(ctx.getTimestamps());
+        } finally {
+            ctx.setTsdata(null);
+            ctx.setDict(null);
+        }
+
+        return result;
+    }
+
+    private Map<SimpleGroupPath, Set<GroupName>> computeGroupKeys(Context ctx) {
+        return ctx.getTsdata().stream()
                 .flatMap(tsc -> tsc.getGroups().stream())
                 .collect(Collectors.groupingBy(GroupName::getPath, Collectors.toSet()));
     }
@@ -143,10 +189,10 @@ public class ToXdrTables implements Closeable {
         TIntObjectMap<tables_tag[]> groupPathMap = new TIntObjectHashMap<>();
 
         // Write dependency data.
-        for (Map.Entry<SimpleGroupPath, Set<GroupName>> grpEntry : computeGroupKeys().entrySet()) {
+        for (Map.Entry<SimpleGroupPath, Set<GroupName>> grpEntry : computeGroupKeys(ctx).entrySet()) {
             final SimpleGroupPath grp = grpEntry.getKey();
-            final int grpRef = dict.getPathTable().getOrCreate(grp.getPath());
-            assert(!groupPathMap.containsKey(grpRef));
+            final int grpRef = ctx.getDict().getPathTable().getOrCreate(grp.getPath());
+            assert (!groupPathMap.containsKey(grpRef));
             groupPathMap.put(grpRef, createTagTableArray(grp, grpEntry.getValue(), ctx));
         }
 
@@ -166,9 +212,9 @@ public class ToXdrTables implements Closeable {
 
         // Write dependency data.
         for (GroupName grpName : grpNames) {
-            assert(Objects.equals(grp, grpName.getPath()));
-            final int tagRef = dict.getTagsTable().getOrCreate(grpName.getTags());
-            assert(!tagMap.containsKey(tagRef));
+            assert (Objects.equals(grp, grpName.getPath()));
+            final int tagRef = ctx.getDict().getTagsTable().getOrCreate(grpName.getTags());
+            assert (!tagMap.containsKey(tagRef));
             tagMap.put(tagRef, writeGroupTable(grpName, ctx));
         }
 
@@ -183,8 +229,8 @@ public class ToXdrTables implements Closeable {
                 .toArray(tables_tag[]::new);
     }
 
-    private Set<MetricName> computeMetricNames(GroupName grpName) {
-        return tsdata.valueCollection().stream()
+    private Set<MetricName> computeMetricNames(Context ctx, GroupName grpName) {
+        return ctx.getTsdata().stream()
                 .map(tsc -> tsc.get(grpName))
                 .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
                 .flatMap(tsv -> tsv.getMetrics().keySet().stream())
@@ -196,15 +242,15 @@ public class ToXdrTables implements Closeable {
         TLongSet presence = new TLongHashSet();
 
         // Fill presence set.
-        tsdata.valueCollection().stream()
+        ctx.getTsdata().stream()
                 .filter(tsv -> tsv.get(grpName).isPresent())
                 .mapToLong(tsv -> tsv.getTimestamp().toDateTime(DateTimeZone.UTC).getMillis())
                 .forEach(presence::add);
 
         // Write dependency tables.
-        for (MetricName metricName : computeMetricNames(grpName)) {
-            final int metricRef = dict.getPathTable().getOrCreate(metricName.getPath());
-            assert(!metricsMap.containsKey(metricRef));
+        for (MetricName metricName : computeMetricNames(ctx, grpName)) {
+            final int metricRef = ctx.getDict().getPathTable().getOrCreate(metricName.getPath());
+            assert (!metricsMap.containsKey(metricRef));
             metricsMap.put(metricRef, writeMetrics(grpName, metricName, ctx));
         }
 
@@ -223,14 +269,12 @@ public class ToXdrTables implements Closeable {
     }
 
     private FilePos writeMetrics(GroupName grpName, MetricName metricName, Context ctx) throws IOException, OncRpcException {
-        final MetricTable metricTbl = new MetricTable(dict);
+        final MetricTable metricTbl = new MetricTable(ctx.getDict());
 
-        tsdata.forEachEntry((ts, tsc) -> {
+        ctx.getTsdata().forEach(tsc -> {
             tsc.get(grpName)
                     .flatMap(tsv -> tsv.findMetric(metricName))
-                    .ifPresent(value -> metricTbl.add(ts, value));
-
-            return true;
+                    .ifPresent(value -> metricTbl.add(tsc.getTimestamp().toDateTime(DateTimeZone.UTC).getMillis(), value));
         });
 
         return metricTbl.write(ctx.newWriter(), ctx.getTimestamps());
@@ -240,10 +284,10 @@ public class ToXdrTables implements Closeable {
         tsfile_header hdr = new tsfile_header();
         hdr.first = ToXdr.timestamp(ctx.getBegin());
         hdr.last = ToXdr.timestamp(ctx.getEnd());
-        hdr.flags = (ctx.isCompressed() ? header_flags.GZIP : 0) |
-                header_flags.DISTINCT |
-                header_flags.SORTED |
-                header_flags.KIND_TABLES;
+        hdr.flags = (ctx.isCompressed() ? header_flags.GZIP : 0)
+                | header_flags.DISTINCT
+                | header_flags.SORTED
+                | header_flags.KIND_TABLES;
         hdr.reserved = 0;
         hdr.file_size = fileSize;
         hdr.fdt = ToXdr.filePos(bodyPos);
@@ -252,21 +296,42 @@ public class ToXdrTables implements Closeable {
 
     private class Context {
         @Getter
-        private final long timestamps[];
+        private List<TimeSeriesCollection> tsdata = null;
+        @Getter
+        private long timestamps[] = null;
         @Getter
         private final ByteBuffer useBuffer;
         @Getter
         private final boolean compressed;
         @Getter
         private final FileChannelWriter fd;
+        @Getter
+        @Setter
+        private DictionaryForWrite dict;
+        private Long begin = null, end = null;
 
         public Context(@NonNull FileChannel out, boolean compressed) {
-            this.timestamps = tsdata.keys();
-            Arrays.sort(this.timestamps);
-
             this.compressed = compressed;
             this.useBuffer = (compressed ? ByteBuffer.allocate(65536) : ByteBuffer.allocateDirect(65536));
             this.fd = new FileChannelWriter(out, HDR_SPACE);
+        }
+
+        public void setTsdata(List<TimeSeriesCollection> tsdata) {
+            this.tsdata = tsdata;
+            if (tsdata != null) {
+                this.timestamps = tsdata.stream()
+                        .mapToLong(tsc -> tsc.getTimestamp().toDateTime(DateTimeZone.UTC).getMillis())
+                        .sorted()
+                        .toArray();
+                Arrays.sort(this.timestamps);
+
+                if (begin == null || timestamps[0] < begin)
+                    begin = timestamps[0];
+                if (end == null || timestamps[timestamps.length - 1] > end)
+                    end = timestamps[timestamps.length - 1];
+            } else {
+                this.timestamps = null;
+            }
         }
 
         public Writer newWriter() {
@@ -274,11 +339,11 @@ public class ToXdrTables implements Closeable {
         }
 
         public long getBegin() {
-            return timestamps[0];
+            return begin;
         }
 
         public long getEnd() {
-            return timestamps[timestamps.length - 1];
+            return end;
         }
     }
 }

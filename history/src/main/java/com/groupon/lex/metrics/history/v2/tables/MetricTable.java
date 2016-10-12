@@ -50,6 +50,7 @@ import com.groupon.lex.metrics.history.v2.xdr.mt_hist;
 import com.groupon.lex.metrics.history.v2.xdr.mt_other;
 import com.groupon.lex.metrics.history.v2.xdr.mt_str;
 import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter;
+import gnu.trove.TDecorators;
 import gnu.trove.map.TLongByteMap;
 import gnu.trove.map.TLongDoubleMap;
 import gnu.trove.map.TLongIntMap;
@@ -65,11 +66,17 @@ import gnu.trove.map.hash.TLongShortHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 @RequiredArgsConstructor
 public class MetricTable extends AbstractSegmentWriter {
+    private static final Logger LOG = Logger.getLogger(MetricTable.class.getName());
+
     @NonNull
     private final DictionaryForWrite dictionary;
 
@@ -84,14 +91,16 @@ public class MetricTable extends AbstractSegmentWriter {
     private final TLongObjectMap<MetricValue> t_other = new TLongObjectHashMap<>();
 
     public void add(long ts, @NonNull MetricValue value) {
+        LOG.log(Level.FINEST, "adding {0}: {1}", new Object[]{new DateTime(ts, DateTimeZone.UTC), value});
+
         if (value.getBoolValue() != null) {
-            t_bool.put(ts, value.getBoolValue() ? (byte)1 : (byte)0);
+            t_bool.put(ts, value.getBoolValue() ? (byte) 1 : (byte) 0);
         } else if (value.getIntValue() != null) {
             final long v = value.getIntValue();
             if (v >= Short.MIN_VALUE && v <= Short.MAX_VALUE)
-                t_16bit.put(ts, (short)v);
+                t_16bit.put(ts, (short) v);
             else if (v >= Integer.MIN_VALUE && v <= Integer.MAX_VALUE)
-                t_32bit.put(ts, (int)v);
+                t_32bit.put(ts, (int) v);
             else
                 t_64bit.put(ts, v);
         } else if (value.getFltValue() != null) {
@@ -123,6 +132,7 @@ public class MetricTable extends AbstractSegmentWriter {
     }
 
     private static mt_bool encodeBool(TLongByteMap t_bool, long timestamps[]) {
+        LOG.log(Level.FINEST, "encoding {0}", TDecorators.wrap(t_bool));
         boolean values[] = new boolean[timestamps.length];
         int values_len = 0;
         for (int i = 0; i < values.length; ++i) {
@@ -139,6 +149,7 @@ public class MetricTable extends AbstractSegmentWriter {
     }
 
     private static mt_16bit encode16Bit(TLongShortMap t_16bit, long timestamps[]) {
+        LOG.log(Level.FINEST, "encoding {0}", TDecorators.wrap(t_16bit));
         short[] values = new short[timestamps.length];
         int values_len = 0;
         for (int i = 0; i < values.length; ++i) {
@@ -155,6 +166,7 @@ public class MetricTable extends AbstractSegmentWriter {
     }
 
     private static mt_32bit encode32Bit(TLongIntMap t_32bit, long timestamps[]) {
+        LOG.log(Level.FINEST, "encoding {0}", TDecorators.wrap(t_32bit));
         int[] values = new int[timestamps.length];
         int values_len = 0;
         for (int i = 0; i < values.length; ++i) {
@@ -171,6 +183,7 @@ public class MetricTable extends AbstractSegmentWriter {
     }
 
     private static mt_64bit encode64Bit(TLongLongMap t_64bit, long timestamps[]) {
+        LOG.log(Level.FINEST, "encoding {0}", TDecorators.wrap(t_64bit));
         long[] values = new long[timestamps.length];
         int values_len = 0;
         for (int i = 0; i < values.length; ++i) {
@@ -187,6 +200,7 @@ public class MetricTable extends AbstractSegmentWriter {
     }
 
     private static mt_dbl encodeDbl(TLongDoubleMap t_dbl, long timestamps[]) {
+        LOG.log(Level.FINEST, "encoding {0}", TDecorators.wrap(t_dbl));
         double[] values = new double[timestamps.length];
         int values_len = 0;
         for (int i = 0; i < values.length; ++i) {
@@ -203,6 +217,7 @@ public class MetricTable extends AbstractSegmentWriter {
     }
 
     private static mt_str encodeStr(TLongIntMap t_str, long timestamps[]) {
+        LOG.log(Level.FINEST, "encoding {0}", TDecorators.wrap(t_str));
         int[] values = new int[timestamps.length];
         int values_len = 0;
         for (int i = 0; i < values.length; ++i) {
@@ -219,6 +234,7 @@ public class MetricTable extends AbstractSegmentWriter {
     }
 
     private static mt_hist encodeHist(TLongObjectMap<Histogram> t_hist, long timestamps[]) {
+        LOG.log(Level.FINEST, "encoding {0}", TDecorators.wrap(t_hist));
         histogram values[] = new histogram[timestamps.length];
         int values_len = 0;
         for (int i = 0; i < values.length; ++i) {
@@ -235,12 +251,14 @@ public class MetricTable extends AbstractSegmentWriter {
     }
 
     private static mt_empty encodeEmpty(TLongSet t_empty, long timestamps[]) {
+        LOG.log(Level.FINEST, "encoding {0}", TDecorators.wrap(t_empty));
         mt_empty result = new mt_empty();
         result.presence = createPresenceBitset(t_empty, timestamps);
         return result;
     }
 
     private static mt_other encodeOther(TLongObjectMap<MetricValue> t_other, DictionaryForWrite dictionary, long timestamps[]) {
+        LOG.log(Level.FINEST, "encoding {0}", TDecorators.wrap(t_other));
         metric_value[] values = new metric_value[timestamps.length];
         int values_len = 0;
         for (int i = 0; i < values.length; ++i) {

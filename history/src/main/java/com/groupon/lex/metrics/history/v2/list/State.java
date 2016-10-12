@@ -32,9 +32,9 @@
 package com.groupon.lex.metrics.history.v2.list;
 
 import com.groupon.lex.metrics.history.xdr.support.DecodingException;
-import com.groupon.lex.metrics.history.xdr.support.ObjectSequence;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.lib.GCCloseable;
+import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -44,10 +44,15 @@ import org.joda.time.DateTime;
 
 public interface State {
     public ObjectSequence<SegmentReader<TimeSeriesCollection>> sequence();
+
     public void add(TimeSeriesCollection tsc);
+
     public void addAll(Collection<? extends TimeSeriesCollection> tsc);
+
     public DateTime getBegin();
+
     public DateTime getEnd();
+
     public GCCloseable<FileChannel> getFile();
 
     public default ObjectSequence<TimeSeriesCollection> decodedSequence() {

@@ -36,9 +36,11 @@ import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.group_table;
 import com.groupon.lex.metrics.history.v2.xdr.metric_table;
 import com.groupon.lex.metrics.history.v2.xdr.tables_metric;
+import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
+import gnu.trove.map.hash.THashMap;
 import java.util.Arrays;
-import static java.util.Collections.unmodifiableMap;
+import static java.util.Collections.unmodifiableSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -53,7 +55,7 @@ public class RTFGroupTable {
 
     public RTFGroupTable(group_table input, DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
         presence = FromXdr.bitset(input.presence);
-        metrics = unmodifiableMap(metricsMap(input.metric_tbl, dictionary, segmentFactory));
+        metrics = metricsMap(input.metric_tbl, dictionary, segmentFactory);
     }
 
     private static Map<MetricName, SegmentReader<RTFMetricTable>> metricsMap(tables_metric tmArray[], DictionaryDelta dictionary, SegmentReader.Factory<XdrAble> segmentFactory) {
@@ -63,7 +65,9 @@ public class RTFGroupTable {
                         tm -> segmentFactory.get(metric_table::new, FromXdr.filePos(tm.pos))
                                 .map(mt -> new RTFMetricTable(mt, dictionary))
                                 .peek(RTFMetricTable::validate)
-                                .cache()));
+                                .cache(),
+                        (a, b) -> { throw new DecodingException("duplicate metric reference"); },
+                        () -> new THashMap<>(1, 1)));
     }
 
     public void validate() {}
@@ -73,7 +77,7 @@ public class RTFGroupTable {
     }
 
     public Set<MetricName> getMetricNames() {
-        return metrics.keySet();
+        return unmodifiableSet(metrics.keySet());
     }
 
     public SegmentReader<RTFMetricTable> getMetric(MetricName name) {

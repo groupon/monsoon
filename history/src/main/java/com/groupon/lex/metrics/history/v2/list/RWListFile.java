@@ -42,9 +42,6 @@ import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.validateHeaderOrThrow;
 import static com.groupon.lex.metrics.history.xdr.Const.writeMimeHeader;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
-import com.groupon.lex.metrics.history.xdr.support.ForwardSequence;
-import com.groupon.lex.metrics.history.xdr.support.ObjectSequence;
-import com.groupon.lex.metrics.history.xdr.support.ReverseSequence;
 import com.groupon.lex.metrics.history.xdr.support.reader.Crc32VerifyingFileReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
@@ -55,6 +52,9 @@ import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import com.groupon.lex.metrics.lib.GCCloseable;
+import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
+import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
+import com.groupon.lex.metrics.lib.sequence.ReverseSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -114,7 +114,7 @@ public class RWListFile implements TSData {
         try {
             try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(file.get(), 0), MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN), 0))) {
                 writer.beginEncoding();
-                writeMimeHeader(writer, FILE_VERSION, (short)0);
+                writeMimeHeader(writer, FILE_VERSION, (short) 0);
                 hdr.xdrEncode(writer);
                 writer.endEncoding();
             }
@@ -138,9 +138,14 @@ public class RWListFile implements TSData {
     }
 
     @Override
-    public short getMajor() { return FILE_VERSION; }
+    public short getMajor() {
+        return FILE_VERSION;
+    }
+
     @Override
-    public short getMinor() { return 0; }
+    public short getMinor() {
+        return 0;
+    }
 
     @Override
     public Optional<GCCloseable<FileChannel>> getFileChannel() {
@@ -155,7 +160,8 @@ public class RWListFile implements TSData {
     @Override
     public int size() {
         final ObjectSequence<SegmentReader<TimeSeriesCollection>> seq = state.sequence();
-        if (seq.isSorted() && seq.isDistinct()) return seq.size();
+        if (seq.isSorted() && seq.isDistinct())
+            return seq.size();
         return fixSequence(state.decodedSequence()).size();
     }
 
@@ -185,9 +191,14 @@ public class RWListFile implements TSData {
     }
 
     @Override
-    public boolean canAddSingleRecord() { return true; }
+    public boolean canAddSingleRecord() {
+        return true;
+    }
+
     @Override
-    public boolean isOptimized() { return false; }
+    public boolean isOptimized() {
+        return false;
+    }
 
     @Override
     public long getFileSize() {

@@ -29,31 +29,42 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.groupon.lex.metrics.history.xdr.support;
+package com.groupon.lex.metrics.lib.sequence;
 
+import static java.util.Collections.emptyIterator;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Spliterator;
-import java.util.function.IntFunction;
-import java.util.function.Supplier;
-import java.util.stream.IntStream;
+import static java.util.Spliterators.emptySpliterator;
+import java.util.stream.Stream;
 
-public interface Sequence {
-    public Spliterator.OfInt spliterator();
-    public Iterator<Integer> iterator();
-    public IntStream stream();
-    public IntStream parallelStream();
-    public Sequence reverse();
-    public int size();
+public class EmptyObjectSequence<T> implements ObjectSequence<T> {
+    @Override
+    public boolean isSorted() { return true; }
+    @Override
+    public boolean isNonnull() { return true; }
+    @Override
+    public boolean isDistinct() { return true; }
 
-    public default boolean isEmpty() {
-        return size() == 0;
+    @Override
+    public T get(int index) {
+        throw new NoSuchElementException("index " + index + " out of bounds [0..0)");
     }
 
-    public default <T> ObjectSequence<T> map(IntFunction<? extends T> fn, boolean sorted, boolean nonnull, boolean distinct) {
-        return new ObjectSequence<>(this, () -> fn, sorted, nonnull, distinct);
-    }
+    @Override
+    public Iterator<T> iterator() { return emptyIterator(); }
+    @Override
+    public Spliterator<T> spliterator() { return emptySpliterator(); }
+    @Override
+    public Stream<T> stream() { return Stream.empty(); }
+    @Override
+    public Stream<T> parallelStream() { return Stream.empty(); }
 
-    public default <T> ObjectSequence<T> mapSupplied(Supplier<? extends IntFunction<? extends T>> fn, boolean sorted, boolean nonnull, boolean distinct) {
-        return new ObjectSequence<>(this, fn, sorted, nonnull, distinct);
-    }
+    @Override
+    public int size() { return 0; }
+    @Override
+    public boolean isEmpty() { return true; }
+
+    @Override
+    public ObjectSequence<T> reverse() { return this; }
 }

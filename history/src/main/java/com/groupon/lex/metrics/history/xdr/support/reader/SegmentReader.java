@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.history.xdr.support.reader;
 
+import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import java.io.IOException;
 import java.lang.ref.Reference;
@@ -47,6 +48,18 @@ import org.acplt.oncrpc.OncRpcException;
 
 public interface SegmentReader<T> {
     public abstract T decode() throws IOException, OncRpcException;
+
+    public default <Exc extends Exception> T decodeOrThrow(Function<Exception, Exc> exc) throws Exc {
+        try {
+            return decode();
+        } catch (IOException | OncRpcException ex) {
+            throw exc.apply(ex);
+        }
+    }
+
+    public default T decodeOrThrow() throws DecodingException {
+        return decodeOrThrow((cause) -> new DecodingException("segment decode failed", cause));
+    }
 
     public static <T> SegmentReader<T> of(T v) {
         return () -> v;

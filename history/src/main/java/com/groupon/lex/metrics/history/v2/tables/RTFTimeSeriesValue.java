@@ -34,19 +34,14 @@ package com.groupon.lex.metrics.history.v2.tables;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.AbstractTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
-import java.io.IOException;
-import static java.util.Collections.unmodifiableMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.Getter;
-import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -56,25 +51,16 @@ import org.joda.time.DateTimeZone;
  */
 public class RTFTimeSeriesValue extends AbstractTimeSeriesValue {
     private final long ts;
+    private final int index;
     @Getter
     private final GroupName group;
-    private final Map<MetricName, SegmentReader<Optional<MetricValue>>> metrics;
+    private final RTFGroupTable tbl;
 
     public RTFTimeSeriesValue(long ts, int index, GroupName group, RTFGroupTable tbl) {
         this.ts = ts;
+        this.index = index;
         this.group = group;
-        this.metrics = unmodifiableMap(metrics(index, tbl.getMetrics()));
-    }
-
-    private static Map<MetricName, SegmentReader<Optional<MetricValue>>> metrics(int index, Map<MetricName, SegmentReader<RTFMetricTable>> input) {
-        return input.entrySet().stream()
-                .collect(Collectors.toMap(
-                        entry -> entry.getKey(),
-                        entry -> {
-                            return entry.getValue()
-                                    .map(tbl -> tbl.get(index))
-                                    .cache();
-                        }));
+        this.tbl = tbl;
     }
 
     @Override
@@ -84,28 +70,18 @@ public class RTFTimeSeriesValue extends AbstractTimeSeriesValue {
 
     @Override
     public Map<MetricName, MetricValue> getMetrics() {
-        return metrics.entrySet().stream()
-                .map(entry -> {
-                    try {
-                        return entry.getValue().decode().map(mv -> SimpleMapEntry.create(entry.getKey(), mv));
-                    } catch (IOException | OncRpcException ex) {
-                        throw new DecodingException("decoding error", ex);
-                    }
-                })
-                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        return tbl.getMetrics().entrySet().stream()
+                .map(entry -> SimpleMapEntry.create(entry.getKey(), entry.getValue().decodeOrThrow()))
+                .filter(entry -> entry.getValue().contains(index))
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().get(index)));
     }
 
     @Override
     public Optional<MetricValue> findMetric(MetricName name) {
-        return Optional.ofNullable(metrics.get(name))
-                .flatMap(segment -> {
-                    try {
-                        return segment.decode();
-                    } catch (IOException | OncRpcException ex) {
-                        throw new DecodingException("decoding error", ex);
-                    }
-                });
+        return Optional.ofNullable(tbl.getMetrics().get(name))
+                .map(SegmentReader::decodeOrThrow)
+                .filter(mvTbl -> mvTbl.contains(index))
+                .map(mvTbl -> mvTbl.get(index));
     }
 
     @Override

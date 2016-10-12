@@ -1,6 +1,9 @@
 typedef hyper timestamp_msec;
 typedef string string_val<>;  /* makes working with lists of strings easier */
-typedef int timestamp_delta<>;  /* delta encoding: each value is difference (msec) since predecessor. */
+struct timestamp_delta {
+  hyper first;  /* value of timestamp[0] */
+  int delta<>;  /* delta encoding: each value is difference (msec) since predecessor, timestamp[0] is omitted. */
+};
 
 /*
  * Bitset.
@@ -129,10 +132,13 @@ struct tsdata {
     int reserved;  /* Pads to multiple of 8 bytes, once CRC following this is considered. */
 };
 
-struct file_data_tables {
+struct file_data_tables_block {
     timestamp_delta tsd;
-    dictionary_delta dictionary;  /* complete dictionary */
-    tables tables_data;
+    file_segment dictionary;  /* references dictionary_delta, complete dictionary for this block */
+    file_segment tables_data;  /* references tables */
+};
+struct file_data_tables {
+    file_data_tables_block blocks<>;
 };
 
 /*
@@ -163,7 +169,6 @@ struct tables_group {
     int group_ref;  /* reference to dictionary path */
     tables_tag tag_tbl<>;
 };
-
 typedef tables_group tables<>;
 
 struct tables_metric {
