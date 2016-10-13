@@ -183,7 +183,7 @@ public interface ObjectSequence<T> extends Iterable<T> {
         if (isSorted())
             return this;
 
-        return new SortedObjectSequence<>(this, (Comparator<? super T>) getComparator());
+        return new SortedObjectSequence<>(this, (Comparator<? super T>) Comparator.naturalOrder());
     }
 
     public static <T> Comparator<T> reverseComparator(Comparator<T> cmp) {
