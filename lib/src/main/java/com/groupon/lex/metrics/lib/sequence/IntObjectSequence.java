@@ -54,10 +54,16 @@ public class IntObjectSequence<T> implements ObjectSequence<T> {
     @Getter
     private final boolean sorted, nonnull, distinct;
 
+    @Override
     public T get(int index) {
         if (index < 0 || index >= size())
             throw new NoSuchElementException("index " + index + " out of bounds [0.." + size() + ")");
         return fn.apply(underlying.get(index));
+    }
+
+    @Override
+    public <C extends Comparable<? super C>> Comparator<C> getComparator() {
+        return sorted ? underlying.getComparator() : null;
     }
 
     @Override
@@ -82,15 +88,19 @@ public class IntObjectSequence<T> implements ObjectSequence<T> {
 
     @Override
     public IntObjectSequence<T> limit(int n) {
-        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
-        if (n == size()) return this;
+        if (n < 0 || n > size())
+            throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == size())
+            return this;
         return new IntObjectSequence<>(underlying.limit(n), fn, sorted, nonnull, distinct);
     }
 
     @Override
     public IntObjectSequence<T> skip(int n) {
-        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
-        if (n == 0) return this;
+        if (n < 0 || n > size())
+            throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == 0)
+            return this;
         return new IntObjectSequence<>(underlying.skip(n), fn, sorted, nonnull, distinct);
     }
 
@@ -122,9 +132,14 @@ public class IntObjectSequence<T> implements ObjectSequence<T> {
         private final IntFunction<? extends T> fn;
 
         @Override
-        public boolean hasNext() { return underlying.hasNext(); }
+        public boolean hasNext() {
+            return underlying.hasNext();
+        }
+
         @Override
-        public T next() { return fn.apply(underlying.next()); }
+        public T next() {
+            return fn.apply(underlying.next());
+        }
     }
 
     @RequiredArgsConstructor
@@ -167,9 +182,9 @@ public class IntObjectSequence<T> implements ObjectSequence<T> {
 
         @Override
         public Comparator<? super T> getComparator() {
-            if ((characteristics & Spliterator.SORTED) == 0)
+            if (!hasCharacteristics(Spliterator.SORTED))
                 throw new IllegalStateException();
-            return (Comparator)underlying.getComparator();
+            return (Comparator<? super T>) underlying.getComparator();
         }
     }
 }

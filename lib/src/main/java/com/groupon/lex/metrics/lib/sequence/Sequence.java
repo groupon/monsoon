@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.lib.sequence;
 
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Spliterator;
 import java.util.function.IntFunction;
@@ -52,11 +53,28 @@ public interface Sequence extends Iterable<Integer> {
 
     public int size();
 
+    /**
+     * Yields the comparator that orders this sequence.
+     *
+     * Sequences are compared either in natural order or reverse order.
+     *
+     * @return The comparator comparing this sequence.
+     */
+    public <C extends Comparable<? super C>> Comparator<C> getComparator();
+
     public int get(int n);
 
     public Sequence skip(int n);
 
     public Sequence limit(int n);
+
+    public default int[] toArray() {
+        final int size = size();
+        int result[] = new int[size];
+        for (int i = 0; i < size; ++i)
+            result[i] = get(i);
+        return result;
+    }
 
     public default boolean isEmpty() {
         return size() == 0;

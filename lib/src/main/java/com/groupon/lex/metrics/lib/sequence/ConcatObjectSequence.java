@@ -33,6 +33,7 @@ package com.groupon.lex.metrics.lib.sequence;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
@@ -50,10 +51,12 @@ public class ConcatObjectSequence<T> implements ObjectSequence<T> {
     private final int endOffsetList[];  // Contains offset at end of corresponding list entry.
     @Getter
     private final boolean sorted, nonnull, distinct;
+    private final Comparator<?> comparator;
 
     public ConcatObjectSequence(ObjectSequence<T> list[], boolean sorted, boolean distinct) {
         this.list = Arrays.copyOf(list, list.length);
-        this.sorted = sorted && Arrays.stream(this.list).allMatch(ObjectSequence::isSorted);
+        this.comparator = matchingComparator(list);
+        this.sorted = sorted && this.comparator != null && Arrays.stream(this.list).allMatch(ObjectSequence::isSorted);
         this.nonnull = Arrays.stream(this.list).allMatch(ObjectSequence::isNonnull);
         this.distinct = distinct && Arrays.stream(this.list).allMatch(ObjectSequence::isDistinct);
 
@@ -69,6 +72,16 @@ public class ConcatObjectSequence<T> implements ObjectSequence<T> {
         this(list.toArray(new ObjectSequence[list.size()]), sorted, distinct);
     }
 
+    private static Comparator<?> matchingComparator(ObjectSequence<?> list[]) {
+        if (list.length == 0)
+            return Comparator.naturalOrder();
+        Comparator<?> c = list[0].getComparator();
+        for (int i = 1; i < list.length; ++i)
+            if (c != list[i].getComparator())
+                return null;
+        return c;
+    }
+
     @Override
     public T get(int index) throws NoSuchElementException {
         final int subIndex = new ForwardSequence(0, list.length)
@@ -81,13 +94,18 @@ public class ConcatObjectSequence<T> implements ObjectSequence<T> {
     }
 
     @Override
+    public <C extends Comparable<? super C>> Comparator<C> getComparator() {
+        return (Comparator<C>) comparator;
+    }
+
+    @Override
     public Iterator<T> iterator() {
         return new IteratorImpl<>(list);
     }
 
     @Override
     public Spliterator<T> spliterator() {
-        return new SpliteratorImpl<>(list, spliteratorCharacteristics());
+        return new SpliteratorImpl<>(list, spliteratorCharacteristics(), getComparator());
     }
 
     @Override
@@ -157,17 +175,20 @@ public class ConcatObjectSequence<T> implements ObjectSequence<T> {
         private final Spliterator<T> spliters[];
         private int index = 0;
         private final int characteristics;
+        private final Comparator<?> comparator;
 
-        public SpliteratorImpl(ObjectSequence<T> list[], int characteristics) {
+        public SpliteratorImpl(ObjectSequence<T> list[], int characteristics, Comparator<?> comparator) {
             this.spliters = new Spliterator[list.length];
             this.characteristics = characteristics;
             for (int i = 0; i < list.length; ++i)
                 spliters[i] = list[i].spliterator();
+            this.comparator = comparator;
         }
 
-        private SpliteratorImpl(Spliterator<T> spliters[], int characteristics) {
+        private SpliteratorImpl(Spliterator<T> spliters[], int characteristics, Comparator<?> comparator) {
             this.spliters = spliters;
             this.characteristics = characteristics;
+            this.comparator = comparator;
         }
 
         @Override
@@ -207,7 +228,7 @@ public class ConcatObjectSequence<T> implements ObjectSequence<T> {
             Spliterator<T> splittedList[] = Arrays.copyOfRange(spliters, index, index + splitLen);
             Arrays.fill(spliters, index, index + splitLen, null);  // Release resources.
             index += splitLen;
-            return new SpliteratorImpl<>(splittedList, characteristics);
+            return new SpliteratorImpl<>(splittedList, characteristics, comparator);
         }
 
         @Override
@@ -221,6 +242,13 @@ public class ConcatObjectSequence<T> implements ObjectSequence<T> {
         @Override
         public int characteristics() {
             return characteristics;
+        }
+
+        @Override
+        public Comparator<? super T> getComparator() {
+            if (!hasCharacteristics(Spliterator.SORTED))
+                throw new IllegalStateException();
+            return (Comparator<? super T>) comparator;
         }
     }
 }

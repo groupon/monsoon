@@ -34,6 +34,7 @@ package com.groupon.lex.metrics.lib.sequence;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
@@ -54,6 +55,8 @@ public interface ObjectSequence<T> extends Iterable<T> {
     public boolean isDistinct();
 
     public T get(int index) throws NoSuchElementException;
+
+    public <C extends Comparable<? super C>> Comparator<C> getComparator();
 
     public Iterator<T> iterator();
 
@@ -78,7 +81,7 @@ public interface ObjectSequence<T> extends Iterable<T> {
     }
 
     public static <T> ObjectSequence<T> empty() {
-        return new EmptyObjectSequence<>();
+        return new EmptyObjectSequence<>(Comparator.naturalOrder());
     }
 
     public default <R> ObjectSequence<R> map(Function<? super T, ? extends R> fn, boolean sorted, boolean nonnull, boolean distinct) {
@@ -174,5 +177,22 @@ public interface ObjectSequence<T> extends Iterable<T> {
      */
     public default EqualRange equalRange(ToIntFunction<? super T> cmpFn) {
         return new ForwardSequence(0, size()).equalRange((idx) -> cmpFn.applyAsInt(get(idx)));
+    }
+
+    public default ObjectSequence<T> sort() {
+        if (isSorted())
+            return this;
+
+        return new SortedObjectSequence<>(this, (Comparator<? super T>) Comparator.naturalOrder());
+    }
+
+    public static <T> Comparator<T> reverseComparator(Comparator<T> cmp) {
+        assert (cmp == Comparator.naturalOrder() || cmp == Comparator.reverseOrder() || cmp == null);
+        if (cmp == Comparator.naturalOrder())
+            return (Comparator<T>) Comparator.reverseOrder();
+        else if (cmp == Comparator.reverseOrder())
+            return (Comparator<T>) Comparator.naturalOrder();
+        else
+            return null;
     }
 }

@@ -33,9 +33,11 @@ package com.groupon.lex.metrics.lib.sequence;
 
 import java.lang.ref.Reference;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -84,6 +86,11 @@ public class CachingObjectSequence<T> implements ObjectSequence<T> {
     }
 
     @Override
+    public <C extends Comparable<? super C>> Comparator<C> getComparator() {
+        return underlying.getComparator();
+    }
+
+    @Override
     public Iterator<T> iterator() {
         return new ForwardSequence(0, size())
                 .map(this::get, isSorted(), isNonnull(), isDistinct())
@@ -92,9 +99,7 @@ public class CachingObjectSequence<T> implements ObjectSequence<T> {
 
     @Override
     public Spliterator<T> spliterator() {
-        return new ForwardSequence(0, size())
-                .map(this::get, isSorted(), isNonnull(), isDistinct())
-                .spliterator();
+        return new SpliteratorImpl();
     }
 
     @Override
@@ -134,12 +139,65 @@ public class CachingObjectSequence<T> implements ObjectSequence<T> {
             T result;
             if (reference != null) {
                 result = reference.get();
-                if (result != null) return result;
+                if (result != null)
+                    return result;
             }
 
             result = supplier.get();
-            if (result != null) reference = referenceBuilder.apply(result);
+            if (result != null)
+                reference = referenceBuilder.apply(result);
             return result;
+        }
+    }
+
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    private class SpliteratorImpl implements Spliterator<T> {
+        private int index = 0;
+        private int end = cache.length;
+
+        public SpliteratorImpl() {
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super T> action) {
+            if (index == end)
+                return false;
+            action.accept(get(index++));
+            return true;
+        }
+
+        @Override
+        public void forEachRemaining(Consumer<? super T> action) {
+            while (index < end)
+                action.accept(get(index++));
+        }
+
+        @Override
+        public Spliterator<T> trySplit() {
+            if (end - index < 2)
+                return null;
+            final int splitLen = (end - index) / 2;
+
+            SpliteratorImpl result = new SpliteratorImpl(index, index + splitLen);
+            index += splitLen;
+            return result;
+        }
+
+        @Override
+        public long estimateSize() {
+            return end - index;
+        }
+
+        @Override
+        public int characteristics() {
+            return spliteratorCharacteristics();
+        }
+
+        @Override
+        public Comparator<? super T> getComparator() {
+            if (!hasCharacteristics(Spliterator.SORTED))
+                throw new IllegalStateException();
+            return (Comparator<? super T>) CachingObjectSequence.this.getComparator();
         }
     }
 }

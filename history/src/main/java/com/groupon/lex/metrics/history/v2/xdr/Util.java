@@ -31,24 +31,30 @@
  */
 package com.groupon.lex.metrics.history.v2.xdr;
 
+import com.groupon.lex.metrics.GroupName;
+import com.groupon.lex.metrics.SimpleGroupPath;
 import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.support.ByteCountingXdrEncodingStream.xdrSize;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import static com.groupon.lex.metrics.history.xdr.support.reader.Crc32Reader.CRC_LEN;
-import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
 import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
-import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.AbstractTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Queue;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.NonNull;
+import org.joda.time.DateTime;
 
 public class Util {
     /**
@@ -83,47 +89,42 @@ public class Util {
      * Fix a sequence to contain only distinct, sorted elements.
      */
     public static ObjectSequence<TimeSeriesCollection> fixSequence(ObjectSequence<TimeSeriesCollection> seq) {
-        if (seq.isSorted() && seq.isDistinct()) {
-            return seq;
-        }
+        seq = seq.sort();  // Does nothing if already sorted.
 
-        final List<TimeSeriesCollection> collection = seq.stream().collect(Collectors.toList());
-        if (!seq.isSorted()) {
-            Collections.sort(collection);
-        }
-
-        if (!seq.isDistinct() && !collection.isEmpty()) {
+        if (!seq.isDistinct() && !seq.isEmpty()) {
+            List<ObjectSequence<TimeSeriesCollection>> toConcat = new ArrayList<>();
+            int lastGoodIdx = 0;
             int curIdx = 0;
 
-            while (curIdx < collection.size()) {
-                final TimeSeriesCollection curElem = collection.get(curIdx);
+            while (curIdx < seq.size()) {
+                final TimeSeriesCollection curElem = seq.get(curIdx);
 
                 // Find first item with different timestamp.
                 int nextIdx = curIdx + 1;
-                while (nextIdx < collection.size()
-                        && curElem.getTimestamp().equals(collection.get(nextIdx).getTimestamp())) {
+                while (nextIdx < seq.size()
+                        && curElem.getTimestamp().equals(seq.get(nextIdx).getTimestamp())) {
                     ++nextIdx;
                 }
 
                 // If more than 1 adjecent element share timestamp, merge them together.
                 if (curIdx + 1 < nextIdx) {
-                    // XXX this is expensive, use lazy merge instead!
-                    TimeSeriesCollection replacement = new SimpleTimeSeriesCollection(curElem.getTimestamp(), collection.subList(curIdx, nextIdx).stream()
-                            .flatMap(tsc -> tsc.getTSValues().stream())
-                            .collect(Collectors.toMap(TimeSeriesValue::getGroup, Function.identity(), (x, y) -> x))
-                            .values()
-                            .stream());
-                    collection.set(curIdx, replacement);  // Replace current element.
-                    collection.subList(curIdx + 1, nextIdx).clear();  // Drop remaining duplicate elements.
-                }
+                    toConcat.add(seq.limit(curIdx).skip(lastGoodIdx));
 
-                // Advance curIdx.
-                ++curIdx;
+                    TimeSeriesCollection replacement = new LazyMergedTSC(seq.limit(nextIdx).skip(curIdx));
+                    toConcat.add(ObjectSequence.of(true, true, true, replacement));
+                    lastGoodIdx = curIdx = nextIdx;
+                } else {
+                    // Advance curIdx.
+                    ++curIdx;
+                }
             }
+
+            if (lastGoodIdx < curIdx)
+                toConcat.add(seq.skip(lastGoodIdx));
+            seq = ObjectSequence.concat(toConcat, true, true);
         }
 
-        return new ForwardSequence(0, collection.size())
-                .map(collection::get, true, true, true);
+        return seq;
     }
 
     /**
@@ -193,5 +194,65 @@ public class Util {
         }
 
         return ObjectSequence.concat(output, true, true);
+    }
+
+    private static class LazyMergedTSC extends AbstractTimeSeriesCollection {
+        private final ObjectSequence<TimeSeriesCollection> underlying;
+
+        public LazyMergedTSC(@NonNull ObjectSequence<TimeSeriesCollection> underlying) {
+            this.underlying = underlying;
+            if (underlying.isEmpty())
+                throw new IllegalArgumentException("cannot merge 0 TimeSeriesCollections");
+        }
+
+        @Override
+        public DateTime getTimestamp() {
+            return underlying.first().getTimestamp();
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return underlying.stream()
+                    .allMatch(TimeSeriesCollection::isEmpty);
+        }
+
+        @Override
+        public Set<GroupName> getGroups() {
+            return underlying.stream()
+                    .flatMap(tsc -> tsc.getGroups().stream())
+                    .collect(Collectors.toSet());
+        }
+
+        @Override
+        public Set<SimpleGroupPath> getGroupPaths() {
+            return underlying.stream()
+                    .flatMap(tsc -> tsc.getGroupPaths().stream())
+                    .collect(Collectors.toSet());
+        }
+
+        @Override
+        public Collection<TimeSeriesValue> getTSValues() {
+            return underlying.stream()
+                    .flatMap(tsc -> tsc.getTSValues().stream())
+                    .collect(Collectors.toMap(TimeSeriesValue::getGroup, Function.identity(), (a, b) -> a))
+                    .values();
+        }
+
+        @Override
+        public TimeSeriesValueSet getTSValue(SimpleGroupPath name) {
+            return new TimeSeriesValueSet(underlying.stream()
+                    .flatMap(tsc -> tsc.getTSValue(name).stream())
+                    .collect(Collectors.toMap(TimeSeriesValue::getGroup, Function.identity(), (a, b) -> a))
+                    .values());
+        }
+
+        @Override
+        public Optional<TimeSeriesValue> get(GroupName name) {
+            return underlying.stream()
+                    .map(tsc -> tsc.get(name))
+                    .filter(Optional::isPresent)
+                    .map(Optional::get)
+                    .findFirst();
+        }
     }
 }

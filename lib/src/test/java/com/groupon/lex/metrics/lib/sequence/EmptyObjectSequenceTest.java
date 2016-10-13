@@ -5,7 +5,6 @@ import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 import org.hamcrest.Matchers;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
@@ -22,7 +21,6 @@ public class EmptyObjectSequenceTest {
         assertEquals(0, empty.size());
         assertThat(empty, Matchers.emptyIterable());
         assertEquals(EMPTY_LIST, empty.stream().collect(Collectors.toList()));
-        assertSame(empty, empty.reverse());
     }
 
     @Test(expected = NoSuchElementException.class)

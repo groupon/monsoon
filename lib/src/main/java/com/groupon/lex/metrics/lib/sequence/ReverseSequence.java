@@ -49,7 +49,12 @@ import lombok.Value;
 public class ReverseSequence implements Sequence {
     public static int SPLITERATOR_CHARACTERISTICS = ForwardSequence.SPLITERATOR_CHARACTERISTICS;
     private final int begin, end;
-    
+
+    @Override
+    public <C extends Comparable<? super C>> Comparator<C> getComparator() {
+        return Comparator.reverseOrder();
+    }
+
     @Override
     public int get(int n) {
         if (n < 0 || n >= size())
@@ -59,15 +64,19 @@ public class ReverseSequence implements Sequence {
 
     @Override
     public ReverseSequence limit(int n) {
-        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
-        if (n == size()) return this;
+        if (n < 0 || n > size())
+            throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == size())
+            return this;
         return new ReverseSequence(end - n, end);
     }
 
     @Override
     public ReverseSequence skip(int n) {
-        if (n < 0 || n > size()) throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
-        if (n == 0) return this;
+        if (n < 0 || n > size())
+            throw new NoSuchElementException("index " + n + " outside range [0.." + size() + "]");
+        if (n == 0)
+            return this;
         return new ReverseSequence(begin, end - n);
     }
 
@@ -107,10 +116,14 @@ public class ReverseSequence implements Sequence {
         private int end;
 
         @Override
-        public boolean hasNext() { return begin < end; }
+        public boolean hasNext() {
+            return begin < end;
+        }
+
         @Override
         public Integer next() {
-            if (begin >= end) throw new NoSuchElementException();
+            if (begin >= end)
+                throw new NoSuchElementException();
             return --end;
         }
     }
@@ -122,20 +135,23 @@ public class ReverseSequence implements Sequence {
 
         @Override
         public boolean tryAdvance(IntConsumer action) {
-            if (begin >= end) return false;
+            if (begin >= end)
+                return false;
             action.accept(--end);
             return true;
         }
 
         @Override
         public void forEachRemaining(IntConsumer action) {
-            for (int i = end; i > begin; --i) action.accept(i - 1);
+            for (int i = end; i > begin; --i)
+                action.accept(i - 1);
             end = begin;
         }
 
         @Override
         public Spliterator.OfInt trySplit() {
-            if (begin >= end || end - begin < 2) return null;
+            if (begin >= end || end - begin < 2)
+                return null;
 
             final int split = begin + (end - begin) / 2;
             final int rvEnd = end;
@@ -154,6 +170,8 @@ public class ReverseSequence implements Sequence {
         }
 
         @Override
-        public Comparator<Integer> getComparator() { return Comparator.reverseOrder(); }
+        public Comparator<Integer> getComparator() {
+            return Comparator.reverseOrder();
+        }
     };
 }
