@@ -5,35 +5,29 @@
  */
 package com.groupon.lex.metrics.history.xdr.support.writer;
 
-import com.groupon.lex.metrics.history.xdr.support.reader.LzoReader;
 import java.io.IOException;
 import java.io.OutputStream;
 import static java.lang.Math.min;
 import java.nio.ByteBuffer;
 import lombok.NonNull;
-import org.anarres.lzo.LzoAlgorithm;
-import org.anarres.lzo.LzoCompressor;
-import org.anarres.lzo.LzoLibrary;
-import org.anarres.lzo.LzoOutputStream;
+import org.iq80.snappy.SnappyFramedOutputStream;
 
 /**
  *
  * @author ariane
  */
-public class LzoWriter implements FileWriter {
-    public static final LzoAlgorithm ALGORITHM = LzoReader.ALGORITHM;
-    private final LzoOutputStream lzo;
+public class SnappyWriter implements FileWriter {
+    private final SnappyFramedOutputStream snappy;
 
-    public LzoWriter(@NonNull FileWriter out) throws IOException {
-        LzoCompressor compressor = LzoLibrary.getInstance().newCompressor(ALGORITHM, null);
-        this.lzo = new LzoOutputStream(new Adapter(out), compressor, 64 * 1024);
+    public SnappyWriter(@NonNull FileWriter out) throws IOException {
+        this.snappy = new SnappyFramedOutputStream(new Adapter(out));
     }
 
     @Override
     public int write(ByteBuffer data) throws IOException {
         if (data.hasArray()) {
             final int wlen = data.remaining();
-            lzo.write(data.array(), data.arrayOffset() + data.position(), wlen);
+            snappy.write(data.array(), data.arrayOffset() + data.position(), wlen);
             data.position(data.limit());
             return wlen;
         } else {
@@ -42,7 +36,7 @@ public class LzoWriter implements FileWriter {
             while (data.hasRemaining()) {
                 final int buflen = min(data.remaining(), buf.length);
                 data.get(buf, 0, buflen);
-                lzo.write(buf, 0, buflen);
+                snappy.write(buf, 0, buflen);
                 written += buflen;
             }
             return written;
@@ -51,7 +45,7 @@ public class LzoWriter implements FileWriter {
 
     @Override
     public void close() throws IOException {
-        lzo.close();
+        snappy.close();
     }
 
     @Override

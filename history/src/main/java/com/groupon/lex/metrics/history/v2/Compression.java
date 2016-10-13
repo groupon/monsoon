@@ -3,19 +3,19 @@ package com.groupon.lex.metrics.history.v2;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.GzipReader;
-import com.groupon.lex.metrics.history.xdr.support.reader.LzoReader;
+import com.groupon.lex.metrics.history.xdr.support.reader.SnappyReader;
 import com.groupon.lex.metrics.history.xdr.support.writer.FileWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.GzipWriter;
-import com.groupon.lex.metrics.history.xdr.support.writer.LzoWriter;
+import com.groupon.lex.metrics.history.xdr.support.writer.SnappyWriter;
 import java.io.IOException;
 import static java.util.Objects.requireNonNull;
 
 public enum Compression {
     NONE(0, in -> in, out -> out),
     GZIP(header_flags.GZIP, in -> new GzipReader(in), out -> new GzipWriter(out)),
-    LZO(header_flags.LZO, in -> new LzoReader(in), out -> new LzoWriter(out));
+    SNAPPY(header_flags.SNAPPY, in -> new SnappyReader(in), out -> new SnappyWriter(out));
 
-    public static final Compression DEFAULT = LZO;
+    public static final Compression DEFAULT = SNAPPY;
 
     public final int compressionFlag;
     private final WrapReaderFunctor reader;

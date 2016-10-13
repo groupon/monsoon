@@ -6,24 +6,18 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import lombok.NonNull;
-import org.anarres.lzo.LzoAlgorithm;
-import org.anarres.lzo.LzoDecompressor;
-import org.anarres.lzo.LzoInputStream;
-import org.anarres.lzo.LzoLibrary;
+import org.iq80.snappy.SnappyFramedInputStream;
 
-public class LzoReader implements FileReader {
-    public static final LzoAlgorithm ALGORITHM = LzoAlgorithm.LZO1X;
-    private final LzoInputStream lzo;
+public class SnappyReader implements FileReader {
+    private final SnappyFramedInputStream snappy;
     private final boolean validateAllRead;
 
-    public LzoReader(FileReader in, boolean validateAllRead) {
-        LzoDecompressor decompressor = LzoLibrary.getInstance().newDecompressor(ALGORITHM, null);
-        this.lzo = new LzoInputStream(new Adapter(in), decompressor);
-        this.lzo.setInputBufferSize(64 * 1024);
+    public SnappyReader(FileReader in, boolean validateAllRead) throws IOException {
+        this.snappy = new SnappyFramedInputStream(new Adapter(in), true);
         this.validateAllRead = validateAllRead;
     }
 
-    public LzoReader(FileReader in) {
+    public SnappyReader(FileReader in) throws IOException {
         this(in, true);
     }
 
@@ -31,12 +25,12 @@ public class LzoReader implements FileReader {
     public int read(ByteBuffer data) throws IOException {
         final int rlen;
         if (data.hasArray()) {
-            rlen = lzo.read(data.array(), data.arrayOffset() + data.position(), data.remaining());
+            rlen = snappy.read(data.array(), data.arrayOffset() + data.position(), data.remaining());
             if (rlen > 0)
                 data.position(data.position() + rlen);
         } else {
             byte tmp[] = new byte[data.remaining()];
-            rlen = lzo.read(tmp);
+            rlen = snappy.read(tmp);
             if (rlen > 0)
                 data.put(tmp, 0, rlen);
         }
@@ -49,10 +43,10 @@ public class LzoReader implements FileReader {
     @Override
     public void close() throws IOException {
         if (validateAllRead) {
-            if (lzo.read() != -1)
+            if (snappy.read() != -1)
                 throw new IOLengthVerificationFailed(0, 0);
         }
-        lzo.close();
+        snappy.close();
     }
 
     @Override
