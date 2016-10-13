@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.history.xdr.support.writer;
 
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelSegmentReader;
 import com.groupon.lex.metrics.lib.GCCloseable;
@@ -70,17 +71,17 @@ public class AbstractSegmentWriterTest {
     @Test
     public void write() throws Exception {
         GCCloseable<FileChannel> fd = new GCCloseable<>(FileChannel.open(file.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE));
-        FilePos pos = writeable.write(new AbstractSegmentWriter.Writer(fd.get(), 0, false), new long[]{ 9 });
+        FilePos pos = writeable.write(new AbstractSegmentWriter.Writer(fd.get(), 0, Compression.NONE), new long[]{9});
 
-        assertEquals(xdrAble, new FileChannelSegmentReader<>(XdrAbleImpl::new, fd, pos, false).decode());
+        assertEquals(xdrAble, new FileChannelSegmentReader<>(XdrAbleImpl::new, fd, pos, Compression.NONE).decode());
     }
 
     @Test
     public void writeCompressed() throws Exception {
         GCCloseable<FileChannel> fd = new GCCloseable<>(FileChannel.open(file.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE));
-        FilePos pos = writeable.write(new AbstractSegmentWriter.Writer(fd.get(), 0, true), new long[]{ 9 });
+        FilePos pos = writeable.write(new AbstractSegmentWriter.Writer(fd.get(), 0, Compression.DEFAULT), new long[]{9});
 
-        assertEquals(xdrAble, new FileChannelSegmentReader<>(XdrAbleImpl::new, fd, pos, true).decode());
+        assertEquals(xdrAble, new FileChannelSegmentReader<>(XdrAbleImpl::new, fd, pos, Compression.DEFAULT).decode());
     }
 
     @Data

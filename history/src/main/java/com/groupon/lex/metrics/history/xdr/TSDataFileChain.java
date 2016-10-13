@@ -1,6 +1,5 @@
 package com.groupon.lex.metrics.history.xdr;
 
-import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.v2.list.RWListFile;
 import com.groupon.lex.metrics.history.v2.tables.ToXdrTables;
@@ -8,6 +7,7 @@ import com.groupon.lex.metrics.history.xdr.TSDataScanDir.MetaData;
 import com.groupon.lex.metrics.history.xdr.support.FileUtil;
 import com.groupon.lex.metrics.history.xdr.support.MultiFileIterator;
 import com.groupon.lex.metrics.history.xdr.support.TSDataMap;
+import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.lang.ref.SoftReference;
@@ -49,6 +49,7 @@ import org.joda.time.DateTimeZone;
 
 /**
  * A writeable TSDataFile, that uses multiple underlying files.
+ *
  * @author ariane
  */
 public class TSDataFileChain implements TSData {
@@ -57,23 +58,24 @@ public class TSDataFileChain implements TSData {
     public static int MAX_FILERECORDS = 7220;
     private final long max_filesize_;
     private final int max_filerecords_ = MAX_FILERECORDS;
-    private static final boolean COMPRESS_ACTIVE_FILE = true;
-    private static final boolean COMPRESS_OPTIMIZED_FILE = true;
     private List<Future<?>> pendingTasks = new ArrayList<>();
 
-    /** Tests if there are any pending tasks to be completed. */
+    /**
+     * Tests if there are any pending tasks to be completed.
+     */
     public synchronized boolean hasPendingTasks() {
         Iterator<Future<?>> futIter = pendingTasks.iterator();
         while (futIter.hasNext()) {
             Future<?> fut = futIter.next();
-            if (fut.isDone()) futIter.remove();
+            if (fut.isDone())
+                futIter.remove();
         }
         return !pendingTasks.isEmpty();
     }
 
     public void waitPendingTasks() {
         final List<Future<?>> copy;
-        synchronized(this) {
+        synchronized (this) {
             copy = new ArrayList<>(pendingTasks);
         }
         for (Future<?> fut : copy) {
@@ -101,16 +103,27 @@ public class TSDataFileChain implements TSData {
             end_ = requireNonNull(end);
         }
 
-        public Path getFile() { return file_; }
-        public DateTime getBegin() { return begin_; }
-        public DateTime getEnd() { return end_; }
+        public Path getFile() {
+            return file_;
+        }
+
+        public DateTime getBegin() {
+            return begin_;
+        }
+
+        public DateTime getEnd() {
+            return end_;
+        }
 
         @Override
         public int compareTo(Key othr) {
             int cmp = 0;
-            if (cmp == 0) cmp = getBegin().compareTo(othr.getBegin());
-            if (cmp == 0) cmp = getEnd().compareTo(othr.getEnd());
-            if (cmp == 0) cmp = getFile().compareTo(othr.getFile());
+            if (cmp == 0)
+                cmp = getBegin().compareTo(othr.getBegin());
+            if (cmp == 0)
+                cmp = getEnd().compareTo(othr.getEnd());
+            if (cmp == 0)
+                cmp = getFile().compareTo(othr.getFile());
             return cmp;
         }
 
@@ -178,12 +191,14 @@ public class TSDataFileChain implements TSData {
 
     public static Optional<TSDataFileChain> openDirExisting(TSDataScanDir scandir, long max_filesize) {
         List<MetaData> files = scandir.getFiles();
-        if (files.isEmpty()) return Optional.empty();
+        if (files.isEmpty())
+            return Optional.empty();
 
         /* If the most recent file is upgradable, use that to append new records to. */
         Optional<MetaData> last = Optional.of(files.get(files.size() - 1))
                 .filter((md) -> md.isUpgradable());
-        if (last.isPresent()) files = files.subList(0, files.size() - 1);
+        if (last.isPresent())
+            files = files.subList(0, files.size() - 1);
         return Optional.of(new TSDataFileChain(scandir.getDir(), last.map(MetaData::getFileName), files, max_filesize));
     }
 
@@ -215,7 +230,8 @@ public class TSDataFileChain implements TSData {
     }
 
     private synchronized Optional<RWListFile> get_write_store_() throws IOException {
-        if (!write_filename_.isPresent()) return Optional.empty();
+        if (!write_filename_.isPresent())
+            return Optional.empty();
 
         try {
             RWListFile store = write_store_.get();
@@ -231,12 +247,14 @@ public class TSDataFileChain implements TSData {
 
     private synchronized RWListFile get_write_store_for_writing_(DateTime ts_trigger) throws IOException {
         Optional<RWListFile> opt_store = get_write_store_();
-        if (opt_store.filter((fd) -> fd.getFileSize() < max_filesize_ && fd.size() < max_filerecords_).isPresent()) return opt_store.get();
+        if (opt_store.filter((fd) -> fd.getFileSize() < max_filesize_ && fd.size() < max_filerecords_).isPresent())
+            return opt_store.get();
 
         try {
             return new_store_(opt_store, ts_trigger);
         } catch (IOException ex) {
-            if (opt_store.filter((fd) -> fd.getFileSize() < 2 * max_filesize_).isPresent()) return opt_store.get();
+            if (opt_store.filter((fd) -> fd.getFileSize() < 2 * max_filesize_).isPresent())
+                return opt_store.get();
             throw ex;
         }
     }
@@ -308,10 +326,10 @@ public class TSDataFileChain implements TSData {
                 .filter(tsd -> !begin.isAfter(tsd.getEnd()))
                 .collect(Collectors.toList());
         return StreamSupport.stream(
-                    Spliterators.spliteratorUnknownSize(
-                            new MultiFileIterator(files, Comparator.naturalOrder()),
-                            NONNULL | IMMUTABLE | ORDERED | DISTINCT),
-                    false)
+                Spliterators.spliteratorUnknownSize(
+                        new MultiFileIterator(files, Comparator.naturalOrder()),
+                        NONNULL | IMMUTABLE | ORDERED | DISTINCT),
+                false)
                 .filter(tsc -> !tsc.getTimestamp().isBefore(begin));
     }
 
@@ -321,10 +339,10 @@ public class TSDataFileChain implements TSData {
                 .filter(tsd -> !begin.isAfter(tsd.getEnd()) && !end.isBefore(tsd.getBegin()))
                 .collect(Collectors.toList());
         return StreamSupport.stream(
-                    Spliterators.spliteratorUnknownSize(
-                            new MultiFileIterator(files, Comparator.naturalOrder()),
-                            NONNULL | IMMUTABLE | ORDERED | DISTINCT),
-                    false)
+                Spliterators.spliteratorUnknownSize(
+                        new MultiFileIterator(files, Comparator.naturalOrder()),
+                        NONNULL | IMMUTABLE | ORDERED | DISTINCT),
+                false)
                 .filter(tsc -> !tsc.getTimestamp().isBefore(begin))
                 .filter(tsc -> !tsc.getTimestamp().isAfter(end));
     }
@@ -354,9 +372,10 @@ public class TSDataFileChain implements TSData {
 
     @Override
     public boolean contains(Object o) {
-        if (!(o instanceof TimeSeriesCollection)) return false;
+        if (!(o instanceof TimeSeriesCollection))
+            return false;
 
-        final TimeSeriesCollection tsv = (TimeSeriesCollection)o;
+        final TimeSeriesCollection tsv = (TimeSeriesCollection) o;
         final DateTime ts = tsv.getTimestamp();
         return stream_datafiles_()
                 .filter(tsd -> !ts.isBefore(tsd.getBegin()))
@@ -370,7 +389,7 @@ public class TSDataFileChain implements TSData {
         final List<TimeSeriesCollection> tsc_list;
         try {
             tsc_list = c.stream()
-                    .map(tsc -> (TimeSeriesCollection)tsc)
+                    .map(tsc -> (TimeSeriesCollection) tsc)
                     .collect(Collectors.toList());
         } catch (ClassCastException ex) {
             return false;  // Was not a TimeSeriesCollection.
@@ -423,11 +442,11 @@ public class TSDataFileChain implements TSData {
     public DateTime getEnd() {
         try {
             return Stream.concat(
-                            get_write_store_().map(Stream::of).orElseGet(Stream::empty)
-                                    .map(TSData::getEnd),
-                            read_stores_.keySet().stream()
-                                    .map(Key::getEnd)
-                    )
+                    get_write_store_().map(Stream::of).orElseGet(Stream::empty)
+                    .map(TSData::getEnd),
+                    read_stores_.keySet().stream()
+                    .map(Key::getEnd)
+            )
                     .max(Comparator.naturalOrder())
                     .orElseGet(() -> new DateTime(0, DateTimeZone.UTC));
         } catch (IOException ex) {
@@ -440,11 +459,11 @@ public class TSDataFileChain implements TSData {
     public DateTime getBegin() {
         try {
             return Stream.concat(
-                            get_write_store_().map(Stream::of).orElseGet(Stream::empty)
-                                    .map(TSData::getBegin),
-                            read_stores_.keySet().stream()
-                                    .map(Key::getBegin)
-                    )
+                    get_write_store_().map(Stream::of).orElseGet(Stream::empty)
+                    .map(TSData::getBegin),
+                    read_stores_.keySet().stream()
+                    .map(Key::getBegin)
+            )
                     .min(Comparator.naturalOrder())
                     .orElseGet(() -> new DateTime(0, DateTimeZone.UTC));
         } catch (IOException ex) {
@@ -473,9 +492,11 @@ public class TSDataFileChain implements TSData {
 
     /**
      * Attempts to compress the file denoted by the key.
+     *
      * @param file The key of the file to compress.
      * @param tsdata TSData, if it is opened.
-     * @return True if the file was compressed and the key was replaced, false otherwise.
+     * @return True if the file was compressed and the key was replaced, false
+     * otherwise.
      */
     private void compress_file_(Key file, TSData tsdata) throws IOException {
         if (tsdata == null) {
@@ -503,12 +524,12 @@ public class TSDataFileChain implements TSData {
 
             try {
                 try {
-                    tables.write(compressed_data, COMPRESS_OPTIMIZED_FILE);
+                    tables.write(compressed_data);
                 } catch (OncRpcException ex) {
                     throw new IOException("encoding failure", ex);
                 }
 
-                synchronized(this) {
+                synchronized (this) {
                     Files.delete(file.getFile());
                     read_stores_.remove(file);  // Remove if present.
                     read_stores_.put(new Key(new_filename, file.getBegin(), file.getEnd()), null);
@@ -524,7 +545,7 @@ public class TSDataFileChain implements TSData {
                 throw ex;
             } finally {
                 try {
-                    assert(compressed_data != null);
+                    assert (compressed_data != null);
                     compressed_data.close();
                 } catch (IOException ex) {
                     LOG.log(Level.WARNING, "unable to close optimized file {0}", new_filename);
@@ -562,7 +583,7 @@ public class TSDataFileChain implements TSData {
         final String prefix = String.format("monsoon-%04d%02d%02d-%02d%02d", begin.getYear(), begin.getMonthOfYear(), begin.getDayOfMonth(), begin.getHourOfDay(), begin.getMinuteOfHour());
         FileUtil.NamedFileChannel newFile = FileUtil.createNewFile(dir_, prefix, ".tsd");
         LOG.log(Level.INFO, "rotating into new file {0}", newFile.getFileName());
-        return install_new_store_(old_store, newFile.getFileName(), RWListFile.newFile(new GCCloseable<>(newFile.getFileChannel()), COMPRESS_ACTIVE_FILE));
+        return install_new_store_(old_store, newFile.getFileName(), RWListFile.newFile(new GCCloseable<>(newFile.getFileChannel())));
     }
 
     @Override
@@ -591,12 +612,16 @@ public class TSDataFileChain implements TSData {
                 .orElse(false);
     }
 
-    /** Retrieves keys (file metadata) for all files in this chain. */
+    /**
+     * Retrieves keys (file metadata) for all files in this chain.
+     */
     public Set<Key> getKeys() {
         return Collections.unmodifiableSet(read_stores_.keySet());
     }
 
-    /** Removes the file associated with the given key. */
+    /**
+     * Removes the file associated with the given key.
+     */
     public void delete(Key key) {
         if (!read_stores_.containsKey(key))
             throw new IllegalArgumentException("key not present");

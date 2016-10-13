@@ -12,20 +12,15 @@ import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.v2.list.FileListFileSupport;
-import com.groupon.lex.metrics.history.v2.list.RWListFile;
 import com.groupon.lex.metrics.history.v2.tables.FileTableFileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport0;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport1;
-import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
-import java.io.File;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collection;
 import static java.util.Collections.EMPTY_LIST;
@@ -52,7 +47,6 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -132,41 +126,6 @@ public class TSDataTest {
 
         final TSData fd = TSData.readonly(tmpfile);
         fd.addAll(tsdata);
-    }
-
-    /* This test is designed not to fit in memory. */
-    @Test
-    @Ignore
-    public void read_really_large_file() throws Exception {
-        final int FILESIZE = 32 * 1024 * 1024;
-        // Use the TSData writer to create this file.
-        int count = 0;
-        {
-            File collectionFile = File.createTempFile("monsoon-", "-TSDataTest--really_large");
-            collectionFile.deleteOnExit();
-            final TSData writer = RWListFile.newFile(new GCCloseable<>(FileChannel.open(collectionFile.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE)), true);
-            Iterator<TimeSeriesCollection> iter = create_tsdata_(FILESIZE).iterator();
-
-            while (writer.getFileSize() <= FILESIZE) {
-                writer.add(iter.next());
-                ++count;
-            }
-
-            file_support.create_file(tmpfile, writer);
-        }
-
-        // Use streaming matcher, to evade giant collection.
-        final int expected_count = count;
-        Iterator<TimeSeriesCollection> expected = create_tsdata_(FILESIZE).limit(expected_count).iterator();
-
-        TSData fd = TSData.readonly(tmpfile);
-
-        Iterator<TimeSeriesCollection> fd_iter = fd.iterator();
-        while (expected.hasNext()) {
-            assertTrue(fd_iter.hasNext());
-            assertEquals(expected.next(), fd_iter.next());
-        }
-        assertFalse(fd_iter.hasNext());
     }
 
     private Stream<TimeSeriesCollection> create_tsdata_(int count) {

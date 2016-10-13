@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.history.xdr.support.reader;
 
 import com.groupon.lex.metrics.history.xdr.support.IOLengthVerificationFailed;
+import java.io.EOFException;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -57,7 +58,7 @@ public class SizeVerifyingReaderTest {
 
         data = new byte[1024 * 1024];
         for (int i = 0; i < data.length; ++i)
-            data[i] = (byte)(i ^ (i % 97));
+            data[i] = (byte) (i ^ (i % 97));
 
         try (FileChannel fd = FileChannel.open(file, StandardOpenOption.WRITE)) {
             for (int i = 0; i < 2; ++i) {
@@ -83,7 +84,7 @@ public class SizeVerifyingReaderTest {
         assertArrayEquals(data, output);
     }
 
-    @Test(expected = IOLengthVerificationFailed.class)
+    @Test(expected = EOFException.class)
     public void readTooMuch() throws Exception {
         byte output[] = new byte[data.length + 1024];
 

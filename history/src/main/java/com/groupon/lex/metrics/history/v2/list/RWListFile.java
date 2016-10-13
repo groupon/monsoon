@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.history.v2.list;
 
 import com.groupon.lex.metrics.history.TSData;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.fixSequence;
@@ -103,11 +104,15 @@ public class RWListFile implements TSData {
             state = new ReadOnlyState(file, hdr);
     }
 
-    public static RWListFile newFile(@NonNull GCCloseable<FileChannel> file, boolean compress) throws IOException {
+    public static RWListFile newFile(@NonNull GCCloseable<FileChannel> file) throws IOException {
+        return newFile(file, Compression.DEFAULT);
+    }
+
+    public static RWListFile newFile(@NonNull GCCloseable<FileChannel> file, Compression compression) throws IOException {
         final tsfile_header hdr = new tsfile_header();
         hdr.last = hdr.first = ToXdr.timestamp(new DateTime(DateTimeZone.UTC));
         hdr.file_size = MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN;
-        hdr.flags = (header_flags.SORTED | header_flags.KIND_LIST | (compress ? header_flags.GZIP : 0));
+        hdr.flags = (header_flags.SORTED | header_flags.KIND_LIST | compression.compressionFlag);
         hdr.reserved = 0;
         hdr.fdt = ToXdr.filePos(new FilePos(0, 0));
 

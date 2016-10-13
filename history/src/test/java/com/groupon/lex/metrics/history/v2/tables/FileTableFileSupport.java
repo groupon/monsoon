@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.history.v2.tables;
 
 import com.groupon.lex.metrics.history.TSDataVersionDispatch;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
@@ -49,16 +50,24 @@ public class FileTableFileSupport implements FileSupport.Writer {
         try {
             ToXdrTables newTables = new ToXdrTables();
             newTables.addAll(tsdata);
-            newTables.write(fd.get(), compress);
+            newTables.write(fd.get(), compress ? Compression.DEFAULT : Compression.NONE);
         } catch (OncRpcException ex) {
             throw new IOException(ex);
         }
     }
 
     @Override
-    public short getMajor() { return (short)2; }
+    public short getMajor() {
+        return (short) 2;
+    }
+
     @Override
-    public short getMinor() { return (short)0; }
+    public short getMinor() {
+        return (short) 0;
+    }
+
     @Override
-    public boolean isEmptyAllowed() { return false; }
+    public boolean isEmptyAllowed() {
+        return false;
+    }
 }

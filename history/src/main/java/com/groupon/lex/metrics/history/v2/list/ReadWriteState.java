@@ -34,6 +34,7 @@ package com.groupon.lex.metrics.history.v2.list;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
 import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.calculateDictionary;
 import static com.groupon.lex.metrics.history.v2.list.ReadOnlyState.calculateTimeSeries;
@@ -105,14 +106,16 @@ public final class ReadWriteState implements State {
     private final List<SegmentReader<ReadonlyTSDataHeader>> tsdataHeaders;
     private DictionaryForWrite writerDictionary;
     private tsfile_header hdr;
+    private final Compression compression;
 
     public ReadWriteState(GCCloseable<FileChannel> file, tsfile_header hdr) throws IOException, OncRpcException {
         this.file = file;
         this.hdr = hdr;
+        this.compression = Compression.fromFlags(this.hdr.flags);
         tsdataHeaders = readAllTSDataHeaders(file, FromXdr.filePos(hdr.fdt));
-        dictionary = calculateDictionary(file, isGzipped(), tsdataHeaders)
+        dictionary = calculateDictionary(file, compression, tsdataHeaders)
                 .cache();
-        tsdata = calculateTimeSeries(file, isGzipped(), tsdataHeaders, SegmentReader.ofSupplier(this::getDictionary).flatMap(x -> x));
+        tsdata = calculateTimeSeries(file, compression, tsdataHeaders, SegmentReader.ofSupplier(this::getDictionary).flatMap(x -> x));
 
         writerDictionary = new DictionaryForWrite(dictionary.decode());
     }
@@ -133,10 +136,6 @@ public final class ReadWriteState implements State {
 
     public boolean isDistinct() {
         return doReadLocked(() -> (hdr.flags & header_flags.DISTINCT) == header_flags.DISTINCT);
-    }
-
-    private boolean isGzipped() {
-        return doReadLocked(() -> (hdr.flags & header_flags.GZIP) == header_flags.GZIP);
     }
 
     @Override
@@ -182,7 +181,6 @@ public final class ReadWriteState implements State {
         if (tscList.isEmpty())
             return;
 
-        final boolean compressed;
         long recordOffset;
         final DictionaryForWrite newWriterDict;
         FilePos lastRecord;
@@ -190,7 +188,6 @@ public final class ReadWriteState implements State {
             final Lock lock = guard.readLock();
             lock.lock();
             try {
-                compressed = (hdr.flags & header_flags.GZIP) == header_flags.GZIP;
                 recordOffset = hdr.file_size;
                 lastRecord = FromXdr.filePos(hdr.fdt);
                 newWriterDict = writerDictionary.clone();
@@ -204,7 +201,7 @@ public final class ReadWriteState implements State {
                     newWriterDict.getStringTable().getOffset(),
                     newWriterDict.getPathTable().getOffset(),
                     newWriterDict.getTagsTable().getOffset()});
-        final ByteBuffer useBuffer = (compressed ? ByteBuffer.allocate(65536) : ByteBuffer.allocateDirect(65536));
+        final ByteBuffer useBuffer = (compression != Compression.NONE ? ByteBuffer.allocate(65536) : ByteBuffer.allocateDirect(65536));
         if (lastRecord.getOffset() == 0)
             lastRecord = null;  // Empty file.
 
@@ -212,7 +209,7 @@ public final class ReadWriteState implements State {
         final List<EncodedTscHeaderForWrite> writeHeaders;
         try (FileChannelWriter fd = new FileChannelWriter(this.file.get(), recordOffset)) {
             {
-                final Writer writer = new Writer(fd, compressed, useBuffer);
+                final Writer writer = new Writer(fd, compression, useBuffer);
 
                 /* Write the contents of each collection. */
                 writeHeaders = new ArrayList<>(tscList.size());
@@ -276,7 +273,7 @@ public final class ReadWriteState implements State {
 
             tsdataHeaders.addAll(newTsdataHeaders);
             if (newDictionary != null) {
-                dictionary = calculateDictionary(file, compressed, tsdataHeaders)
+                dictionary = calculateDictionary(file, compression, tsdataHeaders)
                         .cache(newDictionary);
             }
             tsdata.addAll(newTsdataHeaders.stream()
@@ -285,8 +282,8 @@ public final class ReadWriteState implements State {
                                 .map(tsdHeader -> {
                                     final SegmentReader<DictionaryDelta> dictSegment = SegmentReader.ofSupplier(this::getDictionary)
                                             .flatMap(Function.identity());
-                                    final SegmentReader<record_array> recordsSegment = tsdHeader.recordsDecoder(file, compressed);
-                                    final TimeSeriesCollection newTsc = new ListTSC(tsdHeader.getTimestamp(), recordsSegment, dictSegment, new FileChannelSegmentReader.Factory(file, compressed));
+                                    final SegmentReader<record_array> recordsSegment = tsdHeader.recordsDecoder(file, compression);
+                                    final TimeSeriesCollection newTsc = new ListTSC(tsdHeader.getTimestamp(), recordsSegment, dictSegment, new FileChannelSegmentReader.Factory(file, compression));
                                     return newTsc;
                                 })
                                 .share();
@@ -431,7 +428,7 @@ public final class ReadWriteState implements State {
             tscHdr.ts = ToXdr.timestamp(timestamp);
             tscHdr.records = ToXdr.filePos(encodedTsc);
 
-            FilePos pos = new Writer(fd, false, useBuffer).write(tscHdr);
+            FilePos pos = new Writer(fd, Compression.NONE, useBuffer).write(tscHdr);
             LOG.log(Level.FINEST, "tsdata header written at {0}", pos);
             return pos;
         }

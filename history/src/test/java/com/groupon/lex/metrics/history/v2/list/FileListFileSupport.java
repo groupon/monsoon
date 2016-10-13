@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.history.v2.list;
 
 import com.groupon.lex.metrics.history.TSDataVersionDispatch;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -46,13 +47,18 @@ import java.util.Collection;
 public class FileListFileSupport implements FileSupport.Writer {
     @Override
     public void create_file(TSDataVersionDispatch.Releaseable<FileChannel> fd, Collection<? extends TimeSeriesCollection> tsdata, boolean compress) throws IOException {
-        RWListFile listFile = RWListFile.newFile(new GCCloseable<>(fd.release()), true);
+        RWListFile listFile = RWListFile.newFile(new GCCloseable<>(fd.release()), compress ? Compression.DEFAULT : Compression.NONE);
         tsdata.forEach(listFile::add);
     }
 
     @Override
-    public short getMajor() { return (short)2; }
+    public short getMajor() {
+        return (short) 2;
+    }
+
     @Override
-    public short getMinor() { return (short)0; }
+    public short getMinor() {
+        return (short) 0;
+    }
 
 }

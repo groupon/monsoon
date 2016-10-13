@@ -34,6 +34,7 @@ package com.groupon.lex.metrics.history.v2.tables;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.SimpleGroupPath;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.createPresenceBitset;
@@ -101,18 +102,22 @@ public class ToXdrTables implements Closeable {
         tsdataQueue.addAll(tsc);
     }
 
-    public void write(@NonNull FileChannel out, boolean compress) throws OncRpcException, IOException {
-        writeFile(out, compress);
+    public void write(@NonNull FileChannel out, Compression compression) throws OncRpcException, IOException {
+        writeFile(out, compression);
+    }
+
+    public void write(@NonNull FileChannel out) throws OncRpcException, IOException {
+        writeFile(out, Compression.DEFAULT);
     }
 
     @Override
     public void close() throws IOException {
     }
 
-    private void writeFile(FileChannel out, boolean compress) throws IOException, OncRpcException {
+    private void writeFile(FileChannel out, Compression compression) throws IOException, OncRpcException {
         if (tsdataQueue.isEmpty())
             throw new IllegalStateException("table files may not be empty");
-        final Context ctx = new Context(out, compress);
+        final Context ctx = new Context(out, compression);
 
         final FilePos bodyPos;
         final long fileEnd;
@@ -284,7 +289,7 @@ public class ToXdrTables implements Closeable {
         tsfile_header hdr = new tsfile_header();
         hdr.first = ToXdr.timestamp(ctx.getBegin());
         hdr.last = ToXdr.timestamp(ctx.getEnd());
-        hdr.flags = (ctx.isCompressed() ? header_flags.GZIP : 0)
+        hdr.flags = ctx.getCompression().compressionFlag
                 | header_flags.DISTINCT
                 | header_flags.SORTED
                 | header_flags.KIND_TABLES;
@@ -302,7 +307,7 @@ public class ToXdrTables implements Closeable {
         @Getter
         private final ByteBuffer useBuffer;
         @Getter
-        private final boolean compressed;
+        private final Compression compression;
         @Getter
         private final FileChannelWriter fd;
         @Getter
@@ -310,9 +315,9 @@ public class ToXdrTables implements Closeable {
         private DictionaryForWrite dict;
         private Long begin = null, end = null;
 
-        public Context(@NonNull FileChannel out, boolean compressed) {
-            this.compressed = compressed;
-            this.useBuffer = (compressed ? ByteBuffer.allocate(65536) : ByteBuffer.allocateDirect(65536));
+        public Context(@NonNull FileChannel out, Compression compression) {
+            this.compression = compression;
+            this.useBuffer = (compression == Compression.NONE ? ByteBuffer.allocate(65536) : ByteBuffer.allocateDirect(65536));
             this.fd = new FileChannelWriter(out, HDR_SPACE);
         }
 
@@ -335,7 +340,7 @@ public class ToXdrTables implements Closeable {
         }
 
         public Writer newWriter() {
-            return new Writer(fd, compressed, useBuffer);
+            return new Writer(fd, compression, useBuffer);
         }
 
         public long getBegin() {
