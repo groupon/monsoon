@@ -38,7 +38,6 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.Collection;
-import org.acplt.oncrpc.OncRpcException;
 
 /**
  *
@@ -47,12 +46,8 @@ import org.acplt.oncrpc.OncRpcException;
 public class FileTableFileSupport implements FileSupport.Writer {
     @Override
     public void create_file(TSDataVersionDispatch.Releaseable<FileChannel> fd, Collection<? extends TimeSeriesCollection> tsdata, boolean compress) throws IOException {
-        try {
-            ToXdrTables newTables = new ToXdrTables();
+        try (ToXdrTables newTables = new ToXdrTables(fd.get(), compress ? Compression.DEFAULT : Compression.NONE)) {
             newTables.addAll(tsdata);
-            newTables.write(fd.get(), compress ? Compression.DEFAULT : Compression.NONE);
-        } catch (OncRpcException ex) {
-            throw new IOException(ex);
         }
     }
 

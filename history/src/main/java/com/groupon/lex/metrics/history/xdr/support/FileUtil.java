@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.history.xdr.support;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.OpenOption;
@@ -49,15 +50,28 @@ import lombok.Getter;
  */
 public class FileUtil {
     private static final SecureRandom RANDOM = new SecureRandom();
+    public static final Path TMPDIR = new File(System.getProperty("java.io.tmpdir")).toPath();
 
-    /** Create a temporary file that will be removed when it is closed. */
+    /**
+     * Create a temporary file that will be removed when it is closed.
+     */
     public static FileChannel createTempFile(Path dir, String prefix, String suffix) throws IOException {
-        return createNewFileImpl(dir, prefix, suffix, new OpenOption[]{ READ, WRITE, CREATE_NEW, DELETE_ON_CLOSE }).getFileChannel();
+        return createNewFileImpl(dir, prefix, suffix, new OpenOption[]{READ, WRITE, CREATE_NEW, DELETE_ON_CLOSE}).getFileChannel();
     }
 
-    /** Creates a new file and opens it for reading and writing. */
+    /**
+     * Create a temporary file that will be removed when it is closed, in the
+     * tmpdir location.
+     */
+    public static FileChannel createTempFile(String prefix, String suffix) throws IOException {
+        return createTempFile(TMPDIR, prefix, suffix);
+    }
+
+    /**
+     * Creates a new file and opens it for reading and writing.
+     */
     public static NamedFileChannel createNewFile(Path dir, String prefix, String suffix) throws IOException {
-        return createNewFileImpl(dir, prefix, suffix, new OpenOption[]{ READ, WRITE, CREATE_NEW });
+        return createNewFileImpl(dir, prefix, suffix, new OpenOption[]{READ, WRITE, CREATE_NEW});
     }
 
     private static NamedFileChannel createNewFileImpl(Path dir, String prefix, String suffix, OpenOption openOptions[]) throws IOException {

@@ -1,6 +1,7 @@
 package com.groupon.lex.metrics.history.xdr;
 
 import com.groupon.lex.metrics.history.TSData;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.list.RWListFile;
 import com.groupon.lex.metrics.history.v2.tables.ToXdrTables;
 import com.groupon.lex.metrics.history.xdr.TSDataScanDir.MetaData;
@@ -508,48 +509,34 @@ public class TSDataFileChain implements TSData {
             }
         }
 
-        try (final ToXdrTables tables = new ToXdrTables()) {
-            tables.addAll(tsdata);
+        final DateTime begin = tsdata.getBegin();
+        final String prefix = String.format("monsoon-%04d%02d%02d-%02d%02d", begin.getYear(), begin.getMonthOfYear(), begin.getDayOfMonth(), begin.getHourOfDay(), begin.getMinuteOfHour());
 
-            final FileChannel compressed_data;
-            final Path new_filename;
-            {
-                final DateTime begin = tsdata.getBegin();
-                final String prefix = String.format("monsoon-%04d%02d%02d-%02d%02d", begin.getYear(), begin.getMonthOfYear(), begin.getDayOfMonth(), begin.getHourOfDay(), begin.getMinuteOfHour());
-
-                FileUtil.NamedFileChannel newFile = FileUtil.createNewFile(dir_, prefix, ".optimized");
-                new_filename = newFile.getFileName();
-                compressed_data = newFile.getFileChannel();
+        final FileUtil.NamedFileChannel newFile = FileUtil.createNewFile(dir_, prefix, ".optimized");
+        try {
+            try (final ToXdrTables tables = new ToXdrTables(newFile.getFileChannel(), Compression.DEFAULT)) {
+                tables.addAll(tsdata);
             }
 
+            synchronized (this) {
+                Files.delete(file.getFile());
+                read_stores_.remove(file);  // Remove if present.
+                read_stores_.put(new Key(newFile.getFileName(), file.getBegin(), file.getEnd()), null);
+            }
+        } catch (IOException | RuntimeException | Error ex) {
+            LOG.log(Level.SEVERE, "unable to write optimized file " + newFile.getFileName(), ex);
             try {
-                try {
-                    tables.write(compressed_data);
-                } catch (OncRpcException ex) {
-                    throw new IOException("encoding failure", ex);
-                }
-
-                synchronized (this) {
-                    Files.delete(file.getFile());
-                    read_stores_.remove(file);  // Remove if present.
-                    read_stores_.put(new Key(new_filename, file.getBegin(), file.getEnd()), null);
-                }
+                Files.delete(newFile.getFileName());
+            } catch (IOException ex1) {
+                LOG.log(Level.SEVERE, "unable to remove output file " + newFile.getFileName(), ex1);
+                ex.addSuppressed(ex1);
+            }
+            throw ex;
+        } finally {
+            try {
+                newFile.getFileChannel().close();
             } catch (IOException ex) {
-                LOG.log(Level.SEVERE, "unable to write optimized file " + new_filename, ex);
-                try {
-                    Files.delete(new_filename);
-                } catch (IOException ex1) {
-                    LOG.log(Level.SEVERE, "unable to remove output file " + new_filename, ex1);
-                    ex.addSuppressed(ex1);
-                }
-                throw ex;
-            } finally {
-                try {
-                    assert (compressed_data != null);
-                    compressed_data.close();
-                } catch (IOException ex) {
-                    LOG.log(Level.WARNING, "unable to close optimized file {0}", new_filename);
-                }
+                LOG.log(Level.WARNING, "unable to close optimized file {0}", newFile.getFileName());
             }
         }
     }
