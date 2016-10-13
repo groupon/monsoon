@@ -25,8 +25,7 @@ public class LzoWriter implements FileWriter {
     private final LzoOutputStream lzo;
 
     public LzoWriter(@NonNull FileWriter out) throws IOException {
-        LzoAlgorithm algorithm = LzoAlgorithm.LZO1X;
-        LzoCompressor compressor = LzoLibrary.getInstance().newCompressor(algorithm, null);
+        LzoCompressor compressor = LzoLibrary.getInstance().newCompressor(ALGORITHM, null);
         this.lzo = new LzoOutputStream(new Adapter(out), compressor, 64 * 1024);
     }
 
