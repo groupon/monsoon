@@ -49,7 +49,7 @@ enum header_flags {
     /* indicate if opaque segments are compressed (gzip) */
     COMPRESSION_MASK = 0x3f000000,
     GZIP = 0x20000000,
-    LZO = 0x30000000,
+    LZO = 0x30000000,  /* LZO 1X-1 */
 
     /* indicate if all records are sorted by timestamp */
     SORTED = 0x40000000,
