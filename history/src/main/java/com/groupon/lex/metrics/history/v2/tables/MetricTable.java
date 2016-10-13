@@ -31,7 +31,6 @@
  */
 package com.groupon.lex.metrics.history.v2.tables;
 
-import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
@@ -40,6 +39,7 @@ import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.createPresenceBitset;
 import com.groupon.lex.metrics.history.v2.xdr.histogram;
 import com.groupon.lex.metrics.history.v2.xdr.metric_table;
 import com.groupon.lex.metrics.history.v2.xdr.metric_value;
+import com.groupon.lex.metrics.history.v2.xdr.metrickind;
 import com.groupon.lex.metrics.history.v2.xdr.mt_16bit;
 import com.groupon.lex.metrics.history.v2.xdr.mt_32bit;
 import com.groupon.lex.metrics.history.v2.xdr.mt_64bit;
@@ -70,8 +70,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
 @RequiredArgsConstructor
 public class MetricTable extends AbstractSegmentWriter {
@@ -86,33 +84,43 @@ public class MetricTable extends AbstractSegmentWriter {
     private final TLongLongMap t_64bit = new TLongLongHashMap();
     private final TLongDoubleMap t_dbl = new TLongDoubleHashMap();
     private final TLongIntMap t_str = new TLongIntHashMap();
-    private final TLongObjectMap<Histogram> t_hist = new TLongObjectHashMap<>();
+    private final TLongObjectMap<histogram> t_hist = new TLongObjectHashMap<>();
     private final TLongSet t_empty = new TLongHashSet();
-    private final TLongObjectMap<MetricValue> t_other = new TLongObjectHashMap<>();
+    private final TLongObjectMap<metric_value> t_other = new TLongObjectHashMap<>();
 
     public void add(long ts, @NonNull MetricValue value) {
-        LOG.log(Level.FINEST, "adding {0}: {1}", new Object[]{new DateTime(ts, DateTimeZone.UTC), value});
+        add(ts, ToXdr.metricValue(value, dictionary.getStringTable()::getOrCreate));
+    }
 
-        if (value.getBoolValue() != null) {
-            t_bool.put(ts, value.getBoolValue() ? (byte) 1 : (byte) 0);
-        } else if (value.getIntValue() != null) {
-            final long v = value.getIntValue();
-            if (v >= Short.MIN_VALUE && v <= Short.MAX_VALUE)
-                t_16bit.put(ts, (short) v);
-            else if (v >= Integer.MIN_VALUE && v <= Integer.MAX_VALUE)
-                t_32bit.put(ts, (int) v);
-            else
-                t_64bit.put(ts, v);
-        } else if (value.getFltValue() != null) {
-            t_dbl.put(ts, value.getFltValue());
-        } else if (value.getStrValue() != null) {
-            t_str.put(ts, dictionary.getStringTable().getOrCreate(value.getStrValue()));
-        } else if (value.getHistValue() != null) {
-            t_hist.put(ts, value.getHistValue());
-        } else if (value.isPresent()) {
-            t_other.put(ts, value);
-        } else {
-            t_empty.add(ts);
+    public void add(long ts, @NonNull metric_value value) {
+        switch (value.kind) {
+            default:
+                t_other.put(ts, value);
+                break;
+            case metrickind.BOOL:
+                t_bool.put(ts, value.bool_value ? (byte) 1 : (byte) 0);
+                break;
+            case metrickind.INT:
+                final long v = value.int_value;
+                if (v >= Short.MIN_VALUE && v <= Short.MAX_VALUE)
+                    t_16bit.put(ts, (short) v);
+                else if (v >= Integer.MIN_VALUE && v <= Integer.MAX_VALUE)
+                    t_32bit.put(ts, (int) v);
+                else
+                    t_64bit.put(ts, v);
+                break;
+            case metrickind.FLOAT:
+                t_dbl.put(ts, value.dbl_value);
+                break;
+            case metrickind.STRING:
+                t_str.put(ts, value.str_dict_ref);
+                break;
+            case metrickind.HISTOGRAM:
+                t_hist.put(ts, value.hist_value);
+                break;
+            case metrickind.EMPTY:
+                t_empty.add(ts);
+                break;
         }
     }
 
@@ -127,7 +135,7 @@ public class MetricTable extends AbstractSegmentWriter {
         mt.metrics_str = encodeStr(t_str, timestamps);
         mt.metrics_hist = encodeHist(t_hist, timestamps);
         mt.metrics_empty = encodeEmpty(t_empty, timestamps);
-        mt.metrics_other = encodeOther(t_other, dictionary, timestamps);
+        mt.metrics_other = encodeOther(t_other, timestamps);
         return mt;
     }
 
@@ -233,14 +241,14 @@ public class MetricTable extends AbstractSegmentWriter {
         return result;
     }
 
-    private static mt_hist encodeHist(TLongObjectMap<Histogram> t_hist, long timestamps[]) {
+    private static mt_hist encodeHist(TLongObjectMap<histogram> t_hist, long timestamps[]) {
         LOG.log(Level.FINEST, "encoding {0}", TDecorators.wrap(t_hist));
         histogram values[] = new histogram[timestamps.length];
         int values_len = 0;
         for (int i = 0; i < values.length; ++i) {
             final long ts = timestamps[i];
             if (t_hist.containsKey(ts))
-                values[values_len++] = ToXdr.histogram(t_hist.get(ts));
+                values[values_len++] = t_hist.get(ts);
         }
 
         mt_hist result = new mt_hist();
@@ -257,15 +265,15 @@ public class MetricTable extends AbstractSegmentWriter {
         return result;
     }
 
-    private static mt_other encodeOther(TLongObjectMap<MetricValue> t_other, DictionaryForWrite dictionary, long timestamps[]) {
+    private static mt_other encodeOther(TLongObjectMap<metric_value> t_other, long timestamps[]) {
         LOG.log(Level.FINEST, "encoding {0}", TDecorators.wrap(t_other));
         metric_value[] values = new metric_value[timestamps.length];
         int values_len = 0;
         for (int i = 0; i < values.length; ++i) {
             final long ts = timestamps[i];
-            MetricValue mv = t_other.get(ts);
+            metric_value mv = t_other.get(ts);
             if (mv != null)
-                values[values_len++] = ToXdr.metricValue(mv, dictionary.getStringTable()::getOrCreate);
+                values[values_len++] = mv;
         }
 
         mt_other result = new mt_other();

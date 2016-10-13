@@ -62,11 +62,9 @@ import static com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingF
 import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
-import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.THashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
@@ -78,13 +76,14 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
@@ -114,7 +113,7 @@ public class ToXdrTables implements Closeable {
     private final Compression compression;
 
     private final TLongSet timestamps = new TLongHashSet();
-    private final Map<GroupName, GroupTmpFile> groups = new THashMap<>();
+    private final Map<GroupName, GroupTmpFile> groups = new HashMap<>(1000, 0.5f);
     private DictionaryForWrite dictionary;
     private final List<file_data_tables_block> blocks = new ArrayList<>();
     private Long firstTs = null, lastTs = null;  // Timestamps in current block.
@@ -152,25 +151,27 @@ public class ToXdrTables implements Closeable {
                 }
 
                 timestamps.add(timestamp);
-
-                for (TimeSeriesValue tsv : tsc.getTSValues()) {
-                    final GroupTmpFile group = groups.computeIfAbsent(
-                            tsv.getGroup(),
-                            grp -> {
-                                try {
-                                    return new GroupTmpFile(dictionary);
-                                } catch (IOException ex) {
-                                    throw new RuntimeException("unable to create temporary file", ex);
-                                }
-                            });
-                    group.add(timestamp, tsv.getMetrics());
-                }
+                for (TimeSeriesValue tsv : tsc.getTSValues())
+                    processGroup(timestamp, tsv);
             } catch (OncRpcException ex) {
                 throw new IOException("encoding error", ex);
             }
         } finally {
             LOG.log(Level.INFO, "adding timeseries {0} took {1} msec", new Object[]{tsc.getTimestamp(), System.currentTimeMillis() - ts0});
         }
+    }
+
+    private void processGroup(long timestamp, TimeSeriesValue tsv) throws IOException, OncRpcException {
+        final GroupTmpFile group = groups.computeIfAbsent(
+                tsv.getGroup(),
+                grp -> {
+                    try {
+                        return new GroupTmpFile(dictionary);
+                    } catch (IOException ex) {
+                        throw new RuntimeException("unable to create temporary file for " + grp, ex);
+                    }
+                });
+        group.add(timestamp, tsv.getMetrics());
     }
 
     public void addAll(Collection<? extends TimeSeriesCollection> tscCollection) throws IOException {
@@ -326,7 +327,7 @@ public class ToXdrTables implements Closeable {
         final TIntObjectMap<MetricTable> metricTbl = new TIntObjectHashMap<>();
 
         metrics.iterator().forEachRemaining(timestampedMetric -> {
-            final int nameRef = dictionary.getPathTable().getOrCreate(timestampedMetric.getName().getPath());
+            final int nameRef = timestampedMetric.getName();
             if (!metricTbl.containsKey(nameRef))
                 metricTbl.put(nameRef, new MetricTable(dictionary));
             metricTbl.get(nameRef).add(timestampedMetric.getTimestamp(), timestampedMetric.getValue());
@@ -467,12 +468,11 @@ public class ToXdrTables implements Closeable {
         }
 
         public void add(long timestamp, MetricName mn, MetricValue mv) throws IOException, OncRpcException {
-            metricData.add(new Atom(timestamp, mn, mv, Any2.left(dictionary)));
+            metricData.add(new Atom(timestamp, mn, mv, dictionary));
         }
 
         public Iterator<MetricRecord> iterator() throws IOException, OncRpcException {
-            Any2<DictionaryForWrite, DictionaryDelta> dictionaryDelta = Any2.right(dictionary.asDictionaryDelta());
-            Iterator<Atom> underlying = metricData.iterator(() -> new Atom(dictionaryDelta));
+            Iterator<Atom> underlying = metricData.iterator(() -> new Atom());
             return new Iterator<MetricRecord>() {
                 @Override
                 public boolean hasNext() {
@@ -493,31 +493,30 @@ public class ToXdrTables implements Closeable {
         }
 
         @Getter
-        @AllArgsConstructor
-        @RequiredArgsConstructor
+        @NoArgsConstructor
         private static class Atom implements XdrAble {
             private long timestamp;
-            private MetricName metricName;
-            private MetricValue metricValue;
-            @NonNull
-            private final Any2<DictionaryForWrite, DictionaryDelta> dictionary;  // Left is used for write, right is used for read.
+            private int metricName;
+            private metric_value metricValue;
+
+            public Atom(long timestamp, MetricName metricName, MetricValue metricValue, DictionaryForWrite dictionary) {
+                this.timestamp = timestamp;
+                this.metricName = dictionary.getPathTable().getOrCreate(metricName.getPath());
+                this.metricValue = ToXdr.metricValue(metricValue, dictionary.getStringTable()::getOrCreate);
+            }
 
             @Override
             public void xdrEncode(XdrEncodingStream stream) throws OncRpcException, IOException {
-                assert getDictionary().getLeft().isPresent();
-
                 ToXdr.timestamp(timestamp).xdrEncode(stream);
-                stream.xdrEncodeInt(dictionary.getLeft().get().getPathTable().getOrCreate(metricName.getPath()));
-                ToXdr.metricValue(metricValue, dictionary.getLeft().get().getStringTable()::getOrCreate).xdrEncode(stream);
+                stream.xdrEncodeInt(metricName);
+                metricValue.xdrEncode(stream);
             }
 
             @Override
             public void xdrDecode(XdrDecodingStream stream) throws OncRpcException, IOException {
-                assert getDictionary().getRight().isPresent();
-
                 timestamp = FromXdr.timestamp(new timestamp_msec(stream)).getMillis();
-                metricName = MetricName.valueOf(getDictionary().getRight().get().getPath(stream.xdrDecodeInt()));
-                metricValue = FromXdr.metricValue(new metric_value(stream), getDictionary().getRight().get()::getString);
+                metricName = stream.xdrDecodeInt();
+                metricValue = new metric_value(stream);
             }
         }
     }
@@ -525,7 +524,7 @@ public class ToXdrTables implements Closeable {
     @Value
     private static class MetricRecord {
         private final long timestamp;
-        private final MetricName name;
-        private final MetricValue value;
+        private final int name;
+        private final metric_value value;
     }
 }
