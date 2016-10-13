@@ -47,7 +47,9 @@ enum header_flags {
     KIND_TABLES = 0x1,
 
     /* indicate if opaque segments are compressed (gzip) */
+    COMPRESSION_MASK = 0x3f000000,
     GZIP = 0x20000000,
+    LZO = 0x30000000,
 
     /* indicate if all records are sorted by timestamp */
     SORTED = 0x40000000,
