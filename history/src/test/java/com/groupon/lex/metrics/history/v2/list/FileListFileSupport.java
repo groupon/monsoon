@@ -47,7 +47,7 @@ import java.util.Collection;
 public class FileListFileSupport implements FileSupport.Writer {
     @Override
     public void create_file(TSDataVersionDispatch.Releaseable<FileChannel> fd, Collection<? extends TimeSeriesCollection> tsdata, boolean compress) throws IOException {
-        RWListFile listFile = RWListFile.newFile(new GCCloseable<>(fd.release()), compress ? Compression.DEFAULT : Compression.NONE);
+        RWListFile listFile = RWListFile.newFile(new GCCloseable<>(fd.release()), compress ? Compression.DEFAULT_APPEND : Compression.NONE);
         tsdata.forEach(listFile::add);
     }
 

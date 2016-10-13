@@ -75,12 +75,12 @@ public class FileChannelSegmentReaderTest {
 
     @Test
     public void readCompressed() throws Exception {
-        FilePos pos = create(Compression.DEFAULT);
+        FilePos pos = create(Compression.DEFAULT_APPEND);
 
         GCCloseable<FileChannel> fd = new GCCloseable<>(FileChannel.open(file, StandardOpenOption.READ));
-        FileChannelSegmentReader<XdrAbleImpl> reader = new FileChannelSegmentReader<>(XdrAbleImpl::new, fd, pos, Compression.DEFAULT);
+        FileChannelSegmentReader<XdrAbleImpl> reader = new FileChannelSegmentReader<>(XdrAbleImpl::new, fd, pos, Compression.DEFAULT_APPEND);
 
-        assertEquals(Compression.DEFAULT, reader.getCompression());
+        assertEquals(Compression.DEFAULT_APPEND, reader.getCompression());
         assertEquals(expected, reader.decode());
     }
 
@@ -98,8 +98,8 @@ public class FileChannelSegmentReaderTest {
     @Test
     public void factoryCompressed() throws Exception {
         GCCloseable<FileChannel> fd = new GCCloseable<>(FileChannel.open(file, StandardOpenOption.READ));
-        FileChannelSegmentReader.Factory factory = new FileChannelSegmentReader.Factory(fd, Compression.DEFAULT);
-        FilePos pos = create(Compression.DEFAULT);
+        FileChannelSegmentReader.Factory factory = new FileChannelSegmentReader.Factory(fd, Compression.DEFAULT_APPEND);
+        FilePos pos = create(Compression.DEFAULT_APPEND);
 
         assertEquals(expected, factory.get(XdrAbleImpl::new, pos).decode());
     }

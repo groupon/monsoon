@@ -514,7 +514,7 @@ public class TSDataFileChain implements TSData {
 
         final FileUtil.NamedFileChannel newFile = FileUtil.createNewFile(dir_, prefix, ".optimized");
         try {
-            try (final ToXdrTables tables = new ToXdrTables(newFile.getFileChannel(), Compression.DEFAULT)) {
+            try (final ToXdrTables tables = new ToXdrTables(newFile.getFileChannel(), Compression.DEFAULT_OPTIMIZED)) {
                 tables.addAll(tsdata);
             }
 

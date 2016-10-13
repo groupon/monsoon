@@ -105,7 +105,7 @@ public class RWListFile implements TSData {
     }
 
     public static RWListFile newFile(@NonNull GCCloseable<FileChannel> file) throws IOException {
-        return newFile(file, Compression.DEFAULT);
+        return newFile(file, Compression.DEFAULT_APPEND);
     }
 
     public static RWListFile newFile(@NonNull GCCloseable<FileChannel> file, Compression compression) throws IOException {
