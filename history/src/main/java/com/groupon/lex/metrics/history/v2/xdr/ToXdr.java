@@ -39,7 +39,6 @@ import gnu.trove.list.array.TShortArrayList;
 import gnu.trove.set.TLongSet;
 import java.util.Arrays;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -106,7 +105,6 @@ public class ToXdr {
     public static timestamp_delta timestamp_delta(long[] timestamps) {
         timestamps = Arrays.copyOf(timestamps, timestamps.length);
         Arrays.sort(timestamps);
-        System.err.println("timestamp_delta encoding of: " + Arrays.stream(timestamps).mapToObj(Long::toString).collect(Collectors.toList()));
 
         long begin = timestamps[0];
         int[] result = new int[timestamps.length - 1];
@@ -121,8 +119,6 @@ public class ToXdr {
         timestamp_delta ts = new timestamp_delta();
         ts.first = timestamps[0];
         ts.delta = result;
-
-        System.err.println("timestamp_delta encoded to: first=" + ts.first + "; delta=" + Arrays.stream(ts.delta).mapToObj(Integer::toString).collect(Collectors.toList()));
         return ts;
     }
 
