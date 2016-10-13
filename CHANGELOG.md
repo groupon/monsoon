@@ -9,6 +9,7 @@ Features:
 - Frontend chart now loads data incrementally and update continuously.
 - Frontend timespec completely reworked.
 - Frontend evaluation logic moved into separate component.
+- Created file format 2.0, which is better at not reading data that is not requested during expression evaluation.
 
 Bug fixes:
 - Fix RPC timeout caused by BufferedIterator reading underlying iterator in the constructor.  This caused RPC calls to time out if the underlying iterator required more than 30 seconds for its first element to be available.
