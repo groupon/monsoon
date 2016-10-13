@@ -15,7 +15,7 @@ public enum Compression {
     GZIP(header_flags.GZIP, in -> new GzipReader(in), out -> new GzipWriter(out)),
     SNAPPY(header_flags.SNAPPY, in -> new SnappyReader(in), out -> new SnappyWriter(out));
 
-    public static final Compression DEFAULT = SNAPPY;
+    public static final Compression DEFAULT = GZIP;
 
     public final int compressionFlag;
     private final WrapReaderFunctor reader;
