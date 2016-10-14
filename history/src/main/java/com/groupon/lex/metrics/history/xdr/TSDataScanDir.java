@@ -20,7 +20,9 @@ import lombok.Getter;
 import org.joda.time.DateTime;
 
 /**
- * Scan all files in the given directory and retain a list of all files that matched.
+ * Scan all files in the given directory and retain a list of all files that
+ * matched.
+ *
  * @author ariane
  */
 public class TSDataScanDir {
@@ -60,31 +62,67 @@ public class TSDataScanDir {
             }
         }
 
-        /** The name of the file. */
-        public Path getFileName() { return filename_; }
-        /** The lowest timestamp in the file. */
-        public DateTime getBegin() { return begin_; }
-        /** The highest timestamp in the file. */
-        public DateTime getEnd() { return end_; }
-        /** The major version of the file data. */
-        public short getVersionMajor() { return version_major_; }
-        /** The minor version of the file data. */
-        public short getVersionMinor() { return version_minor_; }
-        /** The size of the file. */
-        public long getFileSize() { return file_size_; }
-        /** If the file supports adding records one at a time. */
-        public boolean canAddSingleRecord() { return singleRecordSupported; }
+        /**
+         * The name of the file.
+         */
+        public Path getFileName() {
+            return filename_;
+        }
 
         /**
-         * Check if the file is upgradable to the latest version
-         * of the file data used by the implementation.
+         * The lowest timestamp in the file.
+         */
+        public DateTime getBegin() {
+            return begin_;
+        }
+
+        /**
+         * The highest timestamp in the file.
+         */
+        public DateTime getEnd() {
+            return end_;
+        }
+
+        /**
+         * The major version of the file data.
+         */
+        public short getVersionMajor() {
+            return version_major_;
+        }
+
+        /**
+         * The minor version of the file data.
+         */
+        public short getVersionMinor() {
+            return version_minor_;
+        }
+
+        /**
+         * The size of the file.
+         */
+        public long getFileSize() {
+            return file_size_;
+        }
+
+        /**
+         * If the file supports adding records one at a time.
+         */
+        public boolean canAddSingleRecord() {
+            return singleRecordSupported;
+        }
+
+        /**
+         * Check if the file is upgradable to the latest version of the file
+         * data used by the implementation.
          *
-         * If a file is upgradable, it means that the data inside it is valid
-         * in both the version it currently has and the version the implementation uses.
-         * In that case, the WriteableTSDataFile implementation may opt to add
-         * new records to that file.
-         * Otherwise, it will have to start a new file to write records to.
-         * @return True if the file version can be set to the latest version, false otherwise.
+         * If a file is upgradable, it means that the data inside it is valid in
+         * both the version it currently has and the version the implementation
+         * uses. In that case, the WriteableTSDataFile implementation may opt to
+         * add new records to that file. Otherwise, it will have to start a new
+         * file to write records to.
+         *
+         * @return True if the file version can be set to the latest version,
+         * false otherwise.
          */
         public boolean isUpgradable() {
             return canAddSingleRecord() && Const.isUpgradable(getVersionMajor(), getVersionMinor());
@@ -140,6 +178,7 @@ public class TSDataScanDir {
 
     /**
      * Comparator, in order to sort MetaData based on the end timestamp.
+     *
      * @param x One of the MetaData to compare.
      * @param y Another one of the MetaData to compare.
      * @return Comparator result.
@@ -150,6 +189,7 @@ public class TSDataScanDir {
 
     /**
      * Construct a new instance with the given directory and metadata.
+     *
      * @param dir The directory used during directory scan.
      * @param meta_data The meta data of files in the directory.
      */
@@ -159,8 +199,9 @@ public class TSDataScanDir {
     }
 
     /**
-     * Scan a directory for files.  This method reads the entire stream and
+     * Scan a directory for files. This method reads the entire stream and
      * closes it immediately.
+     *
      * @param dir The directory to scan for files.
      * @throws IOException if the directory cannot be listed.
      */
@@ -172,11 +213,12 @@ public class TSDataScanDir {
 
     /**
      * Scan the directory for valid TSDataFiles.
+     *
      * @param dir The directory to scan.
      * @throws IOException if the directory cannot be listed.
      */
     public TSDataScanDir(Path dir) throws IOException {
-        this(requireNonNull(dir), file_listing_(requireNonNull(dir)).stream()
+        this(requireNonNull(dir), file_listing_(requireNonNull(dir)).parallelStream()
                 .map(MetaData::fromFile)
                 .flatMap((opt_md) -> opt_md.map(Stream::of).orElseGet(Stream::empty))
                 .sorted(TSDataScanDir::metadata_end_cmp_)
@@ -186,17 +228,25 @@ public class TSDataScanDir {
     /**
      * @return the directory used to create this TSDataScanDir.
      */
-    public Path getDir() { return dir_; }
+    public Path getDir() {
+        return dir_;
+    }
+
     /**
      * @return list of valid TSDataFiles matching predicates.
      */
-    public List<MetaData> getFiles() { return meta_data_; }
+    public List<MetaData> getFiles() {
+        return meta_data_;
+    }
 
     /**
      * Filter the list of files to contain only upgradable files.
      *
-     * Note that the current instance is untouched and a new instance is returned.
-     * @return A new instance of TSDataScanDir, describing only files that are upgradable.
+     * Note that the current instance is untouched and a new instance is
+     * returned.
+     *
+     * @return A new instance of TSDataScanDir, describing only files that are
+     * upgradable.
      */
     public TSDataScanDir filterUpgradable() {
         return new TSDataScanDir(getDir(), getFiles().stream().filter(MetaData::isUpgradable).collect(Collectors.toList()));
