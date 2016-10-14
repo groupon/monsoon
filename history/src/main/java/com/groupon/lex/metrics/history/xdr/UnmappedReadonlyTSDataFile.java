@@ -10,6 +10,7 @@ import com.groupon.lex.metrics.history.xdr.support.Parser;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import com.groupon.lex.metrics.history.xdr.support.XdrStreamIterator;
 import com.groupon.lex.metrics.lib.GCCloseable;
+import com.groupon.lex.metrics.lib.LazyEval;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -35,6 +36,8 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
     private final DateTime begin_, end_;
     private final int version_;
     private final boolean is_gzipped_;
+    private final LazyEval<Integer> sizeEval = new LazyEval<>(() -> (int) stream().count());
+    private final LazyEval<Boolean> emptyEval = new LazyEval<>(() -> !stream().findAny().isPresent());
 
     public UnmappedReadonlyTSDataFile(GCCloseable<FileChannel> fd) throws IOException {
         fd_ = requireNonNull(fd);
@@ -158,5 +161,15 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
     @Override
     public Optional<GCCloseable<FileChannel>> getFileChannel() {
         return Optional.of(fd_);
+    }
+
+    @Override
+    public int size() {
+        return sizeEval.get();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return emptyEval.get();
     }
 }

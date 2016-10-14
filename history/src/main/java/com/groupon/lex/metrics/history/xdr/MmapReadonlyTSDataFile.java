@@ -15,6 +15,8 @@ import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID2_E
 import com.groupon.lex.metrics.history.xdr.support.Parser;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import com.groupon.lex.metrics.history.xdr.support.XdrStreamIterator;
+import com.groupon.lex.metrics.lib.GCCloseable;
+import com.groupon.lex.metrics.lib.LazyEval;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -25,6 +27,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 import java.util.Iterator;
 import static java.util.Objects.requireNonNull;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.acplt.oncrpc.OncRpcException;
@@ -40,6 +43,8 @@ public final class MmapReadonlyTSDataFile implements TSData {
     private final DateTime begin_, end_;
     private final int version_;
     private final boolean is_gzippped_;
+    private final LazyEval<Integer> sizeEval = new LazyEval<>(() -> (int) stream().count());
+    private final LazyEval<Boolean> emptyEval = new LazyEval<>(() -> !stream().findAny().isPresent());
 
     private class TsvIterator extends XdrStreamIterator {  // non-static, to keep weak reference to MmapReadonlyTSDataFile alive.
         public TsvIterator() throws IOException {
@@ -167,5 +172,20 @@ public final class MmapReadonlyTSDataFile implements TSData {
     @Override
     public boolean add(TimeSeriesCollection tsv) {
         throw new UnsupportedOperationException("add");
+    }
+
+    @Override
+    public Optional<GCCloseable<FileChannel>> getFileChannel() {
+        return Optional.empty();
+    }
+
+    @Override
+    public int size() {
+        return sizeEval.get();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return emptyEval.get();
     }
 }
