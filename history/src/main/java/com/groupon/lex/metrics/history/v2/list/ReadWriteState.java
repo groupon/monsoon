@@ -209,7 +209,7 @@ public final class ReadWriteState implements State {
         final List<EncodedTscHeaderForWrite> writeHeaders;
         try (FileChannelWriter fd = new FileChannelWriter(this.file.get(), recordOffset)) {
             {
-                final Writer writer = new Writer(fd, compression, useBuffer);
+                final Writer writer = new Writer(fd, compression, useBuffer, false);
 
                 /* Write the contents of each collection. */
                 writeHeaders = new ArrayList<>(tscList.size());
@@ -428,7 +428,7 @@ public final class ReadWriteState implements State {
             tscHdr.ts = ToXdr.timestamp(timestamp);
             tscHdr.records = ToXdr.filePos(encodedTsc);
 
-            FilePos pos = new Writer(fd, Compression.NONE, useBuffer).write(tscHdr);
+            FilePos pos = new Writer(fd, Compression.NONE, useBuffer, false).write(tscHdr);
             LOG.log(Level.FINEST, "tsdata header written at {0}", pos);
             return pos;
         }

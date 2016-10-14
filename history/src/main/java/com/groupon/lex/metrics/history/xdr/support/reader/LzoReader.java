@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import org.anarres.lzo.LzoAlgorithm;
 import org.anarres.lzo.LzoDecompressor;
-import org.anarres.lzo.LzoInputStream;
 import org.anarres.lzo.LzoLibrary;
+import org.anarres.lzo.LzopInputStream;
 
 public class LzoReader extends AbstractInputStreamReader {
     public static final LzoAlgorithm ALGORITHM = LzoAlgorithm.LZO1X;
@@ -18,9 +18,9 @@ public class LzoReader extends AbstractInputStreamReader {
         super(createLzoInputStream(newAdapter(in)));
     }
 
-    private static InputStream createLzoInputStream(InputStream adapter) {
+    private static InputStream createLzoInputStream(InputStream adapter) throws IOException {
         LzoDecompressor decompressor = LzoLibrary.getInstance().newDecompressor(ALGORITHM, null);
-        LzoInputStream lzo = new LzoInputStream(adapter, decompressor);
+        LzopInputStream lzo = new LzopInputStream(adapter);
         lzo.setInputBufferSize(64 * 1024);
         return lzo;
     }

@@ -71,7 +71,7 @@ public class AbstractSegmentWriterTest {
     @Test
     public void write() throws Exception {
         GCCloseable<FileChannel> fd = new GCCloseable<>(FileChannel.open(file.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE));
-        FilePos pos = writeable.write(new AbstractSegmentWriter.Writer(fd.get(), 0, Compression.NONE), new long[]{9});
+        FilePos pos = writeable.write(new AbstractSegmentWriter.Writer(fd.get(), 0, Compression.NONE, false), new long[]{9});
 
         assertEquals(xdrAble, new FileChannelSegmentReader<>(XdrAbleImpl::new, fd, pos, Compression.NONE).decode());
     }
@@ -79,7 +79,7 @@ public class AbstractSegmentWriterTest {
     @Test
     public void writeCompressed() throws Exception {
         GCCloseable<FileChannel> fd = new GCCloseable<>(FileChannel.open(file.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE));
-        FilePos pos = writeable.write(new AbstractSegmentWriter.Writer(fd.get(), 0, Compression.DEFAULT_APPEND), new long[]{9});
+        FilePos pos = writeable.write(new AbstractSegmentWriter.Writer(fd.get(), 0, Compression.DEFAULT_APPEND, false), new long[]{9});
 
         assertEquals(xdrAble, new FileChannelSegmentReader<>(XdrAbleImpl::new, fd, pos, Compression.DEFAULT_APPEND).decode());
     }

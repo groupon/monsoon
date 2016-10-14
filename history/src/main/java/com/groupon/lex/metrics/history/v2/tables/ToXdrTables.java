@@ -404,7 +404,7 @@ public class ToXdrTables implements Closeable {
 
         public Writer newWriter() {
             assert Thread.holdsLock(this);
-            return new Writer(fd, compression, useBuffer);
+            return new Writer(fd, compression, useBuffer, true);
         }
 
         public long getBegin() {
