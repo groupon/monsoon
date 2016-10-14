@@ -13,6 +13,7 @@ import com.groupon.lex.metrics.history.xdr.support.GzipDecodingBufferSupplier;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID1_EXPECT;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID2_EXPECT;
 import com.groupon.lex.metrics.history.xdr.support.Parser;
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import com.groupon.lex.metrics.history.xdr.support.XdrStreamIterator;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
@@ -27,7 +28,6 @@ import static java.util.Objects.requireNonNull;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.acplt.oncrpc.OncRpcException;
-import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import org.joda.time.DateTime;
 
 /**
@@ -103,7 +103,7 @@ public final class MmapReadonlyTSDataFile implements TSData {
         final Parser.BeginEnd header = Parser.fromVersion(version_).header(stream);
         begin_ = header.getBegin();
         end_ = header.getEnd();
-        LOG.log(Level.INFO, "instantiated: version={0}.{1} begin={2}, end={3}", new Object[]{version_major(version_), version_minor(version_), begin_, end_});
+        LOG.log(Level.FINE, "instantiated: version={0}.{1} begin={2}, end={3}", new Object[]{version_major(version_), version_minor(version_), begin_, end_});
     }
 
     public static MmapReadonlyTSDataFile open(Path file) throws IOException {
@@ -113,20 +113,43 @@ public final class MmapReadonlyTSDataFile implements TSData {
     }
 
     @Override
-    public DateTime getBegin() { return begin_; }
+    public DateTime getBegin() {
+        return begin_;
+    }
+
     @Override
-    public DateTime getEnd() { return end_; }
+    public DateTime getEnd() {
+        return end_;
+    }
+
     @Override
-    public short getMajor() { return version_major(version_); }
+    public short getMajor() {
+        return version_major(version_);
+    }
+
     @Override
-    public short getMinor() { return version_minor(version_); }
+    public short getMinor() {
+        return version_minor(version_);
+    }
+
     @Override
-    public long getFileSize() { return data_.limit(); }
+    public long getFileSize() {
+        return data_.limit();
+    }
+
     @Override
-    public boolean canAddSingleRecord() { return !is_gzippped_; }
+    public boolean canAddSingleRecord() {
+        return !is_gzippped_;
+    }
+
     @Override
-    public boolean isOptimized() { return false; }
-    private ByteBuffer getReadonlyData() { return data_.asReadOnlyBuffer(); }
+    public boolean isOptimized() {
+        return false;
+    }
+
+    private ByteBuffer getReadonlyData() {
+        return data_.asReadOnlyBuffer();
+    }
 
     @Override
     public Iterator<TimeSeriesCollection> iterator() {
