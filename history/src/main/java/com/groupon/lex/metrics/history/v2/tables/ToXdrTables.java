@@ -125,6 +125,7 @@ public class ToXdrTables implements Closeable {
     private final List<file_data_tables_block> blocks = new ArrayList<>();
     private Long firstTs = null, lastTs = null;  // Timestamps in current block.
     private long fileOffset = HDR_SPACE;
+    @Getter
     private Long hdrBegin, hdrEnd;  // Timestamps for the entire file.
 
     public void add(@NonNull TimeSeriesCollection tsc) throws IOException {

@@ -1,9 +1,7 @@
 package com.groupon.lex.metrics.history.xdr;
 
 import com.groupon.lex.metrics.history.TSData;
-import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.list.RWListFile;
-import com.groupon.lex.metrics.history.v2.tables.ToXdrTables;
 import com.groupon.lex.metrics.history.xdr.TSDataScanDir.MetaData;
 import com.groupon.lex.metrics.history.xdr.support.FileUtil;
 import com.groupon.lex.metrics.history.xdr.support.MultiFileIterator;
@@ -32,8 +30,8 @@ import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import java.util.Spliterators;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -499,66 +497,56 @@ public class TSDataFileChain implements TSData {
      * @return True if the file was compressed and the key was replaced, false
      * otherwise.
      */
-    private void compress_file_(Key file, TSData tsdata) throws IOException {
-        if (tsdata == null) {
-            try {
-                tsdata = TSData.readonly(file.getFile());
-            } catch (IOException ex) {
-                LOG.log(Level.WARNING, "unable to open " + file.getFile(), ex);
-                throw ex;
-            }
-        }
-
-        final DateTime begin = tsdata.getBegin();
-        final String prefix = String.format("monsoon-%04d%02d%02d-%02d%02d", begin.getYear(), begin.getMonthOfYear(), begin.getDayOfMonth(), begin.getHourOfDay(), begin.getMinuteOfHour());
-
-        final FileUtil.NamedFileChannel newFile = FileUtil.createNewFile(dir_, prefix, ".optimized");
-        try {
-            try (final ToXdrTables tables = new ToXdrTables(newFile.getFileChannel(), Compression.DEFAULT_OPTIMIZED)) {
-                tables.addAll(tsdata);
-            }
-
-            synchronized (this) {
-                Files.delete(file.getFile());
-                read_stores_.remove(file);  // Remove if present.
-                read_stores_.put(new Key(newFile.getFileName(), file.getBegin(), file.getEnd()), null);
-            }
-        } catch (IOException | RuntimeException | Error ex) {
-            LOG.log(Level.SEVERE, "unable to write optimized file " + newFile.getFileName(), ex);
-            try {
-                Files.delete(newFile.getFileName());
-            } catch (IOException ex1) {
-                LOG.log(Level.SEVERE, "unable to remove output file " + newFile.getFileName(), ex1);
-                ex.addSuppressed(ex1);
-            }
-            throw ex;
-        } finally {
-            try {
-                newFile.getFileChannel().close();
-            } catch (IOException ex) {
-                LOG.log(Level.WARNING, "unable to close optimized file {0}", newFile.getFileName());
-            }
-        }
+    private void compress_file_(Key file, TSData tsdata) {
+        LOG.log(Level.INFO, "kicking off optimization of {0}", file.getFile());
+        CompletableFuture<Void> task = new TSDataOptimizerTask(dir_)
+                .add(file.getFile(), tsdata)
+                .run()
+                .thenAccept((newFile) -> {
+                    synchronized (this) {
+                        try {
+                            Files.delete(file.getFile());
+                        } catch (IOException ex) {
+                            LOG.log(Level.WARNING, "unable to remove {0}", file.getFile());
+                        }
+                        read_stores_.remove(file);
+                        read_stores_.put(new Key(newFile.getName(), newFile.getData().getBegin(), newFile.getData().getEnd()), newFile.getData());
+                    }
+                });
+        pendingTasks.add(task);
+        // Remove self after completion.
+        task
+                .whenComplete((result, exc) -> {
+                    if (exc != null)
+                        LOG.log(Level.WARNING, "unable to optimize " + file.getFile(), exc);
+                    synchronized (this) {
+                        pendingTasks.remove(task);
+                    }
+                });
     }
 
-    private synchronized RWListFile install_new_store_(Optional<RWListFile> old_store, Path file, RWListFile new_store) {
+    private synchronized RWListFile install_new_store_(Optional<RWListFile> opt_old_store, Path file, RWListFile new_store) {
         requireNonNull(file);
         requireNonNull(new_store);
 
         write_filename_.ifPresent(filename -> {
-            final Key old_store_key = new Key(filename, old_store.get().getBegin(), old_store.get().getEnd());
-            read_stores_.put(old_store_key, old_store.orElse(null));
+            TSData old_store = opt_old_store
+                    .map(rwfile -> {
+                        TSData tsdata = rwfile;  // Implicit cast.
+                        return tsdata;
+                    })
+                    .orElseGet(() -> {
+                        try {
+                            return TSData.readonly(filename);
+                        } catch (IOException ex) {
+                            throw new IllegalStateException("unable to open old write file " + filename, ex);
+                        }
+                    });
+            final Key old_store_key = new Key(filename, old_store.getBegin(), old_store.getEnd());
+            read_stores_.put(old_store_key, old_store);
 
-            // Optimize in the background, to not block writing of more data.
-            pendingTasks.add(ForkJoinPool.commonPool().submit(() -> {
-                final long t0 = System.currentTimeMillis();
-                try {
-                    compress_file_(old_store_key, old_store.orElse(null));
-                    LOG.log(Level.INFO, "optimizing file {0} took {1} msec", new Object[]{filename, System.currentTimeMillis() - t0});
-                } catch (IOException | RuntimeException ex) {
-                    LOG.log(Level.WARNING, "optimizing file " + filename + " failed after " + (System.currentTimeMillis() - t0) + " msec", ex);
-                }
-            }));
+            // Optimize old file.
+            compress_file_(old_store_key, old_store);
         });
 
         write_filename_ = Optional.of(file);
@@ -575,7 +563,6 @@ public class TSDataFileChain implements TSData {
 
     @Override
     public synchronized boolean add(TimeSeriesCollection e) {
-        hasPendingTasks();
         try {
             return get_write_store_for_writing_(e.getTimestamp()).add(e);
         } catch (IOException ex) {
@@ -585,15 +572,16 @@ public class TSDataFileChain implements TSData {
 
     @Override
     public boolean addAll(Collection<? extends TimeSeriesCollection> e) {
-        hasPendingTasks();
         return e.stream()
                 .map(TimeSeriesCollection::getTimestamp)
                 .min(Comparator.naturalOrder())
                 .map((ts) -> {
-                    try {
-                        return get_write_store_for_writing_(ts).addAll(e);
-                    } catch (IOException ex) {
-                        throw new RuntimeException(ex);
+                    synchronized (this) {
+                        try {
+                            return get_write_store_for_writing_(ts).addAll(e);
+                        } catch (IOException ex) {
+                            throw new RuntimeException(ex);
+                        }
                     }
                 })
                 .orElse(false);
