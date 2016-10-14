@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.history.v2.list;
 
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.tables.DictionaryDelta;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
@@ -71,15 +72,15 @@ public class ReadOnlyState implements State {
 
     public ReadOnlyState(GCCloseable<FileChannel> file, tsfile_header hdr) throws IOException, OncRpcException {
         this.file = file;
-        final boolean gzipped = (hdr.flags & header_flags.GZIP) == header_flags.GZIP;
+        final Compression compression = Compression.fromFlags(hdr.flags);
         this.sorted = (hdr.flags & header_flags.SORTED) == header_flags.SORTED;
         this.distinct = (hdr.flags & header_flags.DISTINCT) == header_flags.DISTINCT;
         this.begin = FromXdr.timestamp(hdr.first);
         this.end = FromXdr.timestamp(hdr.last);
 
         final List<SegmentReader<ReadonlyTSDataHeader>> tsdataHeaders = readAllTSDataHeaders(file, FromXdr.filePos(hdr.fdt));
-        final SegmentReader<DictionaryDelta> dictionary = calculateDictionary(file, gzipped, tsdataHeaders).cache();
-        this.tsdata = unmodifiableList(calculateTimeSeries(file, gzipped, tsdataHeaders, dictionary));
+        final SegmentReader<DictionaryDelta> dictionary = calculateDictionary(file, compression, tsdataHeaders).cache();
+        this.tsdata = unmodifiableList(calculateTimeSeries(file, compression, tsdataHeaders, dictionary));
     }
 
     @Override
@@ -117,28 +118,28 @@ public class ReadOnlyState implements State {
 
     public static SegmentReader<ReadonlyTSDataHeader> readTSDataHeader(GCCloseable<FileChannel> file, FilePos pos) {
         LOG.log(Level.FINEST, "new ReadonlyTSDataHeader segment at {0}", pos);
-        return new FileChannelSegmentReader<>(tsdata::new, file, pos, false)
+        return new FileChannelSegmentReader<>(tsdata::new, file, pos, Compression.NONE)
                 .map(ReadonlyTSDataHeader::new)
                 .cache();
     }
 
-    public static SegmentReader<DictionaryDelta> calculateDictionary(GCCloseable<FileChannel> file, boolean compressed, List<SegmentReader<ReadonlyTSDataHeader>> tsdataList) {
+    public static SegmentReader<DictionaryDelta> calculateDictionary(GCCloseable<FileChannel> file, Compression compression, List<SegmentReader<ReadonlyTSDataHeader>> tsdataList) {
         SegmentReader<DictionaryDelta> accumulated = SegmentReader.of(new DictionaryDelta());
         for (SegmentReader<ReadonlyTSDataHeader> tsdata : tsdataList) {
             accumulated = tsdata
-                    .flatMap(tsdHeader -> tsdHeader.dictionaryDecoder(file, compressed))
+                    .flatMap(tsdHeader -> tsdHeader.dictionaryDecoder(file, compression))
                     .combine(accumulated, (optTsd, dict) -> optTsd.map(tsd -> new DictionaryDelta(tsd, dict)).orElse(dict));
         }
         return accumulated;
     }
 
-    public static List<SegmentReader<TimeSeriesCollection>> calculateTimeSeries(GCCloseable<FileChannel> file, boolean compressed, List<SegmentReader<ReadonlyTSDataHeader>> tsdataList, SegmentReader<DictionaryDelta> dictionary) {
-        final FileChannelSegmentReader.Factory segmentFactory = new FileChannelSegmentReader.Factory(file, compressed);
+    public static List<SegmentReader<TimeSeriesCollection>> calculateTimeSeries(GCCloseable<FileChannel> file, Compression compression, List<SegmentReader<ReadonlyTSDataHeader>> tsdataList, SegmentReader<DictionaryDelta> dictionary) {
+        final FileChannelSegmentReader.Factory segmentFactory = new FileChannelSegmentReader.Factory(file, compression);
         ArrayList<SegmentReader<TimeSeriesCollection>> result = new ArrayList<>();
         for (SegmentReader<ReadonlyTSDataHeader> tsdata : tsdataList) {
             result.add(tsdata
                     .map(tsdHeader -> {
-                        final TimeSeriesCollection tsc = new ListTSC(tsdHeader.getTimestamp(), tsdHeader.recordsDecoder(file, compressed), dictionary, segmentFactory);
+                        final TimeSeriesCollection tsc = new ListTSC(tsdHeader.getTimestamp(), tsdHeader.recordsDecoder(file, compression), dictionary, segmentFactory);
                         return tsc;
                     })
                     .share());

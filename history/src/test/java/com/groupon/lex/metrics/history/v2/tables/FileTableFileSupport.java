@@ -32,12 +32,12 @@
 package com.groupon.lex.metrics.history.v2.tables;
 
 import com.groupon.lex.metrics.history.TSDataVersionDispatch;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.Collection;
-import org.acplt.oncrpc.OncRpcException;
 
 /**
  *
@@ -46,19 +46,23 @@ import org.acplt.oncrpc.OncRpcException;
 public class FileTableFileSupport implements FileSupport.Writer {
     @Override
     public void create_file(TSDataVersionDispatch.Releaseable<FileChannel> fd, Collection<? extends TimeSeriesCollection> tsdata, boolean compress) throws IOException {
-        try {
-            ToXdrTables newTables = new ToXdrTables();
+        try (ToXdrTables newTables = new ToXdrTables(fd.get(), compress ? Compression.DEFAULT_OPTIMIZED : Compression.NONE)) {
             newTables.addAll(tsdata);
-            newTables.write(fd.get(), compress);
-        } catch (OncRpcException ex) {
-            throw new IOException(ex);
         }
     }
 
     @Override
-    public short getMajor() { return (short)2; }
+    public short getMajor() {
+        return (short) 2;
+    }
+
     @Override
-    public short getMinor() { return (short)0; }
+    public short getMinor() {
+        return (short) 0;
+    }
+
     @Override
-    public boolean isEmptyAllowed() { return false; }
+    public boolean isEmptyAllowed() {
+        return false;
+    }
 }

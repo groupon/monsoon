@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.history.v2.list;
 
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.record_array;
@@ -68,17 +69,17 @@ public class ReadonlyTSDataHeader {
         return Optional.ofNullable(previousTSData);
     }
 
-    public SegmentReader<Optional<dictionary_delta>> dictionaryDecoder(GCCloseable<FileChannel> file, boolean compressed) {
+    public SegmentReader<Optional<dictionary_delta>> dictionaryDecoder(GCCloseable<FileChannel> file, Compression compression) {
         if (dictionary == null) {
             LOG.log(Level.FINER, "no dictionary present");
             return SegmentReader.of(Optional.empty());
         }
         LOG.log(Level.FINER, "dictionary present at {0}", dictionary);
-        return new FileChannelSegmentReader<>(dictionary_delta::new, file, dictionary, compressed)
+        return new FileChannelSegmentReader<>(dictionary_delta::new, file, dictionary, compression)
                 .map(Optional::of);
     }
 
-    public SegmentReader<record_array> recordsDecoder(GCCloseable<FileChannel> file, boolean compressed) {
-        return new FileChannelSegmentReader<>(record_array::new, file, records, compressed);
+    public SegmentReader<record_array> recordsDecoder(GCCloseable<FileChannel> file, Compression compression) {
+        return new FileChannelSegmentReader<>(record_array::new, file, records, compression);
     }
 }

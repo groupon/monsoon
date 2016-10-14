@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.history.xdr.support.reader;
 
 import com.groupon.lex.metrics.history.xdr.support.IOLengthVerificationFailed;
+import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -59,12 +60,12 @@ public class Crc32VerifyingFileReaderTest {
     }
 
     public byte[] setupWithCrc(byte padValue, boolean correctCrc, int padLen, int roundUp) throws Exception {
-        assert(padLen == 0 ||
-                (padLen > 0 && padLen < roundUp));  // Padding is used to reach multiple of roundUp.
+        assert (padLen == 0
+                || (padLen > 0 && padLen < roundUp));  // Padding is used to reach multiple of roundUp.
         byte[] data;
         data = new byte[roundUp * (8 * 1024 + 1) - padLen];
         for (int i = 0; i < data.length; ++i)
-            data[i] = (byte)(i ^ (i % 97));
+            data[i] = (byte) (i ^ (i % 97));
 
         CRC32 crc32 = new CRC32();
         crc32.update(ByteBuffer.wrap(data));
@@ -76,7 +77,8 @@ public class Crc32VerifyingFileReaderTest {
 
             buf = ByteBuffer.allocate(padLen);
             buf.order(ByteOrder.BIG_ENDIAN);
-            while (buf.hasRemaining()) buf.put(padValue);
+            while (buf.hasRemaining())
+                buf.put(padValue);
             buf.flip();
             crc32.update(buf.duplicate());
             while (buf.hasRemaining())
@@ -84,7 +86,7 @@ public class Crc32VerifyingFileReaderTest {
 
             buf = ByteBuffer.allocate(4);
             buf.order(ByteOrder.BIG_ENDIAN);
-            buf.putInt((int)(correctCrc ? crc32.getValue() : ~crc32.getValue()));
+            buf.putInt((int) (correctCrc ? crc32.getValue() : ~crc32.getValue()));
             buf.flip();
             while (buf.hasRemaining())
                 fd.write(buf);
@@ -110,52 +112,52 @@ public class Crc32VerifyingFileReaderTest {
 
     @Test
     public void read_pad0_valid() throws Exception {
-        readValid((byte)0, true, 0, 0);
+        readValid((byte) 0, true, 0, 0);
     }
 
     @Test
     public void read_pad0_valid_roundUp() throws Exception {
-        readValid((byte)0, true, 0, 7);  // Should still work with weird roundup.
+        readValid((byte) 0, true, 0, 7);  // Should still work with weird roundup.
     }
 
     @Test
     public void read_pad3_valid_roundUp() throws Exception {
-        readValid((byte)0, true, 3, 7);
+        readValid((byte) 0, true, 3, 7);
     }
 
     @Test
     public void read_pad6_valid_roundUp() throws Exception {
-        readValid((byte)0, true, 6, 7);  // Should still work with weird roundup.
+        readValid((byte) 0, true, 6, 7);  // Should still work with weird roundup.
     }
 
     @Test(expected = Crc32VerifyingFileReader.IOCrcMismatchException.class)
     public void read_pad0_invalid() throws Exception {
-        readValid((byte)0, false, 0, 0);
+        readValid((byte) 0, false, 0, 0);
     }
 
     @Test(expected = Crc32VerifyingFileReader.IOCrcMismatchException.class)
     public void read_pad0_invalid_roundUp() throws Exception {
-        readValid((byte)0, false, 3, 4);
+        readValid((byte) 0, false, 3, 4);
     }
 
     @Test(expected = Crc32VerifyingFileReader.IOCrcMismatchException.class)
     public void read_pad3_invalid_roundUp() throws Exception {
-        readValid((byte)0, false, 3, 4);
+        readValid((byte) 0, false, 3, 4);
     }
 
     @Test(expected = Crc32VerifyingFileReader.IOPaddingException.class)
     public void read_badPad_valid() throws Exception {
-        readValid((byte)7, false, 3, 4);
+        readValid((byte) 7, false, 3, 4);
     }
 
     @Test(expected = IOException.class)
     public void read_badPad_invalid() throws Exception {
-        readValid((byte)7, false, 3, 4);
+        readValid((byte) 7, false, 3, 4);
     }
 
     @Test(expected = IOLengthVerificationFailed.class)
     public void readTooLittle() throws Exception {
-        byte expected[] = setupWithCrc((byte)0, true, 0, 4);
+        byte expected[] = setupWithCrc((byte) 0, true, 0, 4);
         byte output[] = new byte[expected.length - 1024];
 
         try (FileChannel fd = FileChannel.open(file, StandardOpenOption.READ)) {
@@ -167,9 +169,9 @@ public class Crc32VerifyingFileReaderTest {
         }
     }
 
-    @Test(expected = IOLengthVerificationFailed.class)
+    @Test(expected = EOFException.class)
     public void readTooMuch() throws Exception {
-        byte expected[] = setupWithCrc((byte)0, true, 0, 4);
+        byte expected[] = setupWithCrc((byte) 0, true, 0, 4);
         byte output[] = new byte[expected.length + 1024];
 
         try (FileChannel fd = FileChannel.open(file, StandardOpenOption.READ)) {

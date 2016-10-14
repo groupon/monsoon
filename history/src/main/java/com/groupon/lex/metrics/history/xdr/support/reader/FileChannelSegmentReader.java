@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.history.xdr.support.reader;
 
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import java.io.IOException;
@@ -55,11 +56,11 @@ public class FileChannelSegmentReader<T extends XdrAble> implements SegmentReade
     @NonNull
     private final FilePos pos;
     @Getter
-    private final boolean compressed;
+    private final Compression compression;
 
     @Override
     public T decode() throws IOException, OncRpcException {
-        try (XdrDecodingFileReader reader = new XdrDecodingFileReader(wrapReader(new Crc32VerifyingFileReader(new FileChannelReader(file.get(), pos.getOffset()), pos.getLen(), 4)))) {
+        try (XdrDecodingFileReader reader = new XdrDecodingFileReader(compression.wrap(new Crc32VerifyingFileReader(new FileChannelReader(file.get(), pos.getOffset()), pos.getLen(), 4)))) {
             reader.beginDecoding();
             T instance = type.get();
             LOG.log(Level.FINEST, "decoding {0} at {1}", new Object[]{instance.getClass(), pos});
@@ -69,19 +70,14 @@ public class FileChannelSegmentReader<T extends XdrAble> implements SegmentReade
         }
     }
 
-    private FileReader wrapReader(FileReader reader) throws IOException {
-        if (compressed) reader = new GzipReader(reader);
-        return reader;
-    }
-
     @RequiredArgsConstructor
     public static class Factory implements SegmentReader.Factory<XdrAble> {
         private final GCCloseable<FileChannel> file;
-        private final boolean compressed;
+        private final Compression compression;
 
         @Override
         public <T extends XdrAble> SegmentReader<T> get(Supplier<T> type, FilePos pos) {
-            return new FileChannelSegmentReader<>(type, file, pos, compressed);
+            return new FileChannelSegmentReader<>(type, file, pos, compression);
         }
     }
 }

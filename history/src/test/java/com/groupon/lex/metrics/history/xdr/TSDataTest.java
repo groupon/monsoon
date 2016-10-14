@@ -12,20 +12,15 @@ import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.v2.list.FileListFileSupport;
-import com.groupon.lex.metrics.history.v2.list.RWListFile;
 import com.groupon.lex.metrics.history.v2.tables.FileTableFileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport0;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport1;
-import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
-import java.io.File;
-import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collection;
 import static java.util.Collections.EMPTY_LIST;
@@ -52,7 +47,6 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -67,21 +61,21 @@ public class TSDataTest {
     private Path tmpdir, tmpfile;
     private final DateTime NOW = new DateTime(DateTimeZone.UTC);
 
-    @Parameterized.Parameters
+    @Parameterized.Parameters(name = "{0}")
     public static Collection<Object[]> parameters() {
         return Arrays.asList(
-                new Object[]{new FileSupport(new FileSupport0(), false)},
-                new Object[]{new FileSupport(new FileSupport1(), false)},
-                new Object[]{new FileSupport(new FileTableFileSupport(), false)},
-                new Object[]{new FileSupport(new FileListFileSupport(), false)},
-                new Object[]{new FileSupport(new FileSupport0(), true)},
-                new Object[]{new FileSupport(new FileSupport1(), true)},
-                new Object[]{new FileSupport(new FileTableFileSupport(), true)},
-                new Object[]{new FileSupport(new FileListFileSupport(), true)}
+                new Object[]{"v0.1 uncompressed", new FileSupport(new FileSupport0(), false)},
+                new Object[]{"v1.0 uncompressed", new FileSupport(new FileSupport1(), false)},
+                new Object[]{"v2.0 uncompressed table", new FileSupport(new FileTableFileSupport(), false)},
+                new Object[]{"v2.0 uncompressed list", new FileSupport(new FileListFileSupport(), false)},
+                new Object[]{"v0.1 compressed", new FileSupport(new FileSupport0(), true)},
+                new Object[]{"v1.0 compressed", new FileSupport(new FileSupport1(), true)},
+                new Object[]{"v2.0 compressed table", new FileSupport(new FileTableFileSupport(), true)},
+                new Object[]{"v2.0 compressed list", new FileSupport(new FileListFileSupport(), true)}
         );
     }
 
-    public TSDataTest(FileSupport file_support) {
+    public TSDataTest(String name, FileSupport file_support) {
         this.file_support = file_support;
     }
 
@@ -118,7 +112,7 @@ public class TSDataTest {
 
     @Test(expected = UnsupportedOperationException.class)
     public void cannot_add() throws Exception {
-        final List<TimeSeriesCollection> tsdata = create_tsdata_(10).collect(Collectors.toList());
+        final List<TimeSeriesCollection> tsdata = create_tsdata_(2).collect(Collectors.toList());
         file_support.create_file(tmpfile, tsdata);
 
         final TSData fd = TSData.readonly(tmpfile);
@@ -127,46 +121,11 @@ public class TSDataTest {
 
     @Test(expected = UnsupportedOperationException.class)
     public void cannot_add_all() throws Exception {
-        final List<TimeSeriesCollection> tsdata = create_tsdata_(10).collect(Collectors.toList());
+        final List<TimeSeriesCollection> tsdata = create_tsdata_(2).collect(Collectors.toList());
         file_support.create_file(tmpfile, tsdata);
 
         final TSData fd = TSData.readonly(tmpfile);
         fd.addAll(tsdata);
-    }
-
-    /* This test is designed not to fit in memory. */
-    @Test
-    @Ignore
-    public void read_really_large_file() throws Exception {
-        final int FILESIZE = 32 * 1024 * 1024;
-        // Use the TSData writer to create this file.
-        int count = 0;
-        {
-            File collectionFile = File.createTempFile("monsoon-", "-TSDataTest--really_large");
-            collectionFile.deleteOnExit();
-            final TSData writer = RWListFile.newFile(new GCCloseable<>(FileChannel.open(collectionFile.toPath(), StandardOpenOption.READ, StandardOpenOption.WRITE)), true);
-            Iterator<TimeSeriesCollection> iter = create_tsdata_(FILESIZE).iterator();
-
-            while (writer.getFileSize() <= FILESIZE) {
-                writer.add(iter.next());
-                ++count;
-            }
-
-            file_support.create_file(tmpfile, writer);
-        }
-
-        // Use streaming matcher, to evade giant collection.
-        final int expected_count = count;
-        Iterator<TimeSeriesCollection> expected = create_tsdata_(FILESIZE).limit(expected_count).iterator();
-
-        TSData fd = TSData.readonly(tmpfile);
-
-        Iterator<TimeSeriesCollection> fd_iter = fd.iterator();
-        while (expected.hasNext()) {
-            assertTrue(fd_iter.hasNext());
-            assertEquals(expected.next(), fd_iter.next());
-        }
-        assertFalse(fd_iter.hasNext());
     }
 
     private Stream<TimeSeriesCollection> create_tsdata_(int count) {
@@ -199,7 +158,7 @@ public class TSDataTest {
 
     @Test
     public void to_array() throws Exception {
-        final List<TimeSeriesCollection> tsdata = create_tsdata_(10).collect(Collectors.toList());
+        final List<TimeSeriesCollection> tsdata = create_tsdata_(2).collect(Collectors.toList());
         file_support.create_file(tmpfile, tsdata);
 
         final TSData fd = TSData.readonly(tmpfile);
@@ -209,7 +168,7 @@ public class TSDataTest {
 
     @Test
     public void to_array_with_array_constructor() throws Exception {
-        final List<TimeSeriesCollection> tsdata = create_tsdata_(10).collect(Collectors.toList());
+        final List<TimeSeriesCollection> tsdata = create_tsdata_(2).collect(Collectors.toList());
         file_support.create_file(tmpfile, tsdata);
 
         final TSData fd = TSData.readonly(tmpfile);
@@ -219,13 +178,13 @@ public class TSDataTest {
 
     @Test
     public void contains() throws Exception {
-        final List<TimeSeriesCollection> tsdata = create_tsdata_(10).collect(Collectors.toList());
-        file_support.create_file(tmpfile, tsdata.subList(0, 9));
+        final List<TimeSeriesCollection> tsdata = create_tsdata_(3).collect(Collectors.toList());
+        file_support.create_file(tmpfile, tsdata.subList(0, 2));
 
         final TSData fd = TSData.readonly(tmpfile);
 
-        assertTrue(fd.contains(tsdata.get(8)));
-        assertFalse(fd.contains(tsdata.get(9)));
+        assertTrue(fd.contains(tsdata.get(1)));
+        assertFalse(fd.contains(tsdata.get(2)));
         assertFalse(fd.contains(new Object()));
     }
 
@@ -299,7 +258,7 @@ public class TSDataTest {
 
     @Test
     public void add_all_none_existing() {
-        final List<TimeSeriesCollection> tsdata = create_tsdata_(10).collect(Collectors.toList());
+        final List<TimeSeriesCollection> tsdata = create_tsdata_(4).collect(Collectors.toList());
         final Set<TimeSeriesCollection> result = new HashSet<>();
         final TSData impl = new TSDataMock() {
             @Override
@@ -313,7 +272,7 @@ public class TSDataTest {
 
     @Test
     public void add_all_all_existing() {
-        final List<TimeSeriesCollection> tsdata = create_tsdata_(10).collect(Collectors.toList());
+        final List<TimeSeriesCollection> tsdata = create_tsdata_(4).collect(Collectors.toList());
         final Set<TimeSeriesCollection> result = new HashSet<>(tsdata);
         final TSData impl = new TSDataMock() {
             @Override

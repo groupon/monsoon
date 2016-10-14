@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.history.v2.tables;
 
 import com.groupon.lex.metrics.history.TSData;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables;
@@ -145,13 +146,24 @@ public class ReadonlyTableFile implements TSData {
     }
 
     @Override
-    public short getMajor() { return Const.version_major(version); }
+    public short getMajor() {
+        return Const.version_major(version);
+    }
+
     @Override
-    public short getMinor() { return Const.version_minor(version); }
+    public short getMinor() {
+        return Const.version_minor(version);
+    }
+
     @Override
-    public boolean canAddSingleRecord() { return false; }
+    public boolean canAddSingleRecord() {
+        return false;
+    }
+
     @Override
-    public boolean isOptimized() { return true; }
+    public boolean isOptimized() {
+        return true;
+    }
 
     @Override
     public Optional<GCCloseable<FileChannel>> getFileChannel() {
@@ -184,7 +196,7 @@ public class ReadonlyTableFile implements TSData {
         if ((hdr.flags & header_flags.KIND_MASK) != header_flags.KIND_TABLES)
             throw new IllegalArgumentException("Not a file in table encoding");
 
-        final boolean gzipped = ((hdr.flags & header_flags.GZIP) == header_flags.GZIP);
+        final Compression compression = Compression.fromFlags(hdr.flags);
         if ((hdr.flags & header_flags.DISTINCT) != header_flags.DISTINCT)
             throw new IllegalArgumentException("Bad TableFile: marked as containing duplicate timestamps");
         if ((hdr.flags & header_flags.SORTED) != header_flags.SORTED)
@@ -192,7 +204,7 @@ public class ReadonlyTableFile implements TSData {
         begin = FromXdr.timestamp(hdr.first);
         end = FromXdr.timestamp(hdr.last);
 
-        segmentFactory = new FileChannelSegmentReader.Factory(file, gzipped);
+        segmentFactory = new FileChannelSegmentReader.Factory(file, compression);
         final FilePos bodyPos = FromXdr.filePos(hdr.fdt);
 
         body = segmentFactory.get(file_data_tables::new, bodyPos)

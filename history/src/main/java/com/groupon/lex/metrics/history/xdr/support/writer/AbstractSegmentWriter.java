@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.history.xdr.support.writer;
 
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -51,19 +52,19 @@ public abstract class AbstractSegmentWriter {
     public static class Writer {
         @NonNull
         private final FileChannelWriter out;
-        private final boolean compress;
+        private final Compression compression;
         private ByteBuffer useBuffer;  // May be null.
 
-        public Writer(@NonNull FileChannel out, long offset, boolean compress) {
+        public Writer(@NonNull FileChannel out, long offset, Compression compression) {
             this.out = new FileChannelWriter(out, offset);
-            this.compress = compress;
+            this.compression = compression;
         }
 
         public FilePos write(XdrAble object) throws IOException, OncRpcException {
             final long initPos = out.getOffset();
 
             try (Crc32AppendingFileWriter outerWriter = new Crc32AppendingFileWriter(new CloseInhibitingWriter(out), 4)) {
-                try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(wrapWriter(new CloseInhibitingWriter(outerWriter), compress), useBuffer)) {
+                try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(compression.wrap(new CloseInhibitingWriter(outerWriter)), useBuffer)) {
                     writer.beginEncoding();
                     object.xdrEncode(writer);
                     writer.endEncoding();
@@ -71,13 +72,6 @@ public abstract class AbstractSegmentWriter {
 
                 return new FilePos(initPos, outerWriter.getWritten());
             }
-        }
-
-        private static FileWriter wrapWriter(FileWriter underlying, boolean compress) throws IOException {
-            FileWriter result = underlying;
-            if (compress)
-                result = new GzipWriter(result);
-            return result;
         }
     }
 }
