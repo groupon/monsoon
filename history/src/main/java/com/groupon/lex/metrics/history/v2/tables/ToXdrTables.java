@@ -41,6 +41,7 @@ import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.createPresenceBitset;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
+import com.groupon.lex.metrics.history.v2.xdr.dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables_block;
 import com.groupon.lex.metrics.history.v2.xdr.group_table;
@@ -54,6 +55,7 @@ import com.groupon.lex.metrics.history.v2.xdr.timestamp_msec;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
 import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.writeMimeHeader;
+import com.groupon.lex.metrics.history.xdr.support.FJPTaskExecutor;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import com.groupon.lex.metrics.history.xdr.support.TmpFile;
 import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter.Writer;
@@ -106,7 +108,7 @@ public class ToXdrTables implements Closeable {
     private static final Logger LOG = Logger.getLogger(ToXdrTables.class.getName());
     private static final int HDR_SPACE = MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN;
     private static final int MAX_BLOCK_RECORDS = 10000;
-    private static final Compression TMPFILE_COMPRESSION = Compression.NONE;
+    private static final Compression TMPFILE_COMPRESSION = Compression.SNAPPY;
     @NonNull
     private final FileChannel out;
     @NonNull
@@ -151,8 +153,8 @@ public class ToXdrTables implements Closeable {
                 }
 
                 timestamps.add(timestamp);
-                for (TimeSeriesValue tsv : tsc.getTSValues())
-                    processGroup(timestamp, tsv);
+                new FJPTaskExecutor<>(tsc.getTSValues(), tsv -> processGroup(timestamp, tsv))
+                        .join();
             } catch (OncRpcException ex) {
                 throw new IOException("encoding error", ex);
             }
@@ -243,16 +245,22 @@ public class ToXdrTables implements Closeable {
             throw new IOException("table file may not be empty");
         result.blocks = blocks.toArray(new file_data_tables_block[blocks.size()]);
 
-        return ctx.newWriter().write(result);
+        synchronized (ctx) {
+            return ctx.newWriter().write(result);
+        }
     }
 
     private file_data_tables_block createBlock(Context ctx) throws IOException, OncRpcException {
         ctx.setTsdata(timestamps);
+        tables tables = createTables(ctx);  // Writes dependency data.
+        dictionary_delta encodedDictionary = dictionary.encode();  // Must be last.
 
         file_data_tables_block result = new file_data_tables_block();
-        result.tables_data = ToXdr.filePos(ctx.newWriter().write(createTables(ctx)));  // Writes dependency data.
-        result.dictionary = ToXdr.filePos(ctx.newWriter().write(dictionary.encode()));  // Must be last.
-        result.tsd = ToXdr.timestamp_delta(ctx.getTimestamps());
+        synchronized (ctx) {
+            result.tables_data = ToXdr.filePos(ctx.newWriter().write(tables));
+            result.dictionary = ToXdr.filePos(ctx.newWriter().write(encodedDictionary));
+            result.tsd = ToXdr.timestamp_delta(ctx.getTimestamps());
+        }
 
         // Reset state.
         timestamps.clear();
@@ -272,13 +280,20 @@ public class ToXdrTables implements Closeable {
         TIntObjectMap<List<tables_tag>> groupPathMap = new TIntObjectHashMap<>();
 
         // Write dependency data.
-        for (Map.Entry<GroupName, GroupTmpFile> grpEntry : groups.entrySet()) {
-            final SimpleGroupPath grp = grpEntry.getKey().getPath();
-            final int grpRef = dictionary.getPathTable().getOrCreate(grp.getPath());
-            if (!groupPathMap.containsKey(grpRef))
-                groupPathMap.put(grpRef, new ArrayList<>());
-            groupPathMap.get(grpRef).add(createTagTable(grpEntry.getKey(), grpEntry.getValue(), ctx));
-        }
+        new FJPTaskExecutor<>(
+                groups.entrySet(),
+                grpEntry -> {
+                    final SimpleGroupPath grp = grpEntry.getKey().getPath();
+                    final int grpRef = dictionary.getPathTable().getOrCreate(grp.getPath());
+                    final List<tables_tag> tagList;
+                    synchronized (groupPathMap) {
+                        if (!groupPathMap.containsKey(grpRef))
+                            groupPathMap.put(grpRef, new ArrayList<>());
+                        tagList = groupPathMap.get(grpRef);
+                    }
+                    tagList.add(createTagTable(grpEntry.getKey(), grpEntry.getValue(), ctx));
+                })
+                .join();
 
         // yield encoded table
         return new tables(Arrays.stream(groupPathMap.keys())
@@ -320,7 +335,9 @@ public class ToXdrTables implements Closeable {
                     return tm;
                 })
                 .toArray(tables_metric[]::new);
-        return ctx.newWriter().write(result);
+        synchronized (ctx) {
+            return ctx.newWriter().write(result);
+        }
     }
 
     private TIntObjectMap<FilePos> writeMetrics(MetricTmpFile metrics, Context ctx) throws IOException, OncRpcException {
@@ -334,8 +351,11 @@ public class ToXdrTables implements Closeable {
         });
 
         TIntObjectMap<FilePos> result = new TIntObjectHashMap<>();
-        for (int nameRef : metricTbl.keys())
-            result.put(nameRef, metricTbl.get(nameRef).write(ctx.newWriter(), ctx.getTimestamps()));
+        for (int nameRef : metricTbl.keys()) {
+            synchronized (ctx) {
+                result.put(nameRef, metricTbl.get(nameRef).write(ctx.newWriter(), ctx.getTimestamps()));
+            }
+        }
         return result;
     }
 
@@ -382,6 +402,7 @@ public class ToXdrTables implements Closeable {
         }
 
         public Writer newWriter() {
+            assert Thread.holdsLock(this);
             return new Writer(fd, compression, useBuffer);
         }
 

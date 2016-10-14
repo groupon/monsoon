@@ -35,11 +35,9 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.concurrent.ForkJoinPool;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
 @AllArgsConstructor
@@ -52,56 +50,19 @@ public class FileChannelReader implements FileReader {
 
     @Override
     public int read(ByteBuffer data) throws IOException {
-        return fjpRead(data);
+        final int rlen = fd.read(data, offset);
+        if (rlen == -1)
+            throw new EOFException("no more data (file end)");
+        offset += rlen;
+        return rlen;
     }
 
     @Override
-    public void close() {}
+    public void close() {
+    }
 
     @Override
     public ByteBuffer allocateByteBuffer(int size) {
         return ByteBuffer.allocateDirect(size);
-    }
-
-    @RequiredArgsConstructor
-    private class FJPReader implements ForkJoinPool.ManagedBlocker {
-        private int read = 0;
-        private final ByteBuffer buf;
-        private IOException ex = null;
-
-        public int get() throws IOException {
-            if (ex != null) throw ex;
-            return read;
-        }
-
-        @Override
-        public boolean block() throws InterruptedException {
-            if (ex != null) return true;
-            try {
-                int rlen = fd.read(buf, offset);
-                if (rlen == -1)
-                    throw new EOFException("no more data (file end)");
-                read += rlen;
-                offset += rlen;
-            } catch (IOException ex) {
-                this.ex = ex;
-            }
-            return true;
-        }
-
-        @Override
-        public boolean isReleasable() {
-            return read != 0 || ex != null;
-        }
-    }
-
-    private int fjpRead(ByteBuffer buf) throws IOException {
-        final FJPReader reader = new FJPReader(buf);
-        try {
-            ForkJoinPool.managedBlock(reader);
-        } catch (InterruptedException ex) {
-            throw new IOException("interrupted write", ex);
-        }
-        return reader.get();
     }
 }

@@ -46,11 +46,15 @@ public class ExportMap<T> implements Cloneable {
     private int initSeq;
     private int nextSeq;
 
-    public ExportMap() { this(0, EMPTY_MAP); }
+    public ExportMap() {
+        this(0, EMPTY_MAP);
+    }
+
     public ExportMap(int nextSeq, Map<Integer, T> init) {
         this.initSeq = this.nextSeq = nextSeq;
         init.forEach((idx, val) -> {
-            if (this.nextSeq <= idx) this.nextSeq = idx + 1;
+            if (this.nextSeq <= idx)
+                this.nextSeq = idx + 1;
             table.put(val, idx);
         });
     }
@@ -61,18 +65,25 @@ public class ExportMap<T> implements Cloneable {
         nextSeq = original.nextSeq;
     }
 
-    public int getOrCreate(T value) {
+    public synchronized int getOrCreate(T value) {
         int idx = table.putIfAbsent(value, nextSeq);
-        if (idx == NO_ENTRY) idx = nextSeq++;
+        if (idx == NO_ENTRY)
+            idx = nextSeq++;
         return idx;
     }
 
-    public int getOffset() { return initSeq; }
-    public boolean isEmpty() { return !table.containsValue(initSeq); }
+    public synchronized int getOffset() {
+        return initSeq;
+    }
 
-    public ArrayList<T> invert() {
+    public synchronized boolean isEmpty() {
+        return !table.containsValue(initSeq);
+    }
+
+    public synchronized ArrayList<T> invert() {
         final ArrayList<T> data = new ArrayList<>(nextSeq);
-        for (int i = 0; i < nextSeq; ++i) data.add(null);  // Make all elements accessable by data.set().
+        for (int i = 0; i < nextSeq; ++i)
+            data.add(null);  // Make all elements accessable by data.set().
 
         table.forEachEntry((key, value) -> {
             data.set(value, key);
@@ -84,15 +95,17 @@ public class ExportMap<T> implements Cloneable {
     /**
      * Reset for the next write cycle.
      *
-     * The next write cycle will exclude any data present in the dictionary, during serialization.
+     * The next write cycle will exclude any data present in the dictionary,
+     * during serialization.
      */
-    public void reset() {
+    public synchronized void reset() {
         initSeq = nextSeq;
     }
 
-    public List<T> createMap() {
+    public synchronized List<T> createMap() {
         final List<T> data = new ArrayList<>(nextSeq - initSeq);
-        for (int i = initSeq; i < nextSeq; ++i) data.add(null);  // Make all elements accessable by data.set().
+        for (int i = initSeq; i < nextSeq; ++i)
+            data.add(null);  // Make all elements accessable by data.set().
 
         table.forEachEntry((key, value) -> {
             if (value >= initSeq)
@@ -103,7 +116,7 @@ public class ExportMap<T> implements Cloneable {
     }
 
     @Override
-    public ExportMap<T> clone() {
+    public synchronized ExportMap<T> clone() {
         return new ExportMap<>(this);
     }
 }
