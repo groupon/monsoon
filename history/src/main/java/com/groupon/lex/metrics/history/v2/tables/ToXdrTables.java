@@ -78,10 +78,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.Getter;
@@ -115,7 +116,7 @@ public class ToXdrTables implements Closeable {
     private final Compression compression;
 
     private final TLongSet timestamps = new TLongHashSet();
-    private final Map<GroupName, GroupTmpFile> groups = new HashMap<>(1000, 0.5f);
+    private final ConcurrentMap<GroupName, GroupTmpFile> groups = new ConcurrentHashMap<>(1000, 0.5f, FJPTaskExecutor.DEFAULT_CONCURRENCY);
     private DictionaryForWrite dictionary;
     private final List<file_data_tables_block> blocks = new ArrayList<>();
     private Long firstTs = null, lastTs = null;  // Timestamps in current block.
