@@ -34,10 +34,8 @@ package com.groupon.lex.metrics.history.xdr.support.writer;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.concurrent.ForkJoinPool;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
 @AllArgsConstructor
@@ -49,53 +47,17 @@ public class FileChannelWriter implements FileWriter {
 
     @Override
     public int write(ByteBuffer data) throws IOException {
-        final int wlen = fjpWrite(data);
+        final int wlen = fd.write(data, offset);
         offset += wlen;
         return wlen;
     }
 
     @Override
-    public void close() {}
+    public void close() {
+    }
 
     @Override
     public ByteBuffer allocateByteBuffer(int size) {
         return ByteBuffer.allocateDirect(size);
-    }
-
-    @RequiredArgsConstructor
-    private class FJPWriter implements ForkJoinPool.ManagedBlocker {
-        private int written = 0;
-        private final ByteBuffer buf;
-        private IOException ex;
-
-        public int get() throws IOException {
-            if (ex != null) throw ex;
-            return written;
-        }
-
-        @Override
-        public boolean block() throws InterruptedException {
-            try {
-                written += fd.write(buf, offset);
-            } catch (IOException ex) {
-                this.ex = ex;
-            }
-            return true;
-        }
-
-        @Override
-        public boolean isReleasable() {
-            return false;
-        }
-    }
-
-    private int fjpWrite(ByteBuffer buf) throws IOException {
-        final FJPWriter writer = new FJPWriter(buf);
-        try {
-            ForkJoinPool.managedBlock(writer);
-        } catch (InterruptedException ex) {
-            throw new IOException("interrupted write", ex);
-        }
-        return writer.get();
     }
 }
