@@ -108,7 +108,7 @@ public class ToXdrTables implements Closeable {
     private static final Logger LOG = Logger.getLogger(ToXdrTables.class.getName());
     private static final int HDR_SPACE = MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN;
     private static final int MAX_BLOCK_RECORDS = 10000;
-    private static final Compression TMPFILE_COMPRESSION = Compression.NONE;
+    private static final Compression TMPFILE_COMPRESSION = Compression.SNAPPY;
     @NonNull
     private final FileChannel out;
     @NonNull
