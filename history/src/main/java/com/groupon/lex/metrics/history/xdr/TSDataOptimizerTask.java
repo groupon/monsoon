@@ -129,7 +129,7 @@ public class TSDataOptimizerTask {
      * @return A completeable future that yields the newly created file.
      */
     public CompletableFuture<NewFile> run() {
-        LOG.log(Level.INFO, "starting optimized file creation for {0} files", files.size());
+        LOG.log(Level.FINE, "starting optimized file creation for {0} files", files.size());
         CompletableFuture<NewFile> fileCreation = new CompletableFuture<>();
         final Map<Path, Reference<TSData>> jfpFiles = this.files;  // We clear out files below, which makes fjpCreateTmpFile see an empty map if we don't use a separate variable.
         TASK_POOL.submit(() -> fjpCreateTmpFile(fileCreation, destDir, jfpFiles));
@@ -149,7 +149,7 @@ public class TSDataOptimizerTask {
      * @param files the list of files that make up the resulting file.
      */
     private static void fjpCreateTmpFile(CompletableFuture<NewFile> fileCreation, Path destDir, Map<Path, Reference<TSData>> files) {
-        LOG.log(Level.INFO, "starting temporary file creation...");
+        LOG.log(Level.FINE, "starting temporary file creation...");
         try {
             final FileChannel fd = FileUtil.createTempFile(destDir, "monsoon-", ".optimize-tmp");
             try {
@@ -184,7 +184,7 @@ public class TSDataOptimizerTask {
                 throw ex;
             }
         } catch (Error | RuntimeException | IOException ex) {
-            LOG.log(Level.INFO, "temporary file for optimization failure", ex);
+            LOG.log(Level.WARNING, "temporary file for optimization failure", ex);
             fileCreation.completeExceptionally(ex);  // Propagate exceptions.
         }
     }
