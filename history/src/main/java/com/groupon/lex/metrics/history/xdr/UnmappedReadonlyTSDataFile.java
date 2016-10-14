@@ -1,6 +1,5 @@
 package com.groupon.lex.metrics.history.xdr;
 
-import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.history.TSData;
 import static com.groupon.lex.metrics.history.xdr.Const.version_major;
 import static com.groupon.lex.metrics.history.xdr.Const.version_minor;
@@ -8,7 +7,9 @@ import com.groupon.lex.metrics.history.xdr.support.GzipDecodingBufferSupplier;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID1_EXPECT;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID2_EXPECT;
 import com.groupon.lex.metrics.history.xdr.support.Parser;
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import com.groupon.lex.metrics.history.xdr.support.XdrStreamIterator;
+import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -22,7 +23,6 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.acplt.oncrpc.OncRpcException;
-import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import org.joda.time.DateTime;
 
 /**
@@ -50,7 +50,6 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
         } else {
             is_gzipped_ = false;
         }
-        LOG.log(Level.INFO, "is_gzipped: {0}", is_gzipped_);
 
         final XdrBufferDecodingStream stream;
         if (is_gzipped_)
@@ -69,7 +68,7 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
         final Parser.BeginEnd header = Parser.fromVersion(version_).header(stream);
         begin_ = header.getBegin();
         end_ = header.getEnd();
-        LOG.log(Level.INFO, "instantiated: version={0}.{1} begin={2}, end={3}", new Object[]{version_major(version_), version_minor(version_), begin_, end_});
+        LOG.log(Level.FINE, "instantiated: version={0}.{1} begin={2}, end={3}", new Object[]{version_major(version_), version_minor(version_), begin_, end_});
     }
 
     public static UnmappedReadonlyTSDataFile open(Path file) throws IOException {
@@ -78,13 +77,24 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
     }
 
     @Override
-    public DateTime getBegin() { return begin_; }
+    public DateTime getBegin() {
+        return begin_;
+    }
+
     @Override
-    public DateTime getEnd() { return end_; }
+    public DateTime getEnd() {
+        return end_;
+    }
+
     @Override
-    public short getMajor() { return version_major(version_); }
+    public short getMajor() {
+        return version_major(version_);
+    }
+
     @Override
-    public short getMinor() { return version_minor(version_); }
+    public short getMinor() {
+        return version_minor(version_);
+    }
 
     @Override
     public long getFileSize() {
@@ -97,9 +107,14 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
     }
 
     @Override
-    public boolean canAddSingleRecord() { return !is_gzipped_; }
+    public boolean canAddSingleRecord() {
+        return !is_gzipped_;
+    }
+
     @Override
-    public boolean isOptimized() { return false; }
+    public boolean isOptimized() {
+        return false;
+    }
 
     private class UnmappedBufferSupplier implements BufferSupplier {
         private long offset_;

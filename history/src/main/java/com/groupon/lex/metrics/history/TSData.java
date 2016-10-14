@@ -29,34 +29,58 @@ import org.joda.time.DateTime;
 
 /**
  * Models a closeable collection of TimeSeriesValue.
+ *
  * @author ariane
  */
 public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory {
-    /** Get the lowest timestamp covered by this TSData series. */
+    /**
+     * Get the lowest timestamp covered by this TSData series.
+     */
     public DateTime getBegin();
-    /** Get the highest timestamp covered by this TSData series. */
+
+    /**
+     * Get the highest timestamp covered by this TSData series.
+     */
     public DateTime getEnd();
-    /** Retrieve the filesize used by the TSData. */
+
+    /**
+     * Retrieve the filesize used by the TSData.
+     */
     public long getFileSize();
-    /** Returns the major version of the TSData file.  Note that this is the file-data version, not the application version. */
+
+    /**
+     * Returns the major version of the TSData file. Note that this is the
+     * file-data version, not the application version.
+     */
     public short getMajor();
-    /** Returns the minor version of the TSData file.  Note that this is the file-data version, not the application version. */
+
+    /**
+     * Returns the minor version of the TSData file. Note that this is the
+     * file-data version, not the application version.
+     */
     public short getMinor();
-    /** Returns true if the file is suitable for adding single records at a time. */
+
+    /**
+     * Returns true if the file is suitable for adding single records at a time.
+     */
     public boolean canAddSingleRecord();
-    /** Returns true if the file is optimized for access by (GroupPath, Tags, MetricName) tuple. */
+
+    /**
+     * Returns true if the file is optimized for access by (GroupPath, Tags,
+     * MetricName) tuple.
+     */
     public boolean isOptimized();
 
     /**
-     * Returns an iterator for this TSData.
-     * Iterator is always ordered, without duplicate timestamps.
+     * Returns an iterator for this TSData. Iterator is always ordered, without
+     * duplicate timestamps.
      */
     @Override
     public Iterator<TimeSeriesCollection> iterator();
 
     /**
-     * Returns an iterator for this TSData.
-     * Iterator is always ordered, without duplicate timestamps.
+     * Returns an iterator for this TSData. Iterator is always ordered, without
+     * duplicate timestamps.
      */
     @Override
     public default Spliterator<TimeSeriesCollection> spliterator() {
@@ -64,8 +88,8 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
     }
 
     /**
-     * Stream the TSData contents.
-     * The stream iterates collection in chronological order, without duplicate timestamps.
+     * Stream the TSData contents. The stream iterates collection in
+     * chronological order, without duplicate timestamps.
      */
     @Override
     public default Stream<TimeSeriesCollection> stream() {
@@ -73,8 +97,9 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
     }
 
     /**
-     * Stream the TSData contents in reverse chronological order.
-     * The stream iterates collection in reverse chronological order, without duplicate timestamps.
+     * Stream the TSData contents in reverse chronological order. The stream
+     * iterates collection in reverse chronological order, without duplicate
+     * timestamps.
      */
     @Override
     public default Stream<TimeSeriesCollection> streamReversed() {
@@ -83,17 +108,33 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
         return copy.stream();
     }
 
-    /** Test if the TSData is empty. */
+    /**
+     * Test if the TSData is empty.
+     */
     @Override
-    public default boolean isEmpty() { return !stream().findAny().isPresent(); }
-    /** Returns the number of entries in the TSData. */
-    @Override
-    public default int size() { return (int)stream().count(); }
-    /** Test if the TSData contains the given value. */
-    @Override
-    public default boolean contains(Object o) { return stream().anyMatch((tsv) -> tsv.equals(o)); }
+    public default boolean isEmpty() {
+        return !stream().findAny().isPresent();
+    }
 
-    /** Test if the TSData contains all the given values. */
+    /**
+     * Returns the number of entries in the TSData.
+     */
+    @Override
+    public default int size() {
+        return (int) stream().count();
+    }
+
+    /**
+     * Test if the TSData contains the given value.
+     */
+    @Override
+    public default boolean contains(Object o) {
+        return stream().anyMatch((tsv) -> tsv.equals(o));
+    }
+
+    /**
+     * Test if the TSData contains all the given values.
+     */
     @Override
     public default boolean containsAll(Collection<?> c) {
         Set<?> cc = new HashSet<>(c);  // Make a mutable copy.
@@ -105,54 +146,86 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
     public default Object[] toArray() {
         return stream().toArray();
     }
+
     @Override
     public default <T> T[] toArray(T[] a) {
         return stream().toArray((size) -> {
-            return (T[])java.lang.reflect.Array.newInstance(a.getClass().getComponentType(), size);
+            return (T[]) java.lang.reflect.Array.newInstance(a.getClass().getComponentType(), size);
         });
     }
 
     @Override
     public boolean add(TimeSeriesCollection tsv);
+
     @Override
     public default boolean addAll(Collection<? extends TimeSeriesCollection> c) {
         boolean added = false;
         for (TimeSeriesCollection tsv : c) {
-            if (add(tsv)) added = true;
+            if (add(tsv))
+                added = true;
         }
         return added;
     }
 
-    /** Unsupported. */
+    /**
+     * Unsupported.
+     */
     @Override
-    public default void clear() { throw new UnsupportedOperationException("remove"); }
-    /** Unsupported. */
+    public default void clear() {
+        throw new UnsupportedOperationException("remove");
+    }
+
+    /**
+     * Unsupported.
+     */
     @Override
-    public default boolean retainAll(Collection<?> c) { throw new UnsupportedOperationException("remove"); }
-    /** Unsupported. */
+    public default boolean retainAll(Collection<?> c) {
+        throw new UnsupportedOperationException("remove");
+    }
+
+    /**
+     * Unsupported.
+     */
     @Override
-    public default boolean removeAll(Collection<?> c) { throw new UnsupportedOperationException("remove"); }
-    /** Unsupported. */
+    public default boolean removeAll(Collection<?> c) {
+        throw new UnsupportedOperationException("remove");
+    }
+
+    /**
+     * Unsupported.
+     */
     @Override
-    public default boolean remove(Object o) { throw new UnsupportedOperationException("remove"); }
-    /** Unsupported. */
+    public default boolean remove(Object o) {
+        throw new UnsupportedOperationException("remove");
+    }
+
+    /**
+     * Unsupported.
+     */
     @Override
-    public default boolean removeIf(Predicate<? super TimeSeriesCollection> p) { throw new UnsupportedOperationException("remove"); }
+    public default boolean removeIf(Predicate<? super TimeSeriesCollection> p) {
+        throw new UnsupportedOperationException("remove");
+    }
 
     /**
      * Open the given TSData file.
+     *
      * @param file The file to open.
      * @return A TSData instance that will read the given file.
-     * @throws IOException If an IOException occurs, the file is not a valid TSData file or the version of the file is too new.
+     * @throws IOException If an IOException occurs, the file is not a valid
+     * TSData file or the version of the file is too new.
      */
     public static TSData readonly(Path file) throws IOException {
         final Logger LOG = Logger.getLogger(TSData.class.getName());
-        LOG.log(Level.INFO, "opening {0}", file);
 
-        return TSDataVersionDispatch.open(file);
+        final TSData result = TSDataVersionDispatch.open(file);
+        LOG.log(Level.INFO, "opened v{0}.{1}: {2} ({3}-{4}, {5} scrapes)", new Object[]{result.getMajor(), result.getMinor(), file, result.getBegin(), result.getEnd(), result.getMajor() >= 3 ? result.size() : "unspecified"});
+        return result;
     }
 
-    /** Return the file channel used to read this file, if it is available. */
+    /**
+     * Return the file channel used to read this file, if it is available.
+     */
     public default Optional<GCCloseable<FileChannel>> getFileChannel() {
         return Optional.empty();
     }
