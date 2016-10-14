@@ -55,8 +55,12 @@ public final class RTFFileDataTables {
     private final file_data_tables input;
     private final ObjectSequence<RTFFileDataTablesBlock> blocks;
     private final SegmentReader<ObjectSequence<TimeSeriesCollection>> sequence;
+    private final boolean sorted;
+    private final boolean distinct;
 
-    public RTFFileDataTables(@NonNull file_data_tables input, @NonNull SegmentReader.Factory<XdrAble> segmentFactory) {
+    public RTFFileDataTables(@NonNull file_data_tables input, @NonNull SegmentReader.Factory<XdrAble> segmentFactory, boolean sorted, boolean distinct) {
+        this.sorted = sorted;
+        this.distinct = distinct;
         this.input = input;
         this.blocks = new ForwardSequence(0, input.blocks.length)
                 .map(blockIdx -> new RTFFileDataTablesBlock(input.blocks[blockIdx], segmentFactory), true, true, true)
@@ -70,7 +74,10 @@ public final class RTFFileDataTables {
     }
 
     private ObjectSequence<TimeSeriesCollection> buildSequence() {
-        return Util.mergeSequences(blocks.stream().map(block -> block.getTsdata()).toArray(ObjectSequence[]::new));
+        ObjectSequence[] seq = blocks.stream().map(block -> block.getTsdata()).toArray(ObjectSequence[]::new);
+        if (!sorted || !distinct)
+            return Util.mergeSequences(seq);
+        return ObjectSequence.concat(seq, sorted, distinct);
     }
 
     public int size() {

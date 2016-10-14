@@ -197,10 +197,8 @@ public class ReadonlyTableFile implements TSData {
             throw new IllegalArgumentException("Not a file in table encoding");
 
         final Compression compression = Compression.fromFlags(hdr.flags);
-        if ((hdr.flags & header_flags.DISTINCT) != header_flags.DISTINCT)
-            throw new IllegalArgumentException("Bad TableFile: marked as containing duplicate timestamps");
-        if ((hdr.flags & header_flags.SORTED) != header_flags.SORTED)
-            throw new IllegalArgumentException("Bad TableFile: marked as unsorted");
+        final boolean distinct = ((hdr.flags & header_flags.DISTINCT) == header_flags.DISTINCT);
+        final boolean sorted = ((hdr.flags & header_flags.SORTED) == header_flags.SORTED);
         begin = FromXdr.timestamp(hdr.first);
         end = FromXdr.timestamp(hdr.last);
 
@@ -208,7 +206,7 @@ public class ReadonlyTableFile implements TSData {
         final FilePos bodyPos = FromXdr.filePos(hdr.fdt);
 
         body = segmentFactory.get(file_data_tables::new, bodyPos)
-                .map(fdt -> new RTFFileDataTables(fdt, segmentFactory))
+                .map(fdt -> new RTFFileDataTables(fdt, segmentFactory, sorted, distinct))
                 .peek(RTFFileDataTables::validate)
                 .cache();
     }

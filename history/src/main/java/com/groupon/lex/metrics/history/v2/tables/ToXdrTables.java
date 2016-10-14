@@ -66,8 +66,10 @@ import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
+import gnu.trove.iterator.TIntIterator;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 import java.io.Closeable;
@@ -78,6 +80,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -222,6 +226,7 @@ public class ToXdrTables implements Closeable {
     private void writeFile() throws IOException, OncRpcException {
         if (blocks.isEmpty())
             throw new IllegalStateException("table files may not be empty");
+        Collections.sort(blocks, Comparator.comparing(block -> block.tsd.first));
 
         final FilePos bodyPos;
         final long fileEnd;
@@ -234,9 +239,56 @@ public class ToXdrTables implements Closeable {
         try (XdrEncodingFileWriter xdr = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(out, 0), HDR_SPACE), 0), HDR_SPACE)) {
             xdr.beginEncoding();
             writeMimeHeader(xdr);
-            encodeHeader(bodyPos, fileEnd).xdrEncode(xdr);
+            final boolean blocksAreOrdered = blocksAreOrdered(blocks);
+            final boolean blocksAreDistinct = blocksAreOrdered || blocksAreDistinct(blocks);
+            encodeHeader(bodyPos, fileEnd, blocksAreOrdered, blocksAreDistinct).xdrEncode(xdr);
             xdr.endEncoding();
         }
+    }
+
+    private static boolean blocksAreOrdered(List<file_data_tables_block> blocks) {
+        if (blocks.size() <= 1)
+            return true;
+        final Iterator<file_data_tables_block> iter = blocks.iterator();
+
+        // Initialization: figure out end of first block.
+        long predecessorTs;  // Invariant: last timestamp (long) of block preceding iter.next().
+        {
+            long[] predecessorTsd = FromXdr.timestamp_delta(iter.next().tsd);
+            predecessorTs = predecessorTsd[predecessorTsd.length - 1];
+        }
+
+        while (iter.hasNext()) {
+            final file_data_tables_block current = iter.next();
+            if (current.tsd.first <= predecessorTs)  // Intersection: blocks are not ordered.
+                return false;
+
+            long[] currentTsd = FromXdr.timestamp_delta(current.tsd);
+            predecessorTs = currentTsd[currentTsd.length - 1];
+        }
+        return true;
+    }
+
+    private static boolean blocksAreDistinct(List<file_data_tables_block> blocks) {
+        if (blocks.size() <= 1)
+            return true;
+        final TLongIntHashMap tsWithCount = blocks.parallelStream()
+                .flatMapToLong(block -> Arrays.stream(FromXdr.timestamp_delta(block.tsd)))
+                .collect(
+                        TLongIntHashMap::new,
+                        (map, value) -> map.adjustOrPutValue(value, 1, 1),
+                        (result, add) -> {
+                            add.forEachEntry((ts, count) -> {
+                                result.adjustOrPutValue(ts, count, count);
+                                return true;
+                            });
+                        });
+
+        final TIntIterator countIter = tsWithCount.valueCollection().iterator();
+        while (countIter.hasNext())
+            if (countIter.next() > 1)
+                return false;
+        return true;
     }
 
     private FilePos writeBody(Context ctx) throws IOException, OncRpcException {
@@ -360,13 +412,13 @@ public class ToXdrTables implements Closeable {
         return result;
     }
 
-    private tsfile_header encodeHeader(FilePos bodyPos, long fileSize) {
+    private tsfile_header encodeHeader(FilePos bodyPos, long fileSize, boolean blocksAreOrdered, boolean blocksAreDistinct) {
         tsfile_header hdr = new tsfile_header();
         hdr.first = ToXdr.timestamp(hdrBegin);
         hdr.last = ToXdr.timestamp(hdrEnd);
         hdr.flags = compression.compressionFlag
-                | header_flags.DISTINCT
-                | header_flags.SORTED
+                | (blocksAreDistinct ? header_flags.DISTINCT : 0)
+                | (blocksAreOrdered ? header_flags.SORTED : 0)
                 | header_flags.KIND_TABLES;
         hdr.reserved = 0;
         hdr.file_size = fileSize;
