@@ -16,9 +16,11 @@ import com.groupon.lex.metrics.history.v2.tables.FileTableFileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport0;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport1;
+import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -29,6 +31,7 @@ import static java.util.Collections.singletonMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -351,6 +354,23 @@ public class TSDataTest {
         public boolean add(TimeSeriesCollection tsv) {
             fail("unimplemented mock function");
             return false;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            fail("unimplemented mock function");
+            return true;
+        }
+
+        @Override
+        public int size() {
+            fail("unimplemented mock function");
+            return 0;
+        }
+
+        @Override
+        public Optional<GCCloseable<FileChannel>> getFileChannel() {
+            return Optional.empty();
         }
     }
 }

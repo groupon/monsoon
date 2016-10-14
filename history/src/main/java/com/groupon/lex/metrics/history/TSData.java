@@ -112,17 +112,13 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
      * Test if the TSData is empty.
      */
     @Override
-    public default boolean isEmpty() {
-        return !stream().findAny().isPresent();
-    }
+    public boolean isEmpty();
 
     /**
      * Returns the number of entries in the TSData.
      */
     @Override
-    public default int size() {
-        return (int) stream().count();
-    }
+    public int size();
 
     /**
      * Test if the TSData contains the given value.
@@ -224,9 +220,8 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
     }
 
     /**
-     * Return the file channel used to read this file, if it is available.
+     * Return the file channel used to read this file, if it is uses a file
+     * descriptor. Returns Optional.empty() for memory mapped files.
      */
-    public default Optional<GCCloseable<FileChannel>> getFileChannel() {
-        return Optional.empty();
-    }
+    public Optional<GCCloseable<FileChannel>> getFileChannel();
 }

@@ -619,4 +619,9 @@ public class TSDataFileChain implements TSData {
             LOG.log(Level.WARNING, "unable to remove file " + key.getFile(), ex);
         }
     }
+
+    @Override
+    public Optional<GCCloseable<FileChannel>> getFileChannel() {
+        return Optional.empty();
+    }
 }
