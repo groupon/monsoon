@@ -27,7 +27,7 @@ public class TmpFile<T extends XdrAble> implements Closeable {
     private TmpFile(FileChannel fd, Compression compression) throws IOException {
         this.fd = fd;
         this.compression = compression;
-        this.fileIO = Any2.right(new XdrEncodingFileWriter(compression.wrap(new FileChannelWriter(fd, 0)), 64 * 1024));
+        this.fileIO = Any2.right(new XdrEncodingFileWriter(compression.wrap(new FileChannelWriter(fd, 0), false), 64 * 1024));
     }
 
     public TmpFile(Path dir, Compression compression) throws IOException {

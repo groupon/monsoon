@@ -53,7 +53,7 @@ public class DirCollectHistoryTest {
                     try {
                         Files.delete(f);
                     } catch (IOException ex) {
-                        Logger.getLogger(DirCollectHistoryTest.class.getName()).log(Level.SEVERE, null, ex);
+                        Logger.getLogger(DirCollectHistoryTest.class.getName()).log(Level.INFO, null, ex);
                     }
                 });
         Files.delete(tmpdir);
@@ -63,17 +63,18 @@ public class DirCollectHistoryTest {
 
     @Test
     public void size_stays_below_threshold() throws Exception {
-        LOG.log(Level.SEVERE, "starting test");
+        LOG.log(Level.INFO, "starting test");
         final Iterator<TimeSeriesCollection> iter = BufferedIterator.iterator(create_tsdata_().iterator());
         // First, grow until 90%, to get an estimate of file size usage.
         int count_until_90_percent = 0;
         while (getTmpdirSize() < 9 * LIMIT / 10) {
             ++count_until_90_percent;
-            LOG.log(Level.SEVERE, "about to add " + count_until_90_percent + "th element");
+            LOG.log(Level.INFO, "about to add " + count_until_90_percent + "th element");
 
             long t0 = System.currentTimeMillis();
             hist.add(iter.next());
-            LOG.log(Level.SEVERE, "added " + count_until_90_percent + " collections, last add took " + (System.currentTimeMillis() - t0) + " msec");
+            hist.waitPendingTasks();  // getTmpdirSize will error if files are removed from under it.
+            LOG.log(Level.INFO, "added " + count_until_90_percent + " collections, last add took " + (System.currentTimeMillis() - t0) + " msec");
         }
         System.out.println("90% threshold = " + count_until_90_percent);
         // Secondly, add the same amount again.
@@ -108,7 +109,9 @@ public class DirCollectHistoryTest {
         assertEquals(tsdata, hist.streamReversed().collect(Collectors.toList()));
     }
 
-    /** Get the size of all files in tmpdir. */
+    /**
+     * Get the size of all files in tmpdir.
+     */
     private long getTmpdirSize() throws Exception {
         try (Stream<Path> listing = Files.list(tmpdir)) {
             return listing

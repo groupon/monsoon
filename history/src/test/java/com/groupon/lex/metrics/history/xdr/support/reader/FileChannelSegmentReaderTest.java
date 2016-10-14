@@ -68,7 +68,7 @@ public class FileChannelSegmentReaderTest {
 
     private FilePos create(Compression compression) throws Exception {
         try (FileChannel fd = FileChannel.open(file, StandardOpenOption.WRITE)) {
-            return new AbstractSegmentWriter.Writer(fd, 32, compression)
+            return new AbstractSegmentWriter.Writer(fd, 32, compression, false)
                     .write(expected);
         }
     }

@@ -54,17 +54,19 @@ public abstract class AbstractSegmentWriter {
         private final FileChannelWriter out;
         private final Compression compression;
         private ByteBuffer useBuffer;  // May be null.
+        private final boolean highestCompression;
 
-        public Writer(@NonNull FileChannel out, long offset, Compression compression) {
+        public Writer(@NonNull FileChannel out, long offset, Compression compression, boolean highestCompression) {
             this.out = new FileChannelWriter(out, offset);
             this.compression = compression;
+            this.highestCompression = highestCompression;
         }
 
         public FilePos write(XdrAble object) throws IOException, OncRpcException {
             final long initPos = out.getOffset();
 
             try (Crc32AppendingFileWriter outerWriter = new Crc32AppendingFileWriter(new CloseInhibitingWriter(out), 4)) {
-                try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(compression.wrap(new CloseInhibitingWriter(outerWriter)), useBuffer)) {
+                try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(compression.wrap(new CloseInhibitingWriter(outerWriter), highestCompression), useBuffer)) {
                     writer.beginEncoding();
                     object.xdrEncode(writer);
                     writer.endEncoding();

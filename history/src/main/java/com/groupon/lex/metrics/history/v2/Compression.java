@@ -13,13 +13,13 @@ import java.io.IOException;
 import static java.util.Objects.requireNonNull;
 
 public enum Compression {
-    NONE(0, in -> in, out -> out),
-    GZIP(header_flags.GZIP, in -> new GzipReader(in), out -> new GzipWriter(out)),
-    SNAPPY(header_flags.SNAPPY, in -> new SnappyReader(in), out -> new SnappyWriter(out)),
-    LZO(header_flags.LZO_1X1, in -> new LzoReader(in), out -> new LzoWriter(out));
+    NONE(0, in -> in, (out, hc) -> out),
+    GZIP(header_flags.GZIP, in -> new GzipReader(in), (out, hc) -> new GzipWriter(out)),
+    SNAPPY(header_flags.SNAPPY, in -> new SnappyReader(in), (out, hc) -> new SnappyWriter(out)),
+    LZO(header_flags.LZO_1X1, in -> new LzoReader(in), (out, hc) -> new LzoWriter(out, hc));
 
     public static final Compression DEFAULT_APPEND = GZIP;
-    public static final Compression DEFAULT_OPTIMIZED = GZIP;
+    public static final Compression DEFAULT_OPTIMIZED = LZO;
 
     public final int compressionFlag;
     private final WrapReaderFunctor reader;
@@ -35,8 +35,8 @@ public enum Compression {
         return this.reader.wrap(reader);
     }
 
-    public FileWriter wrap(FileWriter writer) throws IOException {
-        return this.writer.wrap(writer);
+    public FileWriter wrap(FileWriter writer, boolean highestCompression) throws IOException {
+        return this.writer.wrap(writer, highestCompression);
     }
 
     private static interface WrapReaderFunctor {
@@ -44,7 +44,7 @@ public enum Compression {
     }
 
     private static interface WrapWriterFunctor {
-        public FileWriter wrap(FileWriter out) throws IOException;
+        public FileWriter wrap(FileWriter out, boolean highestCompression) throws IOException;
     }
 
     public static Compression fromFlags(int flags) {
