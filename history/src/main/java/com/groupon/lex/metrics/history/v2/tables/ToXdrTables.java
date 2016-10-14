@@ -54,6 +54,7 @@ import com.groupon.lex.metrics.history.v2.xdr.timestamp_msec;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
 import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.writeMimeHeader;
+import com.groupon.lex.metrics.history.xdr.support.FJPTaskExecutor;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import com.groupon.lex.metrics.history.xdr.support.TmpFile;
 import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter.Writer;
@@ -151,8 +152,8 @@ public class ToXdrTables implements Closeable {
                 }
 
                 timestamps.add(timestamp);
-                for (TimeSeriesValue tsv : tsc.getTSValues())
-                    processGroup(timestamp, tsv);
+                new FJPTaskExecutor<>(tsc.getTSValues(), tsv -> processGroup(timestamp, tsv))
+                        .join();
             } catch (OncRpcException ex) {
                 throw new IOException("encoding error", ex);
             }
