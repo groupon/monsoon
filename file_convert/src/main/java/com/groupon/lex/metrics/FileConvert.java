@@ -79,10 +79,7 @@ public class FileConvert {
         final DirCollectHistory src = new DirCollectHistory(srcdir_path_);
         final DirCollectHistory dst = new DirCollectHistory(dstdir_path_);
         BufferedIterator.stream(ForkJoinPool.commonPool(), src.stream())
-                .forEach(tsc -> {
-                    dst.add(tsc);
-                    dst.waitPendingTasks();
-                });
+                .forEach(dst::add);
 
         // Wait for pending optimization to finish.
         src.waitPendingTasks();
