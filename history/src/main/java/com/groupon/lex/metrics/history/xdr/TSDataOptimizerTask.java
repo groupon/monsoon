@@ -21,8 +21,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
-import static java.util.concurrent.ForkJoinPool.defaultForkJoinWorkerThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,16 +38,58 @@ import org.joda.time.DateTimeZone;
  */
 public class TSDataOptimizerTask {
     private static final Logger LOG = Logger.getLogger(TSDataOptimizerTask.class.getName());
-    private static final ForkJoinPool TASK_POOL = new ForkJoinPool(Runtime.getRuntime().availableProcessors(), defaultForkJoinWorkerThreadFactory, null, true);
+
+    /**
+     * The task pool handles the creation of temporary files containing all
+     * data. The task is highly CPU bound (especially the gathering of data
+     * stage in ToXdrTables). Limiting it to 1 thread ensures the tasks don't
+     * overwhelm the ForkJoinPool and the limit of 1 thread means multiple
+     * compression actions will be queued one-after-the-other.
+     *
+     * The task itself mainly uses the ForkJoinPool, so this thread spends most
+     * of the time waiting for work to complete (or new work to come in).
+     */
+    private static final ExecutorService TASK_POOL = Executors.newFixedThreadPool(1);
+
+    /**
+     * The install pool handles the file installation part of creating a new
+     * tables file. It is IO bound, simply copying from a temporary file to the
+     * final file.
+     *
+     * Since it's IO bound, it won't interfere with ForkJoinPool tasks. It is a
+     * separate thread from the task pool, to allow the task pool to pick up a
+     * new file while the old file is being written out.
+     */
     private static final ExecutorService INSTALL_POOL = Executors.newFixedThreadPool(1);
+
+    /**
+     * List of outstanding futures. The list is used during program termination
+     * to cancel all incomplete futures and thus shut down any dependant tasks
+     * properly.
+     *
+     * Access is {@code synchronized(OUTSTANDING)}.
+     */
     private static final List<CompletableFuture<NewFile>> OUTSTANDING = new LinkedList<>();
+
+    /**
+     * Destination directory in which to write files. Also used as a location
+     * for temporary files.
+     */
     private final Path destDir;
+
+    /**
+     * List of files to add to the generated tables file.
+     */
     private Map<Path, Reference<TSData>> files = new HashMap<>();
 
     static {
+        // Create shutdown hook that cancels all outstanding futures and tears
+        // down the threads.
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
-                OUTSTANDING.forEach(fut -> fut.cancel(false));
+                synchronized (OUTSTANDING) {
+                    OUTSTANDING.forEach(fut -> fut.cancel(false));
+                }
                 INSTALL_POOL.shutdown();
                 TASK_POOL.shutdown();
                 if (!INSTALL_POOL.awaitTermination(30, TimeUnit.SECONDS))
@@ -132,8 +172,11 @@ public class TSDataOptimizerTask {
         LOG.log(Level.FINE, "starting optimized file creation for {0} files", files.size());
         CompletableFuture<NewFile> fileCreation = new CompletableFuture<>();
         final Map<Path, Reference<TSData>> jfpFiles = this.files;  // We clear out files below, which makes fjpCreateTmpFile see an empty map if we don't use a separate variable.
-        TASK_POOL.submit(() -> fjpCreateTmpFile(fileCreation, destDir, jfpFiles));
-        this.files = new HashMap<>();
+        TASK_POOL.execute(() -> createTmpFile(fileCreation, destDir, jfpFiles));
+        synchronized (OUTSTANDING) {
+            OUTSTANDING.add(fileCreation);
+        }
+        this.files = new HashMap<>();  // Do not use clear! This instance is now shared with the createTmpFile task.
         return fileCreation;
     }
 
@@ -148,7 +191,7 @@ public class TSDataOptimizerTask {
      * temporary file creation.
      * @param files the list of files that make up the resulting file.
      */
-    private static void fjpCreateTmpFile(CompletableFuture<NewFile> fileCreation, Path destDir, Map<Path, Reference<TSData>> files) {
+    private static void createTmpFile(CompletableFuture<NewFile> fileCreation, Path destDir, Map<Path, Reference<TSData>> files) {
         LOG.log(Level.FINE, "starting temporary file creation...");
         try {
             final FileChannel fd = FileUtil.createTempFile(destDir, "monsoon-", ".optimize-tmp");
@@ -185,6 +228,9 @@ public class TSDataOptimizerTask {
             }
         } catch (Error | RuntimeException | IOException ex) {
             LOG.log(Level.WARNING, "temporary file for optimization failure", ex);
+            synchronized (OUTSTANDING) {
+                OUTSTANDING.remove(fileCreation);
+            }
             fileCreation.completeExceptionally(ex);  // Propagate exceptions.
         }
     }
@@ -206,7 +252,9 @@ public class TSDataOptimizerTask {
     private static void install(CompletableFuture<NewFile> fileCreation, Path destDir, FileChannel tmpFile, DateTime begin) {
         try {
             try {
-                OUTSTANDING.remove(fileCreation);
+                synchronized (OUTSTANDING) {
+                    OUTSTANDING.remove(fileCreation);
+                }
                 if (fileCreation.isCancelled())
                     throw new IOException("Installation aborted, due to cancellation.");
 
