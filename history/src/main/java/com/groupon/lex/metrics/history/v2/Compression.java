@@ -19,7 +19,7 @@ public enum Compression {
     LZO(header_flags.LZO_1X1, in -> new LzoReader(in), (out, hc) -> new LzoWriter(out, hc));
 
     public static final Compression DEFAULT_APPEND = GZIP;
-    public static final Compression DEFAULT_OPTIMIZED = GZIP;
+    public static final Compression DEFAULT_OPTIMIZED = LZO;
 
     public final int compressionFlag;
     private final WrapReaderFunctor reader;
