@@ -18,8 +18,8 @@ public enum Compression {
     SNAPPY(header_flags.SNAPPY, in -> new SnappyReader(in), out -> new SnappyWriter(out)),
     LZO(header_flags.LZO_1X1, in -> new LzoReader(in), out -> new LzoWriter(out));
 
-    public static final Compression DEFAULT_APPEND = SNAPPY;
-    public static final Compression DEFAULT_OPTIMIZED = LZO;
+    public static final Compression DEFAULT_APPEND = GZIP;
+    public static final Compression DEFAULT_OPTIMIZED = GZIP;
 
     public final int compressionFlag;
     private final WrapReaderFunctor reader;
