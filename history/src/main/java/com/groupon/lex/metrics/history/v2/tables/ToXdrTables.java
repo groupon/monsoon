@@ -157,7 +157,7 @@ public class ToXdrTables implements Closeable {
                 throw new IOException("encoding error", ex);
             }
         } finally {
-            LOG.log(Level.INFO, "adding timeseries {0} took {1} msec", new Object[]{tsc.getTimestamp(), System.currentTimeMillis() - ts0});
+            LOG.log(Level.FINE, "adding timeseries {0} took {1} msec", new Object[]{tsc.getTimestamp(), System.currentTimeMillis() - ts0});
         }
     }
 
