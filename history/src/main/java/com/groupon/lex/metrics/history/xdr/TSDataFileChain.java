@@ -7,9 +7,12 @@ import com.groupon.lex.metrics.history.xdr.support.FileUtil;
 import com.groupon.lex.metrics.history.xdr.support.MultiFileIterator;
 import com.groupon.lex.metrics.history.xdr.support.TSDataMap;
 import com.groupon.lex.metrics.lib.GCCloseable;
+import com.groupon.lex.metrics.lib.LazyMap;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
+import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,6 +23,7 @@ import java.util.Collections;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonMap;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -31,8 +35,10 @@ import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import java.util.Spliterators;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -496,28 +502,50 @@ public class TSDataFileChain implements TSData {
      * Start optimization of old files.
      */
     public void optimizeOldFiles() {
-        final List<Key> keys;
         synchronized (this) {
             if (optimizeOldFiles)
                 return;  // Already called.
             optimizeOldFiles = true;
 
-            keys = new ArrayList<>(read_stores_.keySet());
+            ForkJoinPool.commonPool().submit(this::optimizeOldFilesTask);
         }
-        keys.removeIf(key -> key.isNewFile() || read_stores_.get(key).isOptimized());
-        Collections.sort(keys);
+    }
 
-        int begin = 0;
+    /**
+     * Task that executes gathering data for background collection.
+     */
+    private void optimizeOldFilesTask() {
+        final Map<Key, Reference<TSData>> keys;
+        synchronized (this) {
+            List<Key> toOptimize = read_stores_.keySet().parallelStream()
+                    .filter(key -> !key.isNewFile() && !read_stores_.get(key).isOptimized())
+                    .sorted()
+                    .collect(Collectors.toList());
+            keys = new LazyMap<>(key -> new WeakReference<>(read_stores_.get(key)), toOptimize, TreeMap::new);
+        }
+
         int count = 0;
-        for (int i = 0; i < keys.size(); ++i) {
-            count += read_stores_.get(keys.get(i)).size();
-            if (count > 50000 || i == keys.size()) {
-                optimizeFiles(keys.subList(begin, i + 1).stream()
-                        .collect(Collectors.toMap(Function.identity(), (x) -> null)));
+        Map<Key, SoftReference<TSData>> batch = new HashMap<>();
+        for (Map.Entry<Key, Reference<TSData>> key : keys.entrySet()) {
+            TSData value = key.getValue().get();
+            if (value == null) {
+                value = read_stores_.get(key);
+                key.setValue(new SoftReference<>(value));
+            }
+            count += value.size();
+            batch.put(key.getKey(), new SoftReference<>(value));
+
+            if (count > 50000) {
+                optimizeFiles(batch.entrySet().stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, (entry) -> entry.getValue().get())));
                 // Reset counters.
-                begin = i + 1;
+                batch.clear();
                 count = 0;
             }
+        }
+        if (!batch.isEmpty()) {
+            optimizeFiles(batch.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, (entry) -> entry.getValue().get())));
         }
     }
 

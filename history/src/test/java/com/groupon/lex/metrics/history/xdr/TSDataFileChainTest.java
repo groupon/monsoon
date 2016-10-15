@@ -287,6 +287,9 @@ public class TSDataFileChainTest {
     public void open_existing() throws Exception {
         final int COUNT = 17;
         fill_(COUNT);
+        Set<TSDataFileChain.Key> expected_keys = fd.getKeys().stream()
+                .map(k -> new TSDataFileChain.Key(k.getFile(), k.getBegin(), k.getEnd(), false)) // Keys from re-opening are all old files.
+                .collect(Collectors.toSet());
 
         TSDataFileChain opened_fd = TSDataFileChain.openDirExisting(tmpdir).get();
 
@@ -296,7 +299,7 @@ public class TSDataFileChainTest {
             assertEquals(expect.next(), actual.next());
         assertFalse(actual.hasNext());
 
-        assertEquals(fd.getKeys(), opened_fd.getKeys());
+        assertEquals(expected_keys, opened_fd.getKeys());
     }
 
     @Test
