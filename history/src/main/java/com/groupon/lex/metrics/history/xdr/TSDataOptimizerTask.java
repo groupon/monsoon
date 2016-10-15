@@ -8,24 +8,20 @@ import com.groupon.lex.metrics.history.v2.tables.ToXdrTables;
 import com.groupon.lex.metrics.history.xdr.support.FileUtil;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import java.io.IOException;
-import java.lang.ref.Reference;
-import java.lang.ref.WeakReference;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -82,7 +78,7 @@ public class TSDataOptimizerTask {
     /**
      * List of files to add to the generated tables file.
      */
-    private Map<Path, Reference<TSData>> files = new HashMap<>();
+    private List<TSData> files = new LinkedList<>();
 
     static {
         // Create shutdown hook that cancels all outstanding futures and tears
@@ -107,22 +103,9 @@ public class TSDataOptimizerTask {
      *
      * @param destDir the destination directory in which the new file will be
      * placed.
-     * @param files zero or more files to add; note that the value of the map is
-     * allowed to be null.
+     * @param files a list of files to add.
      */
-    public TSDataOptimizerTask(@NonNull Path destDir, @NonNull Map<Path, TSData> files) {
-        this(destDir);
-        files.forEach(this::add);
-    }
-
-    /**
-     * Create a new optimizer task and fill it with the given files.
-     *
-     * @param destDir the destination directory in which the new file will be
-     * placed.
-     * @param files a list of filenames to add.
-     */
-    public TSDataOptimizerTask(@NonNull Path destDir, @NonNull Collection<Path> files) {
+    public TSDataOptimizerTask(@NonNull Path destDir, @NonNull Collection<TSData> files) {
         this(destDir);
         files.forEach(this::add);
     }
@@ -143,24 +126,25 @@ public class TSDataOptimizerTask {
      * Add a file to the collection of files that will make up the final
      * optimized file.
      *
-     * @param file The name of the file to be added.
-     * @param tsdata The TSData obtained when opening this file; may be null.
+     * @param tsdata The TSData of which the contents are to be added to the
+     * optimized file.
      * @return this TSDataOptimizerTask.
      */
-    public TSDataOptimizerTask add(@NonNull Path file, TSData tsdata) {
-        files.put(file, new WeakReference<>(tsdata));
+    public TSDataOptimizerTask add(TSData tsdata) {
+        files.add(tsdata);
         return this;
     }
 
     /**
-     * Add a file to the collection of files that will make up the final
+     * Add files to the collection of files that will make up the final
      * optimized file.
      *
-     * @param file The name of the file to be added.
+     * @param tsdata The collection of TSData of which the contents are to be
+     * added to the optimized file.
      * @return this TSDataOptimizerTask.
      */
-    public TSDataOptimizerTask add(@NonNull Path file) {
-        add(file, null);
+    public TSDataOptimizerTask addAll(Collection<? extends TSData> tsdata) {
+        tsdata.forEach(this::add);
         return this;
     }
 
@@ -173,12 +157,12 @@ public class TSDataOptimizerTask {
     public CompletableFuture<NewFile> run() {
         LOG.log(Level.FINE, "starting optimized file creation for {0} files", files.size());
         CompletableFuture<NewFile> fileCreation = new CompletableFuture<>();
-        final Map<Path, Reference<TSData>> jfpFiles = this.files;  // We clear out files below, which makes fjpCreateTmpFile see an empty map if we don't use a separate variable.
-        TASK_POOL.execute(() -> createTmpFile(fileCreation, destDir, jfpFiles));
+        final List<TSData> fjpFiles = this.files;  // We clear out files below, which makes createTmpFile see an empty map if we don't use a separate variable.
+        TASK_POOL.execute(() -> createTmpFile(fileCreation, destDir, fjpFiles));
         synchronized (OUTSTANDING) {
             OUTSTANDING.add(fileCreation);
         }
-        this.files = new HashMap<>();  // Do not use clear! This instance is now shared with the createTmpFile task.
+        this.files = new LinkedList<>();  // Do not use clear! This instance is now shared with the createTmpFile task.
         return fileCreation;
     }
 
@@ -193,29 +177,11 @@ public class TSDataOptimizerTask {
      * temporary file creation.
      * @param files the list of files that make up the resulting file.
      */
-    private static void createTmpFile(CompletableFuture<NewFile> fileCreation, Path destDir, Map<Path, Reference<TSData>> filesMap) {
+    private static void createTmpFile(CompletableFuture<NewFile> fileCreation, Path destDir, List<TSData> files) {
         LOG.log(Level.FINE, "starting temporary file creation...");
 
         try {
-            final List<TSData> files;
-            try {
-                files = filesMap.entrySet().parallelStream()
-                        .map(fileEntry -> {
-                            try {
-                                TSData tsdata = fileEntry.getValue().get();
-                                if (tsdata == null)
-                                    tsdata = TSData.readonly(fileEntry.getKey());
-                                return tsdata;
-                            } catch (IOException ex) {
-                                throw new RuntimeIOException(ex);
-                            }
-                        })
-                        .sorted(Comparator.comparing(TSData::getBegin))
-                        .collect(Collectors.toList());
-                filesMap = null;  // Release resources.
-            } catch (RuntimeIOException ex) {
-                throw ex.getCause();
-            }
+            Collections.sort(files, Comparator.comparing(TSData::getBegin));
 
             final FileChannel fd = FileUtil.createTempFile(destDir, "monsoon-", ".optimize-tmp");
             try {
@@ -225,7 +191,7 @@ public class TSDataOptimizerTask {
                         TSData tsdata = files.remove(0);
                         if (fileCreation.isCancelled())
                             throw new IOException("aborted due to canceled execution");
-                        output.addAll(tsdata);
+                        output.addAll(tsdata);  // Takes a long time.
                     }
                     begin = new DateTime(output.getHdrBegin(), DateTimeZone.UTC);
 
@@ -336,16 +302,5 @@ public class TSDataOptimizerTask {
          */
         @NonNull
         private final TSData data;
-    }
-
-    private static class RuntimeIOException extends RuntimeException {
-        public RuntimeIOException(IOException ex) {
-            super(ex);
-        }
-
-        @Override
-        public IOException getCause() {
-            return (IOException) super.getCause();
-        }
     }
 }

@@ -7,12 +7,10 @@ import com.groupon.lex.metrics.history.xdr.support.FileUtil;
 import com.groupon.lex.metrics.history.xdr.support.MultiFileIterator;
 import com.groupon.lex.metrics.history.xdr.support.TSDataMap;
 import com.groupon.lex.metrics.lib.GCCloseable;
-import com.groupon.lex.metrics.lib.LazyMap;
+import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
-import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
-import java.lang.ref.WeakReference;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,7 +33,6 @@ import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import java.util.Spliterators;
-import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -465,12 +462,22 @@ public class TSDataFileChain implements TSData {
      * compressed. Map values may be null.
      */
     private void optimizeFiles(Map<Key, TSData> files) {
-        Map<Path, TSData> optimizerFiles = files.entrySet().stream()
-                .collect(Collectors.toMap(entry -> entry.getKey().getFile(), entry -> entry.getValue()));
-        List<Key> keys = new ArrayList<>(files.keySet());
-        LOG.log(Level.INFO, "kicking off optimization of {0}", new ArrayList<>(optimizerFiles.keySet()));
+        // Fill in all null values in 'files' and remove keys that have been retired.
+        files = files.entrySet().stream()
+                .map(filesEntry -> {
+                    TSData tsdata = filesEntry.getValue();
+                    if (tsdata == null)
+                        tsdata = read_stores_.get(filesEntry.getKey());
+                    return Optional.ofNullable(tsdata) // Null value if the file was removed between request for compression and now.
+                            .map(tsd -> SimpleMapEntry.create(filesEntry.getKey(), tsd));
+                })
+                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        final List<Key> keys = new ArrayList<>(files.keySet());  // Keys for removal later; we don't want to reference the complete map, as it also holds each TSData and holding on would prevent the GC from retiring them early.
+        LOG.log(Level.INFO, "kicking off optimization of {0}", keys.stream().map(Key::getFile).collect(Collectors.toList()));
 
-        CompletableFuture<Void> task = new TSDataOptimizerTask(dir_, optimizerFiles)
+        CompletableFuture<Void> task = new TSDataOptimizerTask(dir_)
+                .addAll(files.values())
                 .run()
                 .thenAccept((newFile) -> {
                     synchronized (this) {
@@ -499,58 +506,84 @@ public class TSDataFileChain implements TSData {
 
     /**
      * Start optimization of old files.
+     *
+     * @return a completable future of the background selection process. This
+     * future can be used to wait for the background selecting thread to
+     * complete, or to cancel the operation.
      */
-    public void optimizeOldFiles() {
+    public CompletableFuture<?> optimizeOldFiles() {
         synchronized (this) {
             if (optimizeOldFiles)
-                return;  // Already called.
+                return CompletableFuture.completedFuture(null);  // Already called.
 
-            Thread thr = new Thread(this::optimizeOldFilesTask);
+            CompletableFuture<?> task = new CompletableFuture<>();
+            Thread thr = new Thread(() -> optimizeOldFilesTask(task));
             thr.setDaemon(true);
             thr.start();
+            pendingTasks.add(task);
             optimizeOldFiles = true;
+
+            // Make the task remove itself after completion.
+            task.whenComplete((obj, err) -> {
+                try {
+                    if (err != null)
+                        LOG.log(Level.WARNING, "failed selecting old files for optimization", err);
+                } finally {
+                    pendingTasks.remove(task);
+                }
+            });
+
+            return task;
         }
     }
 
     /**
      * Task that executes gathering data for background collection.
+     *
+     * @param handle a CompletableFuture that will be completed when the method
+     * ends.
      */
-    private void optimizeOldFilesTask() {
-        final Map<Key, Reference<TSData>> keys;
-        synchronized (this) {
-            List<Key> toOptimize = read_stores_.keySet().parallelStream()
-                    .filter(key -> !key.isNewFile() && !read_stores_.get(key).isOptimized())
-                    .sorted()
-                    .collect(Collectors.toList());
-            keys = new LazyMap<>(key -> new WeakReference<>(read_stores_.get(key)), toOptimize, TreeMap::new);
-        }
+    private void optimizeOldFilesTask(CompletableFuture<?> handle) {
+        try {
+            final List<Key> keys;
+            synchronized (this) {
+                keys = read_stores_.keySet().stream()
+                        .filter(key -> !key.isNewFile() && !read_stores_.get(key).isOptimized())
+                        .sorted()
+                        .collect(Collectors.toList());
+            }
 
-        int count = 0;
-        Map<Key, SoftReference<TSData>> batch = new HashMap<>();
-        for (Map.Entry<Key, Reference<TSData>> key : keys.entrySet()) {
-            TSData value = key.getValue().get();
-            if (value == null) {
-                value = read_stores_.get(key.getKey());
+            int count = 0;
+            Map<Key, TSData> batch = new HashMap<>();
+            for (Key key : keys) {
+                if (key.isNewFile())
+                    continue;  // New files are handled by file rotation logic.
+                final TSData value = read_stores_.get(key);
                 if (value == null)
                     continue;  // Key lost.
-                key.setValue(new SoftReference<>(value));
-            }
-            final int value_size = value.size();
-            count += value_size;
-            batch.put(key.getKey(), new SoftReference<>(value));
-            LOG.log(Level.INFO, "added {0} ({1} scrapes) to batch ({2} files, {3} scrapes)", new Object[]{key.getKey().getFile(), value_size, batch.size(), count});
+                if (value.isOptimized())
+                    continue;  // Skip already optimized files.
 
-            if (count > 50000) {
-                optimizeFiles(batch.entrySet().stream()
-                        .collect(Collectors.toMap(Map.Entry::getKey, (entry) -> entry.getValue().get())));
-                // Reset counters.
-                batch.clear();
-                count = 0;
+                if (handle.isCancelled())
+                    return;
+                final int value_size = value.size();  // Takes 2-4 seconds for v0.x and v1.x files!
+                count += value_size;
+                batch.put(key, value);
+                LOG.log(Level.INFO, "added {0} ({1} scrapes) to batch ({2} files, {3} scrapes)", new Object[]{key.getFile(), value_size, batch.size(), count});
+
+                if (count > 50000) {
+                    optimizeFiles(batch);
+                    // Reset counters.
+                    batch.clear();
+                    count = 0;
+                }
             }
-        }
-        if (!batch.isEmpty()) {
-            optimizeFiles(batch.entrySet().stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, (entry) -> entry.getValue().get())));
+            if (!batch.isEmpty())
+                optimizeFiles(batch);
+        } catch (Error | Exception ex) {
+            handle.completeExceptionally(ex);
+        } finally {
+            handle.complete(null);
         }
     }
 
