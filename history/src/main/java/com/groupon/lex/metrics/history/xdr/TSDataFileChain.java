@@ -531,6 +531,8 @@ public class TSDataFileChain implements TSData {
             TSData value = key.getValue().get();
             if (value == null) {
                 value = read_stores_.get(key.getKey());
+                if (value == null)
+                    continue;  // Key lost.
                 key.setValue(new SoftReference<>(value));
             }
             final int value_size = value.size();
