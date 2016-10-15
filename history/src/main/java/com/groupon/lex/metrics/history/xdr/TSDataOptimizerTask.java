@@ -14,6 +14,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -24,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -191,20 +193,38 @@ public class TSDataOptimizerTask {
      * temporary file creation.
      * @param files the list of files that make up the resulting file.
      */
-    private static void createTmpFile(CompletableFuture<NewFile> fileCreation, Path destDir, Map<Path, Reference<TSData>> files) {
+    private static void createTmpFile(CompletableFuture<NewFile> fileCreation, Path destDir, Map<Path, Reference<TSData>> filesMap) {
         LOG.log(Level.FINE, "starting temporary file creation...");
+
         try {
+            final List<TSData> files;
+            try {
+                files = filesMap.entrySet().parallelStream()
+                        .map(fileEntry -> {
+                            try {
+                                TSData tsdata = fileEntry.getValue().get();
+                                if (tsdata == null)
+                                    tsdata = TSData.readonly(fileEntry.getKey());
+                                return tsdata;
+                            } catch (IOException ex) {
+                                throw new RuntimeIOException(ex);
+                            }
+                        })
+                        .sorted(Comparator.comparing(TSData::getBegin))
+                        .collect(Collectors.toList());
+                filesMap = null;  // Release resources.
+            } catch (RuntimeIOException ex) {
+                throw ex.getCause();
+            }
+
             final FileChannel fd = FileUtil.createTempFile(destDir, "monsoon-", ".optimize-tmp");
             try {
                 final DateTime begin;
                 try (ToXdrTables output = new ToXdrTables(fd, Compression.DEFAULT_OPTIMIZED)) {
-                    for (Map.Entry<Path, Reference<TSData>> entry : files.entrySet()) {
+                    while (!files.isEmpty()) {
+                        TSData tsdata = files.remove(0);
                         if (fileCreation.isCancelled())
                             throw new IOException("aborted due to canceled execution");
-
-                        TSData tsdata = entry.getValue().get();
-                        if (tsdata == null)
-                            tsdata = TSData.readonly(entry.getKey());
                         output.addAll(tsdata);
                     }
                     begin = new DateTime(output.getHdrBegin(), DateTimeZone.UTC);
@@ -316,5 +336,16 @@ public class TSDataOptimizerTask {
          */
         @NonNull
         private final TSData data;
+    }
+
+    private static class RuntimeIOException extends RuntimeException {
+        public RuntimeIOException(IOException ex) {
+            super(ex);
+        }
+
+        @Override
+        public IOException getCause() {
+            return (IOException) super.getCause();
+        }
     }
 }
