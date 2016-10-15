@@ -63,7 +63,8 @@ public class DirCollectHistory extends AbstractCollectHistory<TSDataFileChain> {
     protected void ensureDiskUsageBelow(long bytes) {
         while (getFileSize() > bytes) {
             Optional<TSDataFileChain.Key> to_erase = selectOldestKey();
-            if (!to_erase.isPresent()) return;
+            if (!to_erase.isPresent())
+                return;
 
             removeKey(to_erase.get());
         }
@@ -72,24 +73,30 @@ public class DirCollectHistory extends AbstractCollectHistory<TSDataFileChain> {
     @Override
     public boolean add(TimeSeriesCollection tsv) {
         final Optional<Long> disk_usage_limit;
-        synchronized(this) {
+        synchronized (this) {
             disk_usage_limit = disk_usage_limit_;
         }
 
         boolean added = super.add(tsv);
-        if (added) disk_usage_limit.ifPresent(this::ensureDiskUsageBelow);
+        if (added)
+            disk_usage_limit.ifPresent(this::ensureDiskUsageBelow);
         return added;
     }
 
     @Override
     public boolean addAll(Collection<? extends TimeSeriesCollection> tsv) {
         final Optional<Long> disk_usage_limit;
-        synchronized(this) {
+        synchronized (this) {
             disk_usage_limit = disk_usage_limit_;
         }
 
         boolean added = super.addAll(tsv);
-        if (added) disk_usage_limit.ifPresent(this::ensureDiskUsageBelow);
+        if (added)
+            disk_usage_limit.ifPresent(this::ensureDiskUsageBelow);
         return added;
+    }
+
+    public void optimizeOldFiles() {
+        getTSData().optimizeOldFiles();
     }
 }

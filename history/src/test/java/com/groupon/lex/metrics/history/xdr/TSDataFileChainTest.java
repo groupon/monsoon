@@ -236,7 +236,7 @@ public class TSDataFileChainTest {
         final int COUNT = LARGE_COUNT;
         fill_(COUNT);
 
-        final TSDataFileChain.Key bad_key = new TSDataFileChain.Key(tmpdir.resolve("I-am-not-here.tsd"), DateTime.now(DateTimeZone.UTC).minusDays(1), DateTime.now(DateTimeZone.UTC));
+        final TSDataFileChain.Key bad_key = new TSDataFileChain.Key(tmpdir.resolve("I-am-not-here.tsd"), DateTime.now(DateTimeZone.UTC).minusDays(1), DateTime.now(DateTimeZone.UTC), true);
         fd.delete(bad_key);
     }
 
@@ -306,7 +306,9 @@ public class TSDataFileChainTest {
         assertEquals(Optional.empty(), opened);
     }
 
-    /** Generates an endless stream of TimeSeriesCollections. */
+    /**
+     * Generates an endless stream of TimeSeriesCollections.
+     */
     private StreamedCollection<TimeSeriesCollection> create_tsdata_() {
         return file_support.create_tsdata(CHAIN_WIDTH);
     }
