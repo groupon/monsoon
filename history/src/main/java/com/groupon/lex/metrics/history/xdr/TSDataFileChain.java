@@ -530,11 +530,13 @@ public class TSDataFileChain implements TSData {
         for (Map.Entry<Key, Reference<TSData>> key : keys.entrySet()) {
             TSData value = key.getValue().get();
             if (value == null) {
-                value = read_stores_.get(key);
+                value = read_stores_.get(key.getKey());
                 key.setValue(new SoftReference<>(value));
             }
-            count += value.size();
+            final int value_size = value.size();
+            count += value_size;
             batch.put(key.getKey(), new SoftReference<>(value));
+            LOG.log(Level.INFO, "added {0} ({1} scrapes) to batch ({2} files, {3} scrapes)", new Object[]{key.getKey().getFile(), value_size, batch.size(), count});
 
             if (count > 50000) {
                 optimizeFiles(batch.entrySet().stream()
