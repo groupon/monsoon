@@ -38,7 +38,6 @@ import java.util.Spliterators;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -505,9 +504,11 @@ public class TSDataFileChain implements TSData {
         synchronized (this) {
             if (optimizeOldFiles)
                 return;  // Already called.
-            optimizeOldFiles = true;
 
-            ForkJoinPool.commonPool().submit(this::optimizeOldFilesTask);
+            Thread thr = new Thread(this::optimizeOldFilesTask);
+            thr.setDaemon(true);
+            thr.start();
+            optimizeOldFiles = true;
         }
     }
 
