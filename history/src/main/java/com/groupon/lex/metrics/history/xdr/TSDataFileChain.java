@@ -7,9 +7,12 @@ import com.groupon.lex.metrics.history.xdr.support.FileUtil;
 import com.groupon.lex.metrics.history.xdr.support.MultiFileIterator;
 import com.groupon.lex.metrics.history.xdr.support.TSDataMap;
 import com.groupon.lex.metrics.lib.GCCloseable;
+import com.groupon.lex.metrics.lib.LazyMap;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
+import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,10 +21,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonMap;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.Set;
@@ -30,6 +35,7 @@ import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import java.util.Spliterators;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -41,7 +47,8 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.ToString;
+import lombok.NonNull;
+import lombok.Value;
 import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -58,6 +65,7 @@ public class TSDataFileChain implements TSData {
     private final long max_filesize_;
     private final int max_filerecords_ = MAX_FILERECORDS;
     private List<Future<?>> pendingTasks = new ArrayList<>();
+    private boolean optimizeOldFiles = false;
 
     /**
      * Tests if there are any pending tasks to be completed.
@@ -90,29 +98,19 @@ public class TSDataFileChain implements TSData {
         hasPendingTasks();  // Clears out the completed futures.
     }
 
-    @ToString
+    @Value
     public static class Key implements Comparable<Key> {
-        private final Path file_;
-        private final DateTime begin_;
-        private final DateTime end_;
-
-        public Key(Path file, DateTime begin, DateTime end) {
-            file_ = requireNonNull(file);
-            begin_ = requireNonNull(begin);
-            end_ = requireNonNull(end);
-        }
-
-        public Path getFile() {
-            return file_;
-        }
-
-        public DateTime getBegin() {
-            return begin_;
-        }
-
-        public DateTime getEnd() {
-            return end_;
-        }
+        @NonNull
+        private final Path file;
+        @NonNull
+        private final DateTime begin;
+        @NonNull
+        private final DateTime end;
+        /**
+         * Indicates the file was created/modified since TSDataFileChain
+         * started. Note that the write file is always considered new.
+         */
+        private final boolean newFile;
 
         @Override
         public int compareTo(Key othr) {
@@ -124,35 +122,6 @@ public class TSDataFileChain implements TSData {
             if (cmp == 0)
                 cmp = getFile().compareTo(othr.getFile());
             return cmp;
-        }
-
-        @Override
-        public int hashCode() {
-            int hash = 5;
-            hash = 37 * hash + Objects.hashCode(this.begin_);
-            hash = 37 * hash + Objects.hashCode(this.end_);
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final Key other = (Key) obj;
-            if (!Objects.equals(this.file_, other.file_)) {
-                return false;
-            }
-            if (!Objects.equals(this.begin_, other.begin_)) {
-                return false;
-            }
-            if (!Objects.equals(this.end_, other.end_)) {
-                return false;
-            }
-            return true;
         }
     }
 
@@ -172,7 +141,7 @@ public class TSDataFileChain implements TSData {
         write_filename_ = requireNonNull(wfile);
         write_store_ = new SoftReference<>(null);
         requireNonNull(rfiles).stream()
-                .map((md) -> new Key(md.getFileName(), md.getBegin(), md.getEnd()))
+                .map((md) -> new Key(md.getFileName(), md.getBegin(), md.getEnd(), false))
                 .forEach((key) -> read_stores_.put(key, null));
         max_filesize_ = max_filesize;
     }
@@ -492,25 +461,28 @@ public class TSDataFileChain implements TSData {
     /**
      * Attempts to compress the file denoted by the key.
      *
-     * @param file The key of the file to compress.
-     * @param tsdata TSData, if it is opened.
-     * @return True if the file was compressed and the key was replaced, false
-     * otherwise.
+     * @param files The keys and associated tsdata for the files to be
+     * compressed. Map values may be null.
      */
-    private void compress_file_(Key file, TSData tsdata) {
-        LOG.log(Level.INFO, "kicking off optimization of {0}", file.getFile());
-        CompletableFuture<Void> task = new TSDataOptimizerTask(dir_)
-                .add(file.getFile(), tsdata)
+    private void optimizeFiles(Map<Key, TSData> files) {
+        Map<Path, TSData> optimizerFiles = files.entrySet().stream()
+                .collect(Collectors.toMap(entry -> entry.getKey().getFile(), entry -> entry.getValue()));
+        List<Key> keys = new ArrayList<>(files.keySet());
+        LOG.log(Level.INFO, "kicking off optimization of {0}", new ArrayList<>(optimizerFiles.keySet()));
+
+        CompletableFuture<Void> task = new TSDataOptimizerTask(dir_, optimizerFiles)
                 .run()
                 .thenAccept((newFile) -> {
                     synchronized (this) {
-                        try {
-                            Files.delete(file.getFile());
-                        } catch (IOException ex) {
-                            LOG.log(Level.WARNING, "unable to remove {0}", file.getFile());
-                        }
-                        read_stores_.remove(file);
-                        read_stores_.put(new Key(newFile.getName(), newFile.getData().getBegin(), newFile.getData().getEnd()), newFile.getData());
+                        keys.forEach(file -> {
+                            try {
+                                Files.delete(file.getFile());
+                            } catch (IOException ex) {
+                                LOG.log(Level.WARNING, "unable to remove {0}", file.getFile());
+                            }
+                            read_stores_.remove(file);
+                        });
+                        read_stores_.put(new Key(newFile.getName(), newFile.getData().getBegin(), newFile.getData().getEnd(), true), newFile.getData());
                     }
                 });
         pendingTasks.add(task);
@@ -518,11 +490,68 @@ public class TSDataFileChain implements TSData {
         task
                 .whenComplete((result, exc) -> {
                     if (exc != null)
-                        LOG.log(Level.WARNING, "unable to optimize " + file.getFile(), exc);
+                        LOG.log(Level.WARNING, "unable to optimize " + keys.stream().map(Key::getFile).collect(Collectors.toList()), exc);
                     synchronized (this) {
                         pendingTasks.remove(task);
                     }
                 });
+    }
+
+    /**
+     * Start optimization of old files.
+     */
+    public void optimizeOldFiles() {
+        synchronized (this) {
+            if (optimizeOldFiles)
+                return;  // Already called.
+
+            Thread thr = new Thread(this::optimizeOldFilesTask);
+            thr.setDaemon(true);
+            thr.start();
+            optimizeOldFiles = true;
+        }
+    }
+
+    /**
+     * Task that executes gathering data for background collection.
+     */
+    private void optimizeOldFilesTask() {
+        final Map<Key, Reference<TSData>> keys;
+        synchronized (this) {
+            List<Key> toOptimize = read_stores_.keySet().parallelStream()
+                    .filter(key -> !key.isNewFile() && !read_stores_.get(key).isOptimized())
+                    .sorted()
+                    .collect(Collectors.toList());
+            keys = new LazyMap<>(key -> new WeakReference<>(read_stores_.get(key)), toOptimize, TreeMap::new);
+        }
+
+        int count = 0;
+        Map<Key, SoftReference<TSData>> batch = new HashMap<>();
+        for (Map.Entry<Key, Reference<TSData>> key : keys.entrySet()) {
+            TSData value = key.getValue().get();
+            if (value == null) {
+                value = read_stores_.get(key.getKey());
+                if (value == null)
+                    continue;  // Key lost.
+                key.setValue(new SoftReference<>(value));
+            }
+            final int value_size = value.size();
+            count += value_size;
+            batch.put(key.getKey(), new SoftReference<>(value));
+            LOG.log(Level.INFO, "added {0} ({1} scrapes) to batch ({2} files, {3} scrapes)", new Object[]{key.getKey().getFile(), value_size, batch.size(), count});
+
+            if (count > 50000) {
+                optimizeFiles(batch.entrySet().stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, (entry) -> entry.getValue().get())));
+                // Reset counters.
+                batch.clear();
+                count = 0;
+            }
+        }
+        if (!batch.isEmpty()) {
+            optimizeFiles(batch.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, (entry) -> entry.getValue().get())));
+        }
     }
 
     private synchronized RWListFile install_new_store_(Optional<RWListFile> opt_old_store, Path file, RWListFile new_store) {
@@ -542,11 +571,11 @@ public class TSDataFileChain implements TSData {
                             throw new IllegalStateException("unable to open old write file " + filename, ex);
                         }
                     });
-            final Key old_store_key = new Key(filename, old_store.getBegin(), old_store.getEnd());
+            final Key old_store_key = new Key(filename, old_store.getBegin(), old_store.getEnd(), true);
             read_stores_.put(old_store_key, old_store);
 
             // Optimize old file.
-            compress_file_(old_store_key, old_store);
+            optimizeFiles(singletonMap(old_store_key, old_store));
         });
 
         write_filename_ = Optional.of(file);

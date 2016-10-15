@@ -31,6 +31,7 @@
  */
 package com.groupon.monsoon.remote.history.server;
 
+import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.history.xdr.DirCollectHistory;
 import com.groupon.lex.metrics.lib.BytesParser.BytesParserOptionHandler;
 import com.groupon.monsoon.remote.history.CollectHistoryServer;
@@ -55,16 +56,19 @@ public class RhistMain {
     public static final int EX_USAGE = 64;  // From sysexits.h
     public static final int EX_TEMPFAIL = 75;  // From sysexits.h
 
-    @Option(name="-h", usage="print usage instructions")
+    @Option(name = "-h", usage = "print usage instructions")
     private boolean help = false;
 
-    @Option(name="-p", usage="list on given port")
+    @Option(name = "-p", usage = "list on given port")
     private int port = CollectHistoryServer.DEFAULT_PORT;
 
-    @Option(name="-s", usage="limit history size", handler = BytesParserOptionHandler.class)
+    @Option(name = "-s", usage = "limit history size", handler = BytesParserOptionHandler.class)
     private long size = 16L << 30;
 
-    @Argument(metaVar="/path/to/history/dir", usage="path: which dir contains the history files", index=0)
+    @Option(name = "-O", usage = "optimize existing files")
+    private boolean optimizeOld = false;
+
+    @Argument(metaVar = "/path/to/history/dir", usage = "path: which dir contains the history files", index = 0)
     private String dir;
 
     @NonNull
@@ -79,6 +83,7 @@ public class RhistMain {
 
     /**
      * Initialize the verifier, using command-line arguments.
+     *
      * @param args The command-line arguments passed to the program.
      */
     public RhistMain(String[] args) {
@@ -105,15 +110,22 @@ public class RhistMain {
     }
 
     public void run() throws IOException, OncRpcException {
-        final CollectHistoryServer server = new CollectHistoryServer(new DirCollectHistory(path_, size));
+        final CollectHistoryServer server = new CollectHistoryServer(openHistory());
 
         OncRpcUdpServerTransport rpcUdp = new OncRpcUdpServerTransport(server, null, port, server.info, 32768);
         rpcUdp.setCharacterEncoding("UTF-8");
         OncRpcTcpServerTransport rpcTcp = new OncRpcTcpServerTransport(server, null, port, server.info, 32768);
         rpcTcp.setCharacterEncoding("UTF-8");
-        server.run(new OncRpcServerTransport[]{ rpcUdp, rpcTcp });
+        server.run(new OncRpcServerTransport[]{rpcUdp, rpcTcp});
         rpcTcp.close();
         rpcUdp.close();
+    }
+
+    private CollectHistory openHistory() throws IOException {
+        DirCollectHistory history = new DirCollectHistory(path_, size);
+        if (optimizeOld)
+            history.optimizeOldFiles();
+        return history;
     }
 
     public static void main(String[] args) {
