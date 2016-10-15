@@ -144,6 +144,7 @@ public class ToXdrTables implements Closeable {
                 hdrEnd = Long.max(hdrEnd, timestamp);
 
             try {
+                // Decide if we should flush out the current block.
                 if (firstTs != null && lastTs != null) {
                     assert !timestamps.isEmpty();
                     boolean flushNow = timestamps.size() >= MAX_BLOCK_RECORDS;
@@ -151,15 +152,26 @@ public class ToXdrTables implements Closeable {
                         flushNow = true;
                     if (timestamp < firstTs && firstTs - timestamp > Integer.MAX_VALUE)
                         flushNow = true;
-                    if (flushNow)
+                    if (flushNow) {
+                        LOG.log(Level.INFO, "creating block {0}", blocks.size());
                         blocks.add(createBlock(new Context()));
-                } else {
+                    }
+                }
+                // Update firstTs and lastTs for current block.
+                if (firstTs != null) {  // Existing block.
+                    assert lastTs != null;
+                    assert !timestamps.isEmpty();
+                    assert dictionary != null;
+                    firstTs = Long.min(firstTs, timestamp);
+                    lastTs = Long.max(lastTs, timestamp);
+                } else {  // First record on new block.
                     assert timestamps.isEmpty();
+                    assert lastTs == null;
+                    assert dictionary == null;
                     firstTs = lastTs = timestamp;
+                    dictionary = new DictionaryForWrite();
                 }
 
-                if (dictionary == null)
-                    dictionary = new DictionaryForWrite();
                 timestamps.add(timestamp);
                 new FJPTaskExecutor<>(tsc.getTSValues(), tsv -> processGroup(timestamp, tsv))
                         .join();
