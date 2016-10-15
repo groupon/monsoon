@@ -41,7 +41,6 @@ import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.createPresenceBitset;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
-import com.groupon.lex.metrics.history.v2.xdr.dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables_block;
 import com.groupon.lex.metrics.history.v2.xdr.group_table;
@@ -57,6 +56,7 @@ import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.writeMimeHeader;
 import com.groupon.lex.metrics.history.xdr.support.FJPTaskExecutor;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
+import com.groupon.lex.metrics.history.xdr.support.Monitor;
 import com.groupon.lex.metrics.history.xdr.support.TmpFile;
 import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter.Writer;
 import com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter;
@@ -87,6 +87,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.Getter;
@@ -299,22 +301,18 @@ public class ToXdrTables implements Closeable {
             throw new IOException("table file may not be empty");
         result.blocks = blocks.toArray(new file_data_tables_block[blocks.size()]);
 
-        synchronized (ctx) {
-            return ctx.newWriter().write(result);
-        }
+        return deref(ctx.write(result));
     }
 
     private file_data_tables_block createBlock(Context ctx) throws IOException, OncRpcException {
         ctx.setTsdata(timestamps);
-        tables tables = createTables(ctx);  // Writes dependency data.
-        dictionary_delta encodedDictionary = dictionary.encode();  // Must be last.
+        Future<FilePos> tables = ctx.write(createTables(ctx));  // Writes dependency data.
+        Future<FilePos> encodedDictionary = ctx.write(dictionary.encode());  // Must be last.
 
         file_data_tables_block result = new file_data_tables_block();
-        synchronized (ctx) {
-            result.tables_data = ToXdr.filePos(ctx.newWriter().write(tables));
-            result.dictionary = ToXdr.filePos(ctx.newWriter().write(encodedDictionary));
-            result.tsd = ToXdr.timestamp_delta(ctx.getTimestamps());
-        }
+        result.tables_data = ToXdr.filePos(deref(tables));
+        result.dictionary = ToXdr.filePos(deref(encodedDictionary));
+        result.tsd = ToXdr.timestamp_delta(ctx.getTimestamps());
 
         // Reset state.
         timestamps.clear();
@@ -389,27 +387,29 @@ public class ToXdrTables implements Closeable {
                     return tm;
                 })
                 .toArray(tables_metric[]::new);
-        synchronized (ctx) {
-            return ctx.newWriter().write(result);
-        }
+        return deref(ctx.write(result));
     }
 
     private TIntObjectMap<FilePos> writeMetrics(MetricTmpFile metrics, Context ctx) throws IOException, OncRpcException {
-        final TIntObjectMap<MetricTable> metricTbl = new TIntObjectHashMap<>();
+        final TIntObjectMap<Future<FilePos>> futurePos = new TIntObjectHashMap<>();
+        {
+            final TIntObjectMap<MetricTable> metricTbl = new TIntObjectHashMap<>();
+            metrics.iterator().forEachRemaining(timestampedMetric -> {
+                final int nameRef = timestampedMetric.getName();
+                if (!metricTbl.containsKey(nameRef))
+                    metricTbl.put(nameRef, new MetricTable(dictionary));
+                metricTbl.get(nameRef).add(timestampedMetric.getTimestamp(), timestampedMetric.getValue());
+            });
 
-        metrics.iterator().forEachRemaining(timestampedMetric -> {
-            final int nameRef = timestampedMetric.getName();
-            if (!metricTbl.containsKey(nameRef))
-                metricTbl.put(nameRef, new MetricTable(dictionary));
-            metricTbl.get(nameRef).add(timestampedMetric.getTimestamp(), timestampedMetric.getValue());
-        });
-
-        TIntObjectMap<FilePos> result = new TIntObjectHashMap<>();
-        for (int nameRef : metricTbl.keys()) {
-            synchronized (ctx) {
-                result.put(nameRef, metricTbl.get(nameRef).write(ctx.newWriter(), ctx.getTimestamps()));
-            }
+            metricTbl.forEachEntry((nameRef, mt) -> {
+                futurePos.put(nameRef, ctx.write(mt.encode(ctx.getTimestamps())));
+                return true;
+            });
         }
+
+        final TIntObjectMap<FilePos> result = new TIntObjectHashMap<>();
+        for (int nameRef : futurePos.keys())
+            result.put(nameRef, deref(futurePos.get(nameRef)));
         return result;
     }
 
@@ -435,10 +435,12 @@ public class ToXdrTables implements Closeable {
         @Getter
         private final FileChannelWriter fd;
         private Long begin = null, end = null;
+        private final Monitor<XdrAble, FilePos> writer;
 
         public Context() {
             this.useBuffer = (compression == Compression.NONE ? ByteBuffer.allocate(65536) : ByteBuffer.allocateDirect(65536));
             this.fd = new FileChannelWriter(out, fileOffset);
+            this.writer = new Monitor<>(new Writer(fd, compression, useBuffer, true)::write);
         }
 
         public void setTsdata(TLongSet tsdata) {
@@ -455,9 +457,8 @@ public class ToXdrTables implements Closeable {
             }
         }
 
-        public Writer newWriter() {
-            assert Thread.holdsLock(this);
-            return new Writer(fd, compression, useBuffer, true);
+        public Future<FilePos> write(XdrAble data) {
+            return writer.enqueue(data);
         }
 
         public long getBegin() {
@@ -601,5 +602,29 @@ public class ToXdrTables implements Closeable {
         private final long timestamp;
         private final int name;
         private final metric_value value;
+    }
+
+    /**
+     * Dereference a future and if it failed, unwrap the exception.
+     */
+    private static <T> T deref(Future<T> future) throws IOException, OncRpcException {
+        for (;;) {
+            try {
+                return future.get();
+            } catch (InterruptedException ex) {
+                LOG.log(Level.WARNING, "interrupted while waiting for future", ex);
+            } catch (ExecutionException | Monitor.MonitorException ex) {
+                Throwable cause = ex.getCause();
+                if (cause instanceof Error)
+                    throw (Error) cause;
+                if (cause instanceof RuntimeException)
+                    throw (RuntimeException) cause;
+                if (cause instanceof IOException)
+                    throw (IOException) cause;
+                if (cause instanceof OncRpcException)
+                    throw (OncRpcException) cause;
+                throw new IllegalStateException("unexpected exception type", ex);
+            }
+        }
     }
 }
