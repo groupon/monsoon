@@ -32,7 +32,6 @@
 package com.groupon.lex.metrics.lib.sequence;
 
 import java.lang.ref.Reference;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -128,7 +127,9 @@ public class CachingObjectSequence<T> implements ObjectSequence<T> {
 
     @Override
     public ObjectSequence<T> reverse() {
-        CachedElement<T>[] newCache = Arrays.copyOf(this.cache, this.cache.length);
+        CachedElement<T>[] newCache = new CachedElement[this.cache.length];
+        for (int i = 0; i < newCache.length; ++i)
+            newCache[newCache.length - 1 - i] = this.cache[i];
         return new CachingObjectSequence<>(underlying.reverse(), referenceBuilder, newCache);
     }
 
