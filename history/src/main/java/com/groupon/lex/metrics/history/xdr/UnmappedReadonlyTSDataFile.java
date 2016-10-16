@@ -36,7 +36,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
@@ -52,8 +51,8 @@ public final class UnmappedReadonlyTSDataFile extends SequenceTSData {
     private final DateTime begin_, end_;
     private final int version_;
     private final boolean is_gzipped_;
-    @Getter(AccessLevel.PUBLIC)
-    private final ForwardIteratingSequence sequence;
+    @Getter
+    private final ObjectSequence<TimeSeriesCollection> sequence;
 
     public UnmappedReadonlyTSDataFile(GCCloseable<FileChannel> fd) throws IOException {
         fd_ = requireNonNull(fd);
@@ -89,7 +88,8 @@ public final class UnmappedReadonlyTSDataFile extends SequenceTSData {
         end_ = header.getEnd();
         LOG.log(Level.FINE, "instantiated: version={0}.{1} begin={2}, end={3}", new Object[]{version_major(version_), version_minor(version_), begin_, end_});
 
-        sequence = new ForwardIteratingSequence(this::makeIterator);
+        sequence = new ForwardIteratingSequence(this::makeIterator)
+                .share();
     }
 
     public static UnmappedReadonlyTSDataFile open(Path file) throws IOException {
@@ -184,10 +184,10 @@ public final class UnmappedReadonlyTSDataFile extends SequenceTSData {
     private static class ForwardIteratingSequence implements ObjectSequence<TimeSeriesCollection> {
         private SoftReference<ForwardIterator<TimeSeriesCollection>> iteratorRef = new SoftReference<>(null);
         private final Supplier<Iterator<TimeSeriesCollection>> iteratorSupplier;
-        private final LazyEval<Integer> sizeEval = new LazyEval<>(() -> Iterators.size(forwardIterator()));
-        private final LazyEval<Boolean> emptyEval = new LazyEval<>(() -> !forwardIterator().hasNext());
+        private final LazyEval<Integer> sizeEval = new LazyEval<>(() -> Iterators.size(makeIterator()));
+        private final LazyEval<Boolean> emptyEval = new LazyEval<>(() -> !makeIterator().hasNext());
 
-        private synchronized ForwardIterator<TimeSeriesCollection> forwardIterator() {
+        private synchronized Iterator<TimeSeriesCollection> makeIterator() {
             ForwardIterator<TimeSeriesCollection> iter = iteratorRef.get();
             if (iter == null) {
                 iter = new ForwardIterator<>(iteratorSupplier.get());
@@ -213,15 +213,15 @@ public final class UnmappedReadonlyTSDataFile extends SequenceTSData {
 
         @Override
         public TimeSeriesCollection get(int index) throws NoSuchElementException {
-            // Only validate size up front, if size is already computed.
+            if (index < 0)
+                throw new NoSuchElementException("index cannot be negative");
+            // Only validate index < size up front, if size is already computed.
             // Otherwise, rely on the Iterator to throw NoSuchElementException.
             Optional<Integer> size = sizeEval.getIfPresent();
-            if (size.isPresent()) {
-                if (index < 0 || index >= size.get())
-                    throw new NoSuchElementException(index + " out of range [0.." + size + ")");
-            }
+            if (size.isPresent() && index >= size.get())
+                throw new NoSuchElementException(index + " out of range [0.." + size + ")");
 
-            ForwardIterator<TimeSeriesCollection> iter = forwardIterator();
+            Iterator<TimeSeriesCollection> iter = makeIterator();
             for (int i = 0; i < index; ++i)
                 iter.next();
             return iter.next();
@@ -229,12 +229,12 @@ public final class UnmappedReadonlyTSDataFile extends SequenceTSData {
 
         @Override
         public <C extends Comparable<? super C>> Comparator<C> getComparator() {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            return Comparator.naturalOrder();
         }
 
         @Override
         public Iterator<TimeSeriesCollection> iterator() {
-            return forwardIterator();
+            return makeIterator();
         }
 
         @Override
@@ -269,7 +269,7 @@ public final class UnmappedReadonlyTSDataFile extends SequenceTSData {
         }
 
         private class SpliteratorImpl implements Spliterator<TimeSeriesCollection> {
-            private final Iterator<TimeSeriesCollection> iterator = forwardIterator();
+            private final Iterator<TimeSeriesCollection> iterator = makeIterator();
 
             @Override
             public boolean tryAdvance(Consumer<? super TimeSeriesCollection> action) {
