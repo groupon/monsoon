@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -57,7 +57,10 @@ public class PathMatcher implements ConfigStatement {
     private final IdentifierMatch matcher_;
     private final LoadingCache<List<String>, CachedOutcome> match_cache_;
 
-    /** Wrapped boolean inside a container class, so the SoftReferences work properly. */
+    /**
+     * Wrapped boolean inside a container class, so the SoftReferences work
+     * properly.
+     */
     @Value
     private static class CachedOutcome {
         private final boolean matched;
@@ -69,8 +72,13 @@ public class PathMatcher implements ConfigStatement {
         }
 
         public boolean match(List<String> path, SkipBacktrack skipper);
+
         public IdentifierMatch rebindWithSuccessor(Optional<IdentifierMatch> successor);
-        public default IdentifierMatch rebindWithSuccessor(IdentifierMatch successor) { return rebindWithSuccessor(Optional.of(successor)); }
+
+        public default IdentifierMatch rebindWithSuccessor(IdentifierMatch successor) {
+            return rebindWithSuccessor(Optional.of(successor));
+        }
+
         public StringBuilder populateExpression(StringBuilder buf);
     }
 
@@ -78,7 +86,9 @@ public class PathMatcher implements ConfigStatement {
         private final String literal_;
         private final Optional<IdentifierMatch> successor_;
 
-        public LiteralNameMatch(String literal) { this(literal, Optional.empty()); }
+        public LiteralNameMatch(String literal) {
+            this(literal, Optional.empty());
+        }
 
         public LiteralNameMatch(String literal, Optional<IdentifierMatch> successor) {
             literal_ = Objects.requireNonNull(literal);
@@ -87,8 +97,10 @@ public class PathMatcher implements ConfigStatement {
 
         @Override
         public boolean match(List<String> path, SkipBacktrack skipper) {
-            if (path.isEmpty()) return false;
-            if (!literal_.equals(path.get(0))) return false;
+            if (path.isEmpty())
+                return false;
+            if (!literal_.equals(path.get(0)))
+                return false;
             return successor_
                     .map((succ) -> succ.match(path.subList(1, path.size()), skipper))
                     .orElse(path.size() == 1);
@@ -142,7 +154,9 @@ public class PathMatcher implements ConfigStatement {
     public static class WildcardMatch implements IdentifierMatch {
         private final Optional<IdentifierMatch> successor_;
 
-        public WildcardMatch() { this(Optional.empty()); }
+        public WildcardMatch() {
+            this(Optional.empty());
+        }
 
         public WildcardMatch(Optional<IdentifierMatch> successor) {
             successor_ = Objects.requireNonNull(successor);
@@ -150,7 +164,8 @@ public class PathMatcher implements ConfigStatement {
 
         @Override
         public boolean match(List<String> path, SkipBacktrack skipper) {
-            if (path.isEmpty()) return false;
+            if (path.isEmpty())
+                return false;
             return successor_
                     .map((succ) -> succ.match(path.subList(1, path.size()), skipper))
                     .orElse(path.size() == 1);
@@ -200,7 +215,9 @@ public class PathMatcher implements ConfigStatement {
     public static class DoubleWildcardMatch implements IdentifierMatch {
         private final Optional<IdentifierMatch> successor_;
 
-        public DoubleWildcardMatch() { this(Optional.empty()); }
+        public DoubleWildcardMatch() {
+            this(Optional.empty());
+        }
 
         public DoubleWildcardMatch(Optional<IdentifierMatch> successor) {
             successor_ = Objects.requireNonNull(successor);
@@ -211,11 +228,13 @@ public class PathMatcher implements ConfigStatement {
             skipper.skip = true;
 
             SkipBacktrack my_skipper = new SkipBacktrack();
-            if (!successor_.isPresent()) return true;
+            if (!successor_.isPresent())
+                return true;
             for (int i = 0; i < path.size(); ++i) {
                 if (successor_.get().match(path.subList(i, path.size()), my_skipper))
                     return true;
-                if (my_skipper.skip) return false;  // Nested expression has done all the backtracking it needs.
+                if (my_skipper.skip)
+                    return false;  // Nested expression has done all the backtracking it needs.
             }
             return false;  // Successor couldn't match.
         }
@@ -266,7 +285,9 @@ public class PathMatcher implements ConfigStatement {
         private final Predicate<String> match_;
         private final Optional<IdentifierMatch> successor_;
 
-        public RegexMatch(String regex) { this(regex, Optional.empty()); }
+        public RegexMatch(String regex) {
+            this(regex, Optional.empty());
+        }
 
         public RegexMatch(String regex, Optional<IdentifierMatch> successor) {
             regex_ = requireNonNull(regex);
@@ -276,8 +297,10 @@ public class PathMatcher implements ConfigStatement {
 
         @Override
         public boolean match(List<String> path, SkipBacktrack skipper) {
-            if (path.isEmpty()) return false;
-            if (!match_.test(path.get(0))) return false;
+            if (path.isEmpty())
+                return false;
+            if (!match_.test(path.get(0)))
+                return false;
             return successor_
                     .map((succ) -> succ.match(path.subList(1, path.size()), skipper))
                     .orElse(path.size() == 1);
@@ -347,7 +370,7 @@ public class PathMatcher implements ConfigStatement {
         this(Arrays.asList(matchers));
     }
 
-    public boolean match_(List<String> grp_path) {
+    private boolean match_(List<String> grp_path) {
         boolean result = matcher_.match(grp_path, new IdentifierMatch.SkipBacktrack());
         LOG.log(Level.FINER, "Attempting to match {0} with {1} -> {2}", new Object[]{grp_path, matcher_, result});
         return result;
@@ -355,16 +378,6 @@ public class PathMatcher implements ConfigStatement {
 
     public boolean match(List<String> grp_path) {
         return match_cache_.getUnchecked(grp_path).isMatched();
-    }
-
-    @Deprecated
-    public boolean match(SimpleGroupPath grp) {
-        return match(grp.getPath());
-    }
-
-    @Deprecated
-    public boolean match(MetricName metric) {
-        return match(metric.getPath());
     }
 
     @Override
