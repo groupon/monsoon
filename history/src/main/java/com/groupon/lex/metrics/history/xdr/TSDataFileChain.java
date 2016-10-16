@@ -5,6 +5,7 @@ import com.groupon.lex.metrics.history.v2.list.RWListFile;
 import com.groupon.lex.metrics.history.xdr.TSDataScanDir.MetaData;
 import com.groupon.lex.metrics.history.xdr.support.FileUtil;
 import com.groupon.lex.metrics.history.xdr.support.MultiFileIterator;
+import com.groupon.lex.metrics.history.xdr.support.SequenceTSData;
 import com.groupon.lex.metrics.history.xdr.support.TSDataMap;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
@@ -592,9 +593,9 @@ public class TSDataFileChain implements TSData {
         requireNonNull(new_store);
 
         write_filename_.ifPresent(filename -> {
-            TSData old_store = opt_old_store
+            SequenceTSData old_store = opt_old_store
                     .map(rwfile -> {
-                        TSData tsdata = rwfile;  // Implicit cast.
+                        SequenceTSData tsdata = rwfile;  // Implicit cast.
                         return tsdata;
                     })
                     .orElseGet(() -> {

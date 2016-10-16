@@ -1,6 +1,5 @@
 package com.groupon.lex.metrics.history.xdr.support;
 
-import com.groupon.lex.metrics.history.TSData;
 import static java.lang.Thread.MIN_PRIORITY;
 import java.lang.management.ManagementFactory;
 import java.lang.ref.PhantomReference;
@@ -42,7 +41,7 @@ import javax.management.ObjectName;
  *
  * @author ariane
  */
-public class TSDataMap<K> implements Map<K, TSData> {
+public class TSDataMap<K> implements Map<K, SequenceTSData> {
     public final static long DEFAULT_MAX_MMAP;
     public final static long DEFAULT_MAX_FD = 128;
 
@@ -111,16 +110,16 @@ public class TSDataMap<K> implements Map<K, TSData> {
         private long max_cost_;
         private long total_cost_ = 0;
         private final Consumer<K> evictor_;
-        private final BiFunction<K, TSData, Long> cost_fn_;
+        private final BiFunction<K, SequenceTSData, Long> cost_fn_;
         private final PriorityQueue<EvictionQueueEntryImpl<K>> entries_ = new PriorityQueue<>(Comparator.comparing(eqe -> eqe.remembered_timestamp_));
 
-        public EvictionQueue(Consumer<K> evictor, BiFunction<K, TSData, Long> cost_fn, long max_cost) {
+        public EvictionQueue(Consumer<K> evictor, BiFunction<K, SequenceTSData, Long> cost_fn, long max_cost) {
             max_cost_ = max_cost;
             cost_fn_ = requireNonNull(cost_fn);
             evictor_ = requireNonNull(evictor);
         }
 
-        public EvictionQueueEntry<K> add(K key, TSData tsd) {
+        public EvictionQueueEntry<K> add(K key, SequenceTSData tsd) {
             final long cost = cost_fn_.apply(key, tsd);
             final EvictionQueueEntryImpl<K> entry = new EvictionQueueEntryImpl<>(key, cost);
             if (cost > 0) {
@@ -132,7 +131,7 @@ public class TSDataMap<K> implements Map<K, TSData> {
             return entry;
         }
 
-        public Optional<EvictionQueueEntry<K>> maybeAdd(K key, TSData tsd) {
+        public Optional<EvictionQueueEntry<K>> maybeAdd(K key, SequenceTSData tsd) {
             final long cost = cost_fn_.apply(key, tsd);
             if (cost <= 0)
                 return Optional.empty();
@@ -173,22 +172,22 @@ public class TSDataMap<K> implements Map<K, TSData> {
 
     private static class EntryValue {
         private final List<EvictionQueueEntry<?>> evictors_;
-        private final AtomicReference<Reference<TSData>> value_;
+        private final AtomicReference<Reference<SequenceTSData>> value_;
         private final int hash_code_;
 
-        public EntryValue(TSData value, Collection<EvictionQueueEntry<?>> evictors) {
+        public EntryValue(SequenceTSData value, Collection<EvictionQueueEntry<?>> evictors) {
             hash_code_ = (value == null ? 0 : value.hashCode());
             value_ = new AtomicReference<>(new SoftReference<>(value));
             evictors_ = new ArrayList<>(evictors);
         }
 
-        public Reference<TSData> getReference() {
+        public Reference<SequenceTSData> getReference() {
             return value_.get();
         }
 
-        public TSData getValue() {
+        public SequenceTSData getValue() {
             updateTimestamp();
-            TSData value = value_.get().get();
+            SequenceTSData value = value_.get().get();
             if (value == null)
                 markLost();
             return value;
@@ -203,7 +202,7 @@ public class TSDataMap<K> implements Map<K, TSData> {
         }
 
         public void onEviction() {
-            final TSData v = value_.get().get();
+            final SequenceTSData v = value_.get().get();
             markLost();
             value_.set(new WeakReference<>(v));
         }
@@ -224,14 +223,14 @@ public class TSDataMap<K> implements Map<K, TSData> {
         }
     }
 
-    private static final Map<Reference<TSData>, EntryValue> reference_map_ = new ConcurrentHashMap<>();
+    private static final Map<Reference<SequenceTSData>, EntryValue> reference_map_ = new ConcurrentHashMap<>();
     private static final ReferenceQueue reference_queue_ = new ReferenceQueue();
     private static final AtomicReference<Thread> cleaner_ = new AtomicReference<>();
     private final Map<K, EntryValue> data_ = new ConcurrentHashMap<>();
     private final Collection<EvictionQueue<K>> evictors_ = unmodifiableList(Arrays.asList(
             new EvictionQueue<>(this::evict_, this::mem_cost_, DEFAULT_MAX_MMAP),
             new EvictionQueue<>(this::evict_, this::fd_cost_, DEFAULT_MAX_FD)));
-    private final Function<? super K, ? extends TSData> resupplier_;
+    private final Function<? super K, ? extends SequenceTSData> resupplier_;
 
     private static void ensure_cleaner_() {
         if (cleaner_.get() != null)
@@ -255,28 +254,28 @@ public class TSDataMap<K> implements Map<K, TSData> {
             th.start();
     }
 
-    public TSDataMap(Function<? super K, ? extends TSData> resupplier) {
+    public TSDataMap(Function<? super K, ? extends SequenceTSData> resupplier) {
         ensure_cleaner_();
         resupplier_ = requireNonNull(resupplier);
     }
 
     @Override
-    public Set<Map.Entry<K, TSData>> entrySet() {
-        return new AbstractSet<Map.Entry<K, TSData>>() {
+    public Set<Map.Entry<K, SequenceTSData>> entrySet() {
+        return new AbstractSet<Map.Entry<K, SequenceTSData>>() {
             @Override
-            public Iterator<Map.Entry<K, TSData>> iterator() {
+            public Iterator<Map.Entry<K, SequenceTSData>> iterator() {
                 final Iterator<Map.Entry<K, EntryValue>> data_iter = data_.entrySet().iterator();
-                return new Iterator<Entry<K, TSData>>() {
+                return new Iterator<Entry<K, SequenceTSData>>() {
                     @Override
                     public boolean hasNext() {
                         return data_iter.hasNext();
                     }
 
                     @Override
-                    public Map.Entry<K, TSData> next() {
+                    public Map.Entry<K, SequenceTSData> next() {
                         final Map.Entry<K, EntryValue> n = data_iter.next();
-                        return new Map.Entry<K, TSData>() {
-                            private TSData remembered_value_ = null;
+                        return new Map.Entry<K, SequenceTSData>() {
+                            private SequenceTSData remembered_value_ = null;
 
                             @Override
                             public K getKey() {
@@ -284,7 +283,7 @@ public class TSDataMap<K> implements Map<K, TSData> {
                             }
 
                             @Override
-                            public TSData getValue() {
+                            public SequenceTSData getValue() {
                                 if (remembered_value_ == null) {
                                     remembered_value_ = n.getValue().getValue();
                                     if (remembered_value_ == null)
@@ -294,7 +293,7 @@ public class TSDataMap<K> implements Map<K, TSData> {
                             }
 
                             @Override
-                            public TSData setValue(TSData tsd) {
+                            public SequenceTSData setValue(SequenceTSData tsd) {
                                 throw new UnsupportedOperationException("TSDataMap entrySet is immutable, use put instead");
                             }
 
@@ -330,21 +329,21 @@ public class TSDataMap<K> implements Map<K, TSData> {
     }
 
     @Override
-    public Collection<TSData> values() {
-        return new AbstractCollection<TSData>() {
+    public Collection<SequenceTSData> values() {
+        return new AbstractCollection<SequenceTSData>() {
             @Override
-            public Iterator<TSData> iterator() {
+            public Iterator<SequenceTSData> iterator() {
                 final Iterator<Entry<K, EntryValue>> data_iter = data_.entrySet().iterator();
-                return new Iterator<TSData>() {
+                return new Iterator<SequenceTSData>() {
                     @Override
                     public boolean hasNext() {
                         return data_iter.hasNext();
                     }
 
                     @Override
-                    public TSData next() {
+                    public SequenceTSData next() {
                         final Entry<K, EntryValue> n = data_iter.next();
-                        TSData value = n.getValue().getValue();
+                        SequenceTSData value = n.getValue().getValue();
                         if (value != null)
                             return value;
                         return get(n.getKey());
@@ -364,7 +363,8 @@ public class TSDataMap<K> implements Map<K, TSData> {
         data_.clear();  // XXX expire all values?
     }
 
-    public TSData put(K key, TSData tsd) {
+    @Override
+    public SequenceTSData put(K key, SequenceTSData tsd) {
         final EntryValue ev = new_entry_value_(key, tsd);
         return Optional.ofNullable(data_.put(key, ev))
                 .map(old_ev -> {
@@ -375,12 +375,12 @@ public class TSDataMap<K> implements Map<K, TSData> {
     }
 
     @Override
-    public void putAll(Map<? extends K, ? extends TSData> m) {
+    public void putAll(Map<? extends K, ? extends SequenceTSData> m) {
         data_.putAll(m.entrySet().stream().collect(Collectors.toMap(Entry::getKey, entry -> new_entry_value_(entry.getKey(), entry.getValue()))));
     }
 
     @Override
-    public TSData remove(Object key) {
+    public SequenceTSData remove(Object key) {
         return Optional.ofNullable(data_.remove(key))
                 .map(ev -> {
                     ev.markLost();
@@ -401,9 +401,9 @@ public class TSDataMap<K> implements Map<K, TSData> {
     }
 
     @Override
-    public TSData get(Object key) {
+    public SequenceTSData get(Object key) {
         class Tmp {
-            public TSData result = null;
+            public SequenceTSData result = null;
         }
         final Tmp tmp = new Tmp();
 
@@ -468,7 +468,7 @@ public class TSDataMap<K> implements Map<K, TSData> {
         }
     }
 
-    private EntryValue new_entry_value_(K key, TSData tsd) {
+    private EntryValue new_entry_value_(K key, SequenceTSData tsd) {
         final List<EvictionQueueEntry<?>> evictor_entries;
         if (tsd == null) {
             evictor_entries = EMPTY_LIST;
@@ -491,11 +491,11 @@ public class TSDataMap<K> implements Map<K, TSData> {
     }
 
     @Deprecated
-    private long mem_cost_(K key, TSData tsd) {
+    private long mem_cost_(K key, SequenceTSData tsd) {
         return 0;
     }
 
-    private long fd_cost_(K key, TSData tsd) {
+    private long fd_cost_(K key, SequenceTSData tsd) {
         return (tsd.getFileChannel().isPresent() ? 1 : 0);
     }
 }
