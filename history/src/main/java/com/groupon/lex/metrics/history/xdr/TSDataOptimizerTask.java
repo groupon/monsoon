@@ -301,6 +301,6 @@ public class TSDataOptimizerTask {
          * The contents of the newly installed file.
          */
         @NonNull
-        private final TSData data;
+        private final ReadonlyTableFile data;
     }
 }

@@ -1,6 +1,7 @@
 package com.groupon.lex.metrics.lib;
 
 import static java.util.Objects.requireNonNull;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -8,11 +9,12 @@ import java.util.function.Supplier;
 /**
  * Lazy evaluation wrapper.
  *
- * Given a supplier (or function with arguments) it will:
- * - invoke the function exactly once to retrieve the result (upon first access)
- * - use the retrieved value on subsequence access.
+ * Given a supplier (or function with arguments) it will: - invoke the function
+ * exactly once to retrieve the result (upon first access) - use the retrieved
+ * value on subsequence access.
  *
  * The exception is if the argument throws an exception or is null.
+ *
  * @author ariane
  */
 public class LazyEval<T> implements Supplier<T> {
@@ -44,13 +46,18 @@ public class LazyEval<T> implements Supplier<T> {
     @Override
     public T get() {
         if (value_ == null) {
-            synchronized(this) {
+            synchronized (this) {
                 if (value_ == null) {
                     value_ = actual_.get();
-                    if (value_ != null) actual_ = null;  // Drop dependant data when no longer needed.
+                    if (value_ != null)
+                        actual_ = null;  // Drop dependant data when no longer needed.
                 }
             }
         }
         return value_;
+    }
+
+    public Optional<T> getIfPresent() {
+        return Optional.ofNullable(value_);
     }
 }

@@ -1,5 +1,6 @@
 package com.groupon.lex.metrics.history;
 
+import com.groupon.lex.metrics.history.xdr.support.SequenceTSData;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
@@ -211,11 +212,11 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
      * @throws IOException If an IOException occurs, the file is not a valid
      * TSData file or the version of the file is too new.
      */
-    public static TSData readonly(Path file) throws IOException {
+    public static SequenceTSData readonly(Path file) throws IOException {
         final Logger LOG = Logger.getLogger(TSData.class.getName());
 
-        final TSData result = TSDataVersionDispatch.open(file);
-        LOG.log(Level.INFO, "opened v{0}.{1}: {2} ({3}-{4}, {5} scrapes)", new Object[]{result.getMajor(), result.getMinor(), file, result.getBegin(), result.getEnd(), result.getMajor() >= 3 ? result.size() : "unspecified"});
+        final SequenceTSData result = TSDataVersionDispatch.open(file);
+        LOG.log(Level.INFO, "opened v{0}.{1}: {2} ({3}-{4}, {5} scrapes)", new Object[]{result.getMajor(), result.getMinor(), file, result.getBegin(), result.getEnd(), result.getMajor() >= 3 ? result.size() : "#???"});
         return result;
     }
 

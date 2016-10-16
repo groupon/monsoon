@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.history;
 
 import com.groupon.lex.metrics.history.xdr.Const;
+import com.groupon.lex.metrics.history.xdr.support.SequenceTSData;
 import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.GzipWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
@@ -63,7 +64,7 @@ public class TSDataVersionDispatchTest {
     @Mock
     private TSDataVersionDispatch.Factory factory_v0, factory_v1;
     @Mock
-    private TSData tsdata;
+    private SequenceTSData tsdata;
 
     private Path file;
     private List<TSDataVersionDispatch.Factory> FACTORY;
@@ -83,7 +84,7 @@ public class TSDataVersionDispatchTest {
     private void applyVersion(int major, int minor) throws Exception {
         try (FileChannel fd = FileChannel.open(file, StandardOpenOption.WRITE)) {
             try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new FileChannelWriter(fd, 0), 64)) {
-                Const.writeMimeHeader(writer, (short)major, (short)minor);
+                Const.writeMimeHeader(writer, (short) major, (short) minor);
             }
         }
     }
@@ -91,7 +92,7 @@ public class TSDataVersionDispatchTest {
     private void applyVersionCompressed(int major, int minor) throws Exception {
         try (FileChannel fd = FileChannel.open(file, StandardOpenOption.WRITE)) {
             try (XdrEncodingFileWriter writer = new XdrEncodingFileWriter(new GzipWriter(new FileChannelWriter(fd, 0)), 64)) {
-                Const.writeMimeHeader(writer, (short)major, (short)minor);
+                Const.writeMimeHeader(writer, (short) major, (short) minor);
             }
         }
     }

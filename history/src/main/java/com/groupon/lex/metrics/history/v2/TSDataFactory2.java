@@ -31,7 +31,6 @@
  */
 package com.groupon.lex.metrics.history.v2;
 
-import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.TSDataVersionDispatch;
 import com.groupon.lex.metrics.history.v2.list.RWListFile;
 import com.groupon.lex.metrics.history.v2.tables.ReadonlyTableFile;
@@ -39,6 +38,7 @@ import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
 import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
+import com.groupon.lex.metrics.history.xdr.support.SequenceTSData;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.XdrDecodingFileReader;
 import com.groupon.lex.metrics.lib.GCCloseable;
@@ -54,7 +54,7 @@ import org.acplt.oncrpc.OncRpcException;
  */
 public class TSDataFactory2 implements TSDataVersionDispatch.Factory {
     @Override
-    public TSData open(TSDataVersionDispatch.Releaseable<FileChannel> fd, boolean completeGzipped) throws IOException {
+    public SequenceTSData open(TSDataVersionDispatch.Releaseable<FileChannel> fd, boolean completeGzipped) throws IOException {
         if (completeGzipped)
             throw new IOException("version 2.x files may not be gzipped");
 

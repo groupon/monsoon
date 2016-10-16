@@ -31,7 +31,6 @@
  */
 package com.groupon.lex.metrics.history.v2.tables;
 
-import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
@@ -41,27 +40,25 @@ import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
 import com.groupon.lex.metrics.history.xdr.Const;
 import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.validateHeaderOrThrow;
-import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
+import com.groupon.lex.metrics.history.xdr.support.SequenceTSData;
 import com.groupon.lex.metrics.history.xdr.support.reader.Crc32VerifyingFileReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelSegmentReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.XdrDecodingFileReader;
 import com.groupon.lex.metrics.lib.GCCloseable;
+import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
-import java.util.Iterator;
 import java.util.Optional;
-import java.util.Spliterator;
-import java.util.stream.Stream;
 import lombok.Getter;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrAble;
 import org.joda.time.DateTime;
 
-public class ReadonlyTableFile implements TSData {
+public class ReadonlyTableFile extends SequenceTSData {
     private static final short FILE_VERSION = 2;  // Only file version that uses Table format.
     private final SegmentReader<RTFFileDataTables> body;
     private final GCCloseable<FileChannel> fd;
@@ -78,71 +75,8 @@ public class ReadonlyTableFile implements TSData {
     }
 
     @Override
-    public Iterator<TimeSeriesCollection> iterator() {
-        try {
-            return body.decode().iterator();
-        } catch (IOException | OncRpcException ex) {
-            throw new DecodingException("decoding failed", ex);
-        }
-    }
-
-    @Override
-    public Spliterator<TimeSeriesCollection> spliterator() {
-        try {
-            return body.decode().spliterator();
-        } catch (IOException | OncRpcException ex) {
-            throw new DecodingException("decoding failed", ex);
-        }
-    }
-
-    @Override
-    public Stream<TimeSeriesCollection> streamReversed() {
-        try {
-            return body.decode().streamReversed();
-        } catch (IOException | OncRpcException ex) {
-            throw new DecodingException("decoding failed", ex);
-        }
-    }
-
-    @Override
-    public Stream<TimeSeriesCollection> stream() {
-        try {
-            return body.decode().stream();
-        } catch (IOException | OncRpcException ex) {
-            throw new DecodingException("decoding failed", ex);
-        }
-    }
-
-    @Override
-    public Stream<TimeSeriesCollection> stream(DateTime begin) {
-        try {
-            return body.decode().stream(begin);
-        } catch (IOException | OncRpcException ex) {
-            throw new DecodingException("decoding failed", ex);
-        }
-    }
-
-    @Override
-    public Stream<TimeSeriesCollection> stream(DateTime begin, DateTime end) {
-        try {
-            return body.decode().stream(begin, end);
-        } catch (IOException | OncRpcException ex) {
-            throw new DecodingException("decoding failed", ex);
-        }
-    }
-
-    @Override
-    public boolean isEmpty() {
-        return size() == 0;
-    }
-
-    @Override
-    public int size() {
-        try {
-            return body.decode().size();
-        } catch (IOException | OncRpcException ex) {
-            throw new DecodingException("decoding failed", ex);
-        }
+    public ObjectSequence<TimeSeriesCollection> getSequence() {
+        return body.decodeOrThrow().getSequence().decodeOrThrow();
     }
 
     @Override

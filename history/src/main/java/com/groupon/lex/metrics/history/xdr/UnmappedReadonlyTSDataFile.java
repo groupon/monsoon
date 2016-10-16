@@ -1,28 +1,44 @@
 package com.groupon.lex.metrics.history.xdr;
 
-import com.groupon.lex.metrics.history.TSData;
+import com.google.common.collect.Iterators;
 import static com.groupon.lex.metrics.history.xdr.Const.version_major;
 import static com.groupon.lex.metrics.history.xdr.Const.version_minor;
 import com.groupon.lex.metrics.history.xdr.support.GzipDecodingBufferSupplier;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID1_EXPECT;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID2_EXPECT;
 import com.groupon.lex.metrics.history.xdr.support.Parser;
+import com.groupon.lex.metrics.history.xdr.support.SequenceTSData;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import com.groupon.lex.metrics.history.xdr.support.XdrStreamIterator;
+import com.groupon.lex.metrics.lib.ForwardIterator;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.lib.LazyEval;
+import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
+import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
+import com.groupon.lex.metrics.lib.sequence.ReverseSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
+import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import static java.util.Collections.emptyIterator;
+import java.util.Comparator;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
+import java.util.Spliterator;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
 
@@ -30,14 +46,14 @@ import org.joda.time.DateTime;
  *
  * @author ariane
  */
-public final class UnmappedReadonlyTSDataFile implements TSData {
+public final class UnmappedReadonlyTSDataFile extends SequenceTSData {
     private static final Logger LOG = Logger.getLogger(UnmappedReadonlyTSDataFile.class.getName());
     private final GCCloseable<FileChannel> fd_;
     private final DateTime begin_, end_;
     private final int version_;
     private final boolean is_gzipped_;
-    private final LazyEval<Integer> sizeEval = new LazyEval<>(() -> (int) stream().count());
-    private final LazyEval<Boolean> emptyEval = new LazyEval<>(() -> !stream().findAny().isPresent());
+    @Getter(AccessLevel.PUBLIC)
+    private final ForwardIteratingSequence sequence;
 
     public UnmappedReadonlyTSDataFile(GCCloseable<FileChannel> fd) throws IOException {
         fd_ = requireNonNull(fd);
@@ -72,6 +88,8 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
         begin_ = header.getBegin();
         end_ = header.getEnd();
         LOG.log(Level.FINE, "instantiated: version={0}.{1} begin={2}, end={3}", new Object[]{version_major(version_), version_minor(version_), begin_, end_});
+
+        sequence = new ForwardIteratingSequence(this::makeIterator);
     }
 
     public static UnmappedReadonlyTSDataFile open(Path file) throws IOException {
@@ -137,8 +155,7 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
         }
     }
 
-    @Override
-    public Iterator<TimeSeriesCollection> iterator() {
+    private Iterator<TimeSeriesCollection> makeIterator() {
         try {
             BufferSupplier decoder = new UnmappedBufferSupplier();
             if (is_gzipped_) {
@@ -163,13 +180,124 @@ public final class UnmappedReadonlyTSDataFile implements TSData {
         return Optional.of(fd_);
     }
 
-    @Override
-    public int size() {
-        return sizeEval.get();
-    }
+    @RequiredArgsConstructor
+    private static class ForwardIteratingSequence implements ObjectSequence<TimeSeriesCollection> {
+        private SoftReference<ForwardIterator<TimeSeriesCollection>> iteratorRef = new SoftReference<>(null);
+        private final Supplier<Iterator<TimeSeriesCollection>> iteratorSupplier;
+        private final LazyEval<Integer> sizeEval = new LazyEval<>(() -> Iterators.size(forwardIterator()));
+        private final LazyEval<Boolean> emptyEval = new LazyEval<>(() -> !forwardIterator().hasNext());
 
-    @Override
-    public boolean isEmpty() {
-        return emptyEval.get();
+        private synchronized ForwardIterator<TimeSeriesCollection> forwardIterator() {
+            ForwardIterator<TimeSeriesCollection> iter = iteratorRef.get();
+            if (iter == null) {
+                iter = new ForwardIterator<>(iteratorSupplier.get());
+                iteratorRef = new SoftReference<>(iter);
+            }
+            return iter.clone();
+        }
+
+        @Override
+        public boolean isSorted() {
+            return true;
+        }
+
+        @Override
+        public boolean isNonnull() {
+            return true;
+        }
+
+        @Override
+        public boolean isDistinct() {
+            return true;
+        }
+
+        @Override
+        public TimeSeriesCollection get(int index) throws NoSuchElementException {
+            // Only validate size up front, if size is already computed.
+            // Otherwise, rely on the Iterator to throw NoSuchElementException.
+            Optional<Integer> size = sizeEval.getIfPresent();
+            if (size.isPresent()) {
+                if (index < 0 || index >= size.get())
+                    throw new NoSuchElementException(index + " out of range [0.." + size + ")");
+            }
+
+            ForwardIterator<TimeSeriesCollection> iter = forwardIterator();
+            for (int i = 0; i < index; ++i)
+                iter.next();
+            return iter.next();
+        }
+
+        @Override
+        public <C extends Comparable<? super C>> Comparator<C> getComparator() {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public Iterator<TimeSeriesCollection> iterator() {
+            return forwardIterator();
+        }
+
+        @Override
+        public Spliterator<TimeSeriesCollection> spliterator() {
+            return new SpliteratorImpl();
+        }
+
+        @Override
+        public Stream<TimeSeriesCollection> stream() {
+            return StreamSupport.stream(spliterator(), false);
+        }
+
+        @Override
+        public Stream<TimeSeriesCollection> parallelStream() {
+            return StreamSupport.stream(spliterator(), true);
+        }
+
+        @Override
+        public int size() {
+            return sizeEval.get();
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return emptyEval.get();
+        }
+
+        @Override
+        public ObjectSequence<TimeSeriesCollection> reverse() {
+            return new ReverseSequence(0, size())
+                    .map(this::get, true, true, true);
+        }
+
+        private class SpliteratorImpl implements Spliterator<TimeSeriesCollection> {
+            private final Iterator<TimeSeriesCollection> iterator = forwardIterator();
+
+            @Override
+            public boolean tryAdvance(Consumer<? super TimeSeriesCollection> action) {
+                if (!iterator.hasNext())
+                    return false;
+                action.accept(iterator.next());
+                return true;
+            }
+
+            @Override
+            public Spliterator<TimeSeriesCollection> trySplit() {
+                return null;  // Splitting may require reading a lot of data up front.
+            }
+
+            @Override
+            public long estimateSize() {
+                return size();
+            }
+
+            @Override
+            public int characteristics() {
+                return ForwardSequence.SPLITERATOR_CHARACTERISTICS;
+            }
+
+            @Override
+            public Comparator<TimeSeriesCollection> getComparator() {
+                return null;
+            }
+        }
     }
 }

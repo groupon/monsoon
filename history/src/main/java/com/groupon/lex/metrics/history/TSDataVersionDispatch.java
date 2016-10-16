@@ -36,10 +36,10 @@ import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.validateHeaderOrThrow;
 import static com.groupon.lex.metrics.history.xdr.Const.version_major;
 import static com.groupon.lex.metrics.history.xdr.Const.version_minor;
-import com.groupon.lex.metrics.history.xdr.MmapReadonlyTSDataFile;
 import com.groupon.lex.metrics.history.xdr.UnmappedReadonlyTSDataFile;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID1_EXPECT;
 import static com.groupon.lex.metrics.history.xdr.support.GzipHeaderConsts.ID2_EXPECT;
+import com.groupon.lex.metrics.history.xdr.support.SequenceTSData;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.GzipReader;
@@ -65,18 +65,18 @@ public class TSDataVersionDispatch {
     public static final List<Factory> VERSION_TABLE = unmodifiableList(Arrays.asList(
             new TSData_0_and_1(), // version 0
             new TSData_0_and_1(), // version 1
-            new TSDataFactory2()  // version 2
+            new TSDataFactory2() // version 2
     ));
 
     public static interface Factory {
-        public TSData open(Releaseable<FileChannel> file, boolean completeGzipped) throws IOException;
+        public SequenceTSData open(Releaseable<FileChannel> file, boolean completeGzipped) throws IOException;
     }
 
-    public static TSData open(Path file) throws IOException {
+    public static SequenceTSData open(Path file) throws IOException {
         return open(file, VERSION_TABLE);
     }
 
-    public static TSData open(Path file, List<Factory> versionTable) throws IOException {
+    public static SequenceTSData open(Path file, List<Factory> versionTable) throws IOException {
         try (Releaseable<FileChannel> fd = new Releaseable<>(FileChannel.open(file, StandardOpenOption.READ))) {
             final boolean completeGzipped;
             try (FileReader reader = new FileChannelReader(fd.get(), 0)) {
@@ -102,7 +102,8 @@ public class TSDataVersionDispatch {
             final Factory factory;
             try {
                 factory = versionTable.get(majorVersion);
-                if (factory == null) throw new IndexOutOfBoundsException("null decoder");
+                if (factory == null)
+                    throw new IndexOutOfBoundsException("null decoder");
             } catch (IndexOutOfBoundsException ex) {
                 throw new IOException("missing implementation for version " + majorVersion + "." + version_minor(version));
             }
@@ -127,22 +128,21 @@ public class TSDataVersionDispatch {
 
         @Override
         public void close() throws IOException {
-            if (item != null) item.close();
+            if (item != null)
+                item.close();
         }
     }
 
     private static class TSData_0_and_1 implements Factory {
         @Override
-        public TSData open(Releaseable<FileChannel> fd, boolean completeGzipped) throws IOException {
-            if (!completeGzipped)
-                return new MmapReadonlyTSDataFile(fd.get().map(FileChannel.MapMode.READ_ONLY, 0, fd.get().size()));
-            else
-                return new UnmappedReadonlyTSDataFile(new GCCloseable<>(fd.release()));
+        public SequenceTSData open(Releaseable<FileChannel> fd, boolean completeGzipped) throws IOException {
+            return new UnmappedReadonlyTSDataFile(new GCCloseable<>(fd.release()));
         }
     }
 
     private static FileReader wrapGzip(FileReader in, boolean gzipped) throws IOException {
-        if (gzipped) in = new GzipReader(in, false);
+        if (gzipped)
+            in = new GzipReader(in, false);
         return in;
     }
 }
