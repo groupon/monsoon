@@ -31,7 +31,6 @@
  */
 package com.groupon.lex.metrics.history.v2.list;
 
-import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
@@ -43,9 +42,9 @@ import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.validateHeaderOrThrow;
 import static com.groupon.lex.metrics.history.xdr.Const.writeMimeHeader;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
+import com.groupon.lex.metrics.history.xdr.support.SequenceTSData;
 import com.groupon.lex.metrics.history.xdr.support.reader.Crc32VerifyingFileReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelReader;
-import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.XdrDecodingFileReader;
 import com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter;
 import static com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter.CRC_LEN;
@@ -53,24 +52,18 @@ import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import com.groupon.lex.metrics.lib.GCCloseable;
-import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
 import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
-import com.groupon.lex.metrics.lib.sequence.ReverseSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.Optional;
-import java.util.Spliterator;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 import lombok.NonNull;
 import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
-public class RWListFile implements TSData {
+public class RWListFile extends SequenceTSData {
     private static final short FILE_VERSION = 2;  // Only file version that uses Table format.
     private final State state;
 
@@ -158,41 +151,8 @@ public class RWListFile implements TSData {
     }
 
     @Override
-    public boolean isEmpty() {
-        return state.sequence().isEmpty();
-    }
-
-    @Override
-    public int size() {
-        final ObjectSequence<SegmentReader<TimeSeriesCollection>> seq = state.sequence();
-        if (seq.isSorted() && seq.isDistinct())
-            return seq.size();
-        return fixSequence(state.decodedSequence()).size();
-    }
-
-    public Stream<TimeSeriesCollection> streamReverse() {
-        return StreamSupport.stream(
-                () -> fixSequence(state.decodedSequence()).reverse().spliterator(),
-                ReverseSequence.SPLITERATOR_CHARACTERISTICS,
-                false);
-    }
-
-    @Override
-    public Stream<TimeSeriesCollection> stream() {
-        return StreamSupport.stream(
-                () -> fixSequence(state.decodedSequence()).spliterator(),
-                ForwardSequence.SPLITERATOR_CHARACTERISTICS,
-                false);
-    }
-
-    @Override
-    public Spliterator<TimeSeriesCollection> spliterator() {
-        return fixSequence(state.decodedSequence()).spliterator();
-    }
-
-    @Override
-    public Iterator<TimeSeriesCollection> iterator() {
-        return fixSequence(state.decodedSequence()).iterator();
+    protected ObjectSequence<TimeSeriesCollection> getSequence() {
+        return fixSequence(state.decodedSequence());
     }
 
     @Override

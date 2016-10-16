@@ -39,21 +39,18 @@ import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
 import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
-import java.util.Iterator;
 import java.util.Set;
-import java.util.Spliterator;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NonNull;
 import org.acplt.oncrpc.XdrAble;
-import org.joda.time.DateTime;
 
 @Getter(AccessLevel.PRIVATE)
 public final class RTFFileDataTables {
     private final file_data_tables input;
     private final ObjectSequence<RTFFileDataTablesBlock> blocks;
+    @Getter(AccessLevel.PUBLIC)
     private final SegmentReader<ObjectSequence<TimeSeriesCollection>> sequence;
     private final boolean sorted;
     private final boolean distinct;
@@ -78,39 +75,6 @@ public final class RTFFileDataTables {
         if (!sorted || !distinct)
             return Util.mergeSequences(seq);
         return ObjectSequence.concat(seq, sorted, distinct);
-    }
-
-    public int size() {
-        return sequence.decodeOrThrow().size();
-    }
-
-    public Iterator<TimeSeriesCollection> iterator() {
-        return sequence.decodeOrThrow().iterator();
-    }
-
-    public Spliterator<TimeSeriesCollection> spliterator() {
-        return sequence.decodeOrThrow().spliterator();
-    }
-
-    public Stream<TimeSeriesCollection> streamReversed() {
-        return sequence.decodeOrThrow().reverse().stream();
-    }
-
-    public Stream<TimeSeriesCollection> stream() {
-        return sequence.decodeOrThrow().stream();
-    }
-
-    public Stream<TimeSeriesCollection> stream(DateTime begin) {
-        ObjectSequence<TimeSeriesCollection> seq = sequence.decodeOrThrow();
-        seq = seq.skip(seq.equalRange((tsc) -> tsc.getTimestamp().compareTo(begin)).getBegin());
-        return seq.stream();
-    }
-
-    public Stream<TimeSeriesCollection> stream(DateTime begin, DateTime end) {
-        ObjectSequence<TimeSeriesCollection> seq = sequence.decodeOrThrow();
-        seq = seq.skip(seq.equalRange((tsc) -> tsc.getTimestamp().compareTo(begin)).getBegin());
-        seq = seq.limit(seq.equalRange((tsc -> tsc.getTimestamp().compareTo(end))).getEnd());
-        return seq.stream();
     }
 
     public Set<SimpleGroupPath> getAllPaths() {
