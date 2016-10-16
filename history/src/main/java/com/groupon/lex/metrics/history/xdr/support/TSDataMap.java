@@ -1,7 +1,6 @@
 package com.groupon.lex.metrics.history.xdr.support;
 
 import com.groupon.lex.metrics.history.TSData;
-import com.groupon.lex.metrics.history.xdr.MmapReadonlyTSDataFile;
 import static java.lang.Thread.MIN_PRIORITY;
 import java.lang.management.ManagementFactory;
 import java.lang.ref.PhantomReference;
@@ -53,7 +52,7 @@ public class TSDataMap<K> implements Map<K, TSData> {
             // Try to figure out the total RAM in the system and assign half of it as MMAP limit.
             final MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
             Object attribute = mBeanServer.getAttribute(new ObjectName("java.lang", "type", "OperatingSystem"), "TotalPhysicalMemorySize");
-            max_mmap = ((Number)attribute).longValue() / 2;
+            max_mmap = ((Number) attribute).longValue() / 2;
         } catch (Exception ex) {  // Also catch RuntimeExceptions, like ClassCastException.
             max_mmap = 16L * 1024 * 1024 * 1024;
             Logger.getLogger(TSDataMap.class.getName()).log(Level.SEVERE, "unable to figure out system RAM size", ex);
@@ -63,8 +62,11 @@ public class TSDataMap<K> implements Map<K, TSData> {
 
     private static interface EvictionQueueEntry<K> {
         public K getKey();
+
         public void updateTimestamp();
+
         public void markLost();
+
         public EvictionQueue getQueue();
     }
 
@@ -84,18 +86,26 @@ public class TSDataMap<K> implements Map<K, TSData> {
             }
 
             @Override
-            public K getKey() { return key_; }
+            public K getKey() {
+                return key_;
+            }
+
             @Override
-            public void updateTimestamp() { timestamp_.set(System.nanoTime()); }
+            public void updateTimestamp() {
+                timestamp_.set(System.nanoTime());
+            }
 
             @Override
             public void markLost() {
-                if (lost_.getAndSet(true)) return;
+                if (lost_.getAndSet(true))
+                    return;
                 getQueue().total_cost_ -= cost_;
             }
 
             @Override
-            public EvictionQueue getQueue() { return EvictionQueue.this; }
+            public EvictionQueue getQueue() {
+                return EvictionQueue.this;
+            }
         }
 
         private long max_cost_;
@@ -114,7 +124,7 @@ public class TSDataMap<K> implements Map<K, TSData> {
             final long cost = cost_fn_.apply(key, tsd);
             final EvictionQueueEntryImpl<K> entry = new EvictionQueueEntryImpl<>(key, cost);
             if (cost > 0) {
-                synchronized(this) {
+                synchronized (this) {
                     entries_.add(entry);
                     total_cost_ += cost;
                 }
@@ -124,24 +134,32 @@ public class TSDataMap<K> implements Map<K, TSData> {
 
         public Optional<EvictionQueueEntry<K>> maybeAdd(K key, TSData tsd) {
             final long cost = cost_fn_.apply(key, tsd);
-            if (cost <= 0) return Optional.empty();
+            if (cost <= 0)
+                return Optional.empty();
 
             final EvictionQueueEntryImpl<K> entry = new EvictionQueueEntryImpl<>(key, cost);
-            synchronized(this) {
+            synchronized (this) {
                 entries_.add(entry);
                 total_cost_ += cost;
             }
             return Optional.of(entry);
         }
 
-        public synchronized long getMaxCost() { return max_cost_; }
-        public synchronized void setMaxCost(long max_cost) { max_cost_ = max_cost; }
+        public synchronized long getMaxCost() {
+            return max_cost_;
+        }
+
+        public synchronized void setMaxCost(long max_cost) {
+            max_cost_ = max_cost;
+        }
 
         public synchronized void maybe_evict_() {
             while (total_cost_ > max_cost_) {
                 final EvictionQueueEntryImpl<K> head = entries_.poll();
-                if (head == null) return;  // Everything is evicted.
-                if (head.lost_.get()) continue;  // Lingering element that is no longer in use.
+                if (head == null)
+                    return;  // Everything is evicted.
+                if (head.lost_.get())
+                    continue;  // Lingering element that is no longer in use.
                 if (head.remembered_timestamp_ != head.timestamp_.get()) {
                     head.remembered_timestamp_ = head.timestamp_.get();
                     entries_.offer(head);
@@ -164,17 +182,25 @@ public class TSDataMap<K> implements Map<K, TSData> {
             evictors_ = new ArrayList<>(evictors);
         }
 
-        public Reference<TSData> getReference() { return value_.get(); }
+        public Reference<TSData> getReference() {
+            return value_.get();
+        }
 
         public TSData getValue() {
             updateTimestamp();
             TSData value = value_.get().get();
-            if (value == null) markLost();
+            if (value == null)
+                markLost();
             return value;
         }
 
-        public void updateTimestamp() { evictors_.forEach(EvictionQueueEntry::updateTimestamp); }
-        private void markLost() { evictors_.forEach(EvictionQueueEntry::markLost); }
+        public void updateTimestamp() {
+            evictors_.forEach(EvictionQueueEntry::updateTimestamp);
+        }
+
+        private void markLost() {
+            evictors_.forEach(EvictionQueueEntry::markLost);
+        }
 
         public void onEviction() {
             final TSData v = value_.get().get();
@@ -189,9 +215,11 @@ public class TSDataMap<K> implements Map<K, TSData> {
 
         @Override
         public boolean equals(Object o) {
-            if (o == null) return false;
-            if (!(o instanceof EntryValue)) return false;
-            final EntryValue other = (EntryValue)o;
+            if (o == null)
+                return false;
+            if (!(o instanceof EntryValue))
+                return false;
+            final EntryValue other = (EntryValue) o;
             return Objects.equals(value_.get(), other.value_.get());
         }
     }
@@ -206,13 +234,15 @@ public class TSDataMap<K> implements Map<K, TSData> {
     private final Function<? super K, ? extends TSData> resupplier_;
 
     private static void ensure_cleaner_() {
-        if (cleaner_.get() != null) return;
+        if (cleaner_.get() != null)
+            return;
         final Thread th = new Thread(() -> {
             for (;;) {
                 try {
                     final Reference ref = reference_queue_.remove();
                     final EntryValue ev = reference_map_.remove(ref);
-                    if (ev != null) ev.markLost();
+                    if (ev != null)
+                        ev.markLost();
                 } catch (InterruptedException ex) {
                     Logger.getLogger(TSDataMap.class.getName()).log(Level.SEVERE, "ignoring interruption", ex);
                 }
@@ -249,13 +279,16 @@ public class TSDataMap<K> implements Map<K, TSData> {
                             private TSData remembered_value_ = null;
 
                             @Override
-                            public K getKey() { return n.getKey(); }
+                            public K getKey() {
+                                return n.getKey();
+                            }
 
                             @Override
                             public TSData getValue() {
                                 if (remembered_value_ == null) {
                                     remembered_value_ = n.getValue().getValue();
-                                    if (remembered_value_ == null) remembered_value_ = get(n.getKey());
+                                    if (remembered_value_ == null)
+                                        remembered_value_ = get(n.getKey());
                                 }
                                 return remembered_value_;
                             }
@@ -272,9 +305,11 @@ public class TSDataMap<K> implements Map<K, TSData> {
 
                             @Override
                             public boolean equals(Object o) {
-                                if (o == null) return false;
-                                if (!(o instanceof Map.Entry)) return false;
-                                Map.Entry<?, ?> other = (Map.Entry<?, ?>)o;
+                                if (o == null)
+                                    return false;
+                                if (!(o instanceof Map.Entry))
+                                    return false;
+                                Map.Entry<?, ?> other = (Map.Entry<?, ?>) o;
                                 return Objects.equals(getKey(), other.getKey()) && Objects.equals(getValue(), other.getValue());
                             }
                         };
@@ -290,7 +325,9 @@ public class TSDataMap<K> implements Map<K, TSData> {
     }
 
     @Override
-    public Set<K> keySet() { return data_.keySet(); }
+    public Set<K> keySet() {
+        return data_.keySet();
+    }
 
     @Override
     public Collection<TSData> values() {
@@ -308,7 +345,8 @@ public class TSDataMap<K> implements Map<K, TSData> {
                     public TSData next() {
                         final Entry<K, EntryValue> n = data_iter.next();
                         TSData value = n.getValue().getValue();
-                        if (value != null) return value;
+                        if (value != null)
+                            return value;
                         return get(n.getKey());
                     }
                 };
@@ -354,8 +392,9 @@ public class TSDataMap<K> implements Map<K, TSData> {
     @Override
     public boolean remove(Object key, Object value) {
         final SoftReference<Object> comparison = new SoftReference<>(value);
-        final EntryValue old_val = data_.computeIfPresent((K)key, (K k, EntryValue d_val) -> {
-            if (Objects.equals(((EntryValue)d_val).getReference(), comparison)) return null;
+        final EntryValue old_val = data_.computeIfPresent((K) key, (K k, EntryValue d_val) -> {
+            if (Objects.equals(((EntryValue) d_val).getReference(), comparison))
+                return null;
             return d_val;
         });
         return old_val != null && Objects.equals(old_val.getReference(), comparison);
@@ -363,10 +402,12 @@ public class TSDataMap<K> implements Map<K, TSData> {
 
     @Override
     public TSData get(Object key) {
-        class Tmp { public TSData result = null; }
+        class Tmp {
+            public TSData result = null;
+        }
         final Tmp tmp = new Tmp();
 
-        data_.computeIfPresent((K)key, (k, d_val) -> {
+        data_.computeIfPresent((K) key, (k, d_val) -> {
             tmp.result = d_val.getValue();
             if (tmp.result == null) {
                 d_val.markLost();
@@ -406,18 +447,21 @@ public class TSDataMap<K> implements Map<K, TSData> {
 
     @Override
     public boolean equals(Object o) {
-        if (o == null) return false;
-        if (!(o instanceof Map)) return false;
+        if (o == null)
+            return false;
+        if (!(o instanceof Map))
+            return false;
 
         if (o instanceof TSDataMap) {
-            final TSDataMap<?> other = (TSDataMap)o;
+            final TSDataMap<?> other = (TSDataMap) o;
             return Objects.equals(data_, other.data_);
         } else {
-            final Map<?, ?> other = (Map)o;
-            if (other.size() != size()) return false;
+            final Map<?, ?> other = (Map) o;
+            if (other.size() != size())
+                return false;
             return other.entrySet().stream()
                     .allMatch(o_entry -> {
-                        final EntryValue my_value = data_.get((K)o_entry.getKey());
+                        final EntryValue my_value = data_.get((K) o_entry.getKey());
                         SoftReference<Object> comparison = new SoftReference<>(o_entry.getValue());
                         return Objects.equals(my_value.getReference(), comparison);
                     });
@@ -435,19 +479,19 @@ public class TSDataMap<K> implements Map<K, TSData> {
                     .collect(Collectors.toList());
         }
         final EntryValue ev = new EntryValue(tsd, evictor_entries);
-        if (tsd != null) reference_map_.put(new PhantomReference<>(tsd, reference_queue_), ev);
+        if (tsd != null)
+            reference_map_.put(new PhantomReference<>(tsd, reference_queue_), ev);
         return ev;
     }
 
     private void evict_(K key) {
         final EntryValue tsd = data_.get(key);
-        if (tsd != null) tsd.onEviction();
+        if (tsd != null)
+            tsd.onEviction();
     }
 
+    @Deprecated
     private long mem_cost_(K key, TSData tsd) {
-        if (tsd instanceof MmapReadonlyTSDataFile) {
-            return ((MmapReadonlyTSDataFile)tsd).getFileSize();
-        }
         return 0;
     }
 
