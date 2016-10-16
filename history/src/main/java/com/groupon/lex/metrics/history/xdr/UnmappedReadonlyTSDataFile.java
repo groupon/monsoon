@@ -10,6 +10,7 @@ import com.groupon.lex.metrics.history.xdr.support.Parser;
 import com.groupon.lex.metrics.history.xdr.support.SequenceTSData;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import com.groupon.lex.metrics.history.xdr.support.XdrStreamIterator;
+import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.lib.ForwardIterator;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.lib.LazyEval;
@@ -36,7 +37,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
@@ -51,8 +51,7 @@ public final class UnmappedReadonlyTSDataFile extends SequenceTSData {
     private final DateTime begin_, end_;
     private final int version_;
     private final boolean is_gzipped_;
-    @Getter
-    private final ObjectSequence<TimeSeriesCollection> sequence;
+    private final SegmentReader<ObjectSequence<TimeSeriesCollection>> sequence;
 
     public UnmappedReadonlyTSDataFile(GCCloseable<FileChannel> fd) throws IOException {
         fd_ = requireNonNull(fd);
@@ -88,13 +87,18 @@ public final class UnmappedReadonlyTSDataFile extends SequenceTSData {
         end_ = header.getEnd();
         LOG.log(Level.FINE, "instantiated: version={0}.{1} begin={2}, end={3}", new Object[]{version_major(version_), version_minor(version_), begin_, end_});
 
-        sequence = new ForwardIteratingSequence(this::makeIterator)
+        sequence = SegmentReader.<ObjectSequence<TimeSeriesCollection>>ofSupplier(() -> new ForwardIteratingSequence(this::makeIterator))
                 .share();
     }
 
     public static UnmappedReadonlyTSDataFile open(Path file) throws IOException {
         final GCCloseable<FileChannel> fd = new GCCloseable<>(FileChannel.open(file, StandardOpenOption.READ));
         return new UnmappedReadonlyTSDataFile(fd);
+    }
+
+    @Override
+    public ObjectSequence<TimeSeriesCollection> getSequence() {
+        return sequence.decodeOrThrow();
     }
 
     @Override
