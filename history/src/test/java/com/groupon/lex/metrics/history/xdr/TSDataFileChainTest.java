@@ -127,11 +127,8 @@ public class TSDataFileChainTest {
 
         List<TimeSeriesCollection> expected_list = create_tsdata_().limit(COUNT).collect(Collectors.toList());
         reverse(expected_list);
-        Iterator<TimeSeriesCollection> expected = expected_list.iterator();
-        Iterator<TimeSeriesCollection> actual = fd.streamReversed().iterator();
-        while (expected.hasNext())
-            assertEquals(expected.next(), actual.next());
-        assertFalse(actual.hasNext());
+        List<TimeSeriesCollection> actual = fd.streamReversed().collect(Collectors.toList());
+        assertEquals(expected_list, actual);
     }
 
     @Test

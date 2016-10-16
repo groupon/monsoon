@@ -75,7 +75,7 @@ public class ReadonlyTableFile extends SequenceTSData {
     }
 
     @Override
-    protected ObjectSequence<TimeSeriesCollection> getSequence() {
+    public ObjectSequence<TimeSeriesCollection> getSequence() {
         return body.decodeOrThrow().getSequence().decodeOrThrow();
     }
 

@@ -151,7 +151,7 @@ public class RWListFile extends SequenceTSData {
     }
 
     @Override
-    protected ObjectSequence<TimeSeriesCollection> getSequence() {
+    public ObjectSequence<TimeSeriesCollection> getSequence() {
         return fixSequence(state.decodedSequence());
     }
 

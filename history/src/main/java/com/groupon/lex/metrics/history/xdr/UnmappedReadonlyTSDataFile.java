@@ -52,7 +52,7 @@ public final class UnmappedReadonlyTSDataFile extends SequenceTSData {
     private final DateTime begin_, end_;
     private final int version_;
     private final boolean is_gzipped_;
-    @Getter(AccessLevel.PROTECTED)
+    @Getter(AccessLevel.PUBLIC)
     private final ForwardIteratingSequence sequence;
 
     public UnmappedReadonlyTSDataFile(GCCloseable<FileChannel> fd) throws IOException {
