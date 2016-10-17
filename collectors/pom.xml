@@ -27,6 +27,7 @@
         <module>collectd</module>
         <module>http</module>
         <module>jmx</module>
+        <module>tcp</module>
     </modules>
 
     <dependencies>
