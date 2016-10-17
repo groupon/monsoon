@@ -32,7 +32,6 @@
 package com.groupon.lex.metrics.collector.collectd;
 
 import com.google.gson.Gson;
-import com.groupon.lex.metrics.GroupGenerator;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
@@ -44,9 +43,13 @@ import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Arrays;
+import java.util.Collection;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -55,6 +58,7 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.hasKey;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -76,19 +80,27 @@ public class CollectdPushCollectorTest {
     private CollectdPushCollector collectd;
     private String collectd_path;
     private HttpServlet collectd_acceptor;
-    private DateTime NOW = DateTime.now(DateTimeZone.UTC);
+    private final DateTime NOW = DateTime.now(DateTimeZone.UTC);
     private String json;
-    private static final GroupName BASE_NAME = GroupName.valueOf(SimpleGroupPath.valueOf("foo"), singletonMap("host", MetricValue.fromStrValue("localhost")));
-    private static final GroupName UPTIME_NAME = GroupName.valueOf(SimpleGroupPath.valueOf("foo", "uptime", "0"), BASE_NAME.getTags());
-    private static final GroupName DOWNTIME_NAME = GroupName.valueOf(SimpleGroupPath.valueOf("foo", "downtime", "0"), BASE_NAME.getTags());
+    private static final GroupName BASE_NAME = GroupName.valueOf(
+            SimpleGroupPath.valueOf("foo"), singletonMap("host",
+            MetricValue.fromStrValue("localhost")));
+    private static final GroupName UPTIME_NAME = GroupName.valueOf(
+            SimpleGroupPath.valueOf("foo", "uptime", "0"), BASE_NAME.getTags());
+    private static final GroupName DOWNTIME_NAME = GroupName.valueOf(
+            SimpleGroupPath.valueOf("foo", "downtime", "0"), BASE_NAME.getTags());
     private static final MetricName UP_METRIC = MetricName.valueOf("up");
-    private static final MetricName UPTIME_METRIC = MetricName.valueOf("uptime", "0");
-    private static final MetricName DOWNTIME_METRIC = MetricName.valueOf("downtime", "0");
+    private static final MetricName UPTIME_METRIC = MetricName.valueOf("uptime",
+            "0");
+    private static final MetricName DOWNTIME_METRIC = MetricName.valueOf(
+            "downtime", "0");
 
     @Mock
     private HttpServletRequest request;
     @Mock
     private HttpServletResponse response;
+
+    private ExecutorService executor;
 
     @Before
     public void setup() throws Exception {
@@ -124,6 +136,13 @@ public class CollectdPushCollectorTest {
         msg2.interval = 60;
         msg2.time = NOW.getMillis() / 1000d;
         json = gson.toJson(Arrays.asList(msg1, msg2));
+
+        executor = Executors.newFixedThreadPool(1);
+    }
+
+    @After
+    public void cleanup() {
+        executor.shutdownNow();
     }
 
     @Test
@@ -141,35 +160,41 @@ public class CollectdPushCollectorTest {
         /* Mock out classes involved in HTTP request. */
         when(request.getMethod()).thenReturn("POST");
         when(request.getCharacterEncoding()).thenReturn("UTF-8");
-        when(request.getReader()).thenReturn(new BufferedReader(new StringReader(json)));
-        when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+        when(request.getReader()).thenReturn(new BufferedReader(
+                new StringReader(json)));
+        when(response.getWriter()).thenReturn(
+                new PrintWriter(new StringWriter()));
 
         /* Before data arrives, getGroups is empty. */
-        GroupGenerator.GroupCollection groups = collectd.getGroups();
-        assertTrue(groups.isSuccessful());
-        assertTrue(groups.getGroups().isEmpty());
+        Collection<MetricGroup> groups = collectd.getGroups(executor,
+                new CompletableFuture<>()).get();
+        assertTrue(groups.isEmpty());
 
         /* Perform HTTP request. */
         collectd_acceptor.service(request, response);
 
         /* After data arrives, getGroups returns this data. */
-        groups = collectd.getGroups();
-        assertTrue(groups.isSuccessful());
+        groups = collectd.getGroups(executor, new CompletableFuture<>()).get();
         // Convenience map for validation.
-        Map<GroupName, Metric[]> group_map = groups.getGroups().stream().map(x -> (MetricGroup)x).collect(Collectors.toMap(MetricGroup::getName, MetricGroup::getMetrics));
-        assertThat(group_map, allOf(hasKey(UPTIME_NAME), hasKey(DOWNTIME_NAME), hasKey(BASE_NAME)));
+        Map<GroupName, Metric[]> group_map = groups.stream().map(
+                x -> (MetricGroup) x).collect(Collectors.toMap(
+                        MetricGroup::getName, MetricGroup::getMetrics));
+        assertThat(group_map, allOf(hasKey(UPTIME_NAME), hasKey(DOWNTIME_NAME),
+                hasKey(BASE_NAME)));
         assertEquals(UPTIME_METRIC, group_map.get(UPTIME_NAME)[0].getName());
-        assertEquals(MetricValue.fromIntValue(17), group_map.get(UPTIME_NAME)[0].getValue());
+        assertEquals(MetricValue.fromIntValue(17),
+                group_map.get(UPTIME_NAME)[0].getValue());
         assertEquals(DOWNTIME_METRIC, group_map.get(DOWNTIME_NAME)[0].getName());
-        assertEquals(MetricValue.fromIntValue(-17), group_map.get(DOWNTIME_NAME)[0].getValue());
+        assertEquals(MetricValue.fromIntValue(-17),
+                group_map.get(DOWNTIME_NAME)[0].getValue());
         assertEquals(UP_METRIC, group_map.get(BASE_NAME)[0].getName());
         assertEquals(MetricValue.TRUE, group_map.get(BASE_NAME)[0].getValue());
 
         /* After data collection, data must be removed from set, but the base names must still exist. */
-        groups = collectd.getGroups();
+        groups = collectd.getGroups(executor, new CompletableFuture<>()).get();
         // Convenience map for validation.
-        group_map = groups.getGroups().stream().map(x -> (MetricGroup)x).collect(Collectors.toMap(MetricGroup::getName, MetricGroup::getMetrics));
-        assertTrue(groups.isSuccessful());
+        group_map = groups.stream().map(x -> (MetricGroup) x).collect(
+                Collectors.toMap(MetricGroup::getName, MetricGroup::getMetrics));
         assertEquals(group_map.keySet(), singleton(BASE_NAME));
         assertEquals(UP_METRIC, group_map.get(BASE_NAME)[0].getName());
         assertEquals(MetricValue.FALSE, group_map.get(BASE_NAME)[0].getValue());
@@ -179,6 +204,10 @@ public class CollectdPushCollectorTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void empty_api_name_is_disallowed() throws Exception {
-        new CollectdPushCollector((path, handler) -> {}, SimpleGroupPath.valueOf("foo"), "");
+        new CollectdPushCollector(
+                (path, handler) -> {
+                    /* skip */
+                },
+                SimpleGroupPath.valueOf("foo"), "");
     }
 }

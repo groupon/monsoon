@@ -31,8 +31,7 @@
  */
 package com.groupon.lex.metrics;
 
-import static com.groupon.lex.metrics.GroupGenerator.failedResult;
-import static com.groupon.lex.metrics.GroupGenerator.successResult;
+import static com.groupon.lex.metrics.GroupGenerator.combineSubTasks;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.Any3;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
@@ -45,6 +44,8 @@ import java.util.List;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -55,10 +56,9 @@ import lombok.RequiredArgsConstructor;
 /**
  * A group generator that manages GroupGenerators based on the active resolver.
  *
- * When a group generator does not exist, for a given argument set,
- * it will create one.
- * When the resolver does not return a given argument set, the associated
- * group generator will be closed.
+ * When a group generator does not exist, for a given argument set, it will
+ * create one. When the resolver does not return a given argument set, the
+ * associated group generator will be closed.
  */
 @RequiredArgsConstructor
 public class ResolverGroupGenerator implements GroupGenerator {
@@ -76,14 +76,16 @@ public class ResolverGroupGenerator implements GroupGenerator {
     }
 
     @Override
-    public GroupCollection getGroups() {
+    public CompletableFuture<Collection<MetricGroup>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
         final Set<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolvedMaps;
 
         try {
             resolvedMaps = resolver.resolve().collect(Collectors.toSet());
         } catch (Exception ex) {
             LOG.log(Level.WARNING, "unable to resolve", ex);
-            return failedResult();
+            CompletableFuture<Collection<MetricGroup>> error = new CompletableFuture<>();
+            error.completeExceptionally(ex);
+            return error;
         }
 
         // Close all generators that are not to run.
@@ -108,21 +110,26 @@ public class ResolverGroupGenerator implements GroupGenerator {
                 generators.put(resolvedMap, requireNonNull(createGenerator.create(resolvedMap)));
             } catch (Exception ex) {
                 LOG.log(Level.WARNING, "unable to create generator", ex);
-                return failedResult();
+                CompletableFuture<Collection<MetricGroup>> error = new CompletableFuture<>();
+                error.completeExceptionally(ex);
+                return error;
             }
         }
 
         // Evaluate all generators.
-        final List<GroupCollection> results = new ArrayList<>(generators.size());
+        final List<CompletableFuture<Collection<MetricGroup>>> results = new ArrayList<>(generators.size());
         for (GroupGenerator generator : generators.values()) {
-            final GroupCollection groups = generator.getGroups();
-            if (!groups.isSuccessful()) return failedResult();
-            results.add(groups);
+            try {
+                results.add(generator.getGroups(executor, timeout));
+            } catch (Error | Exception ex) {
+                results.forEach(fut -> fut.cancel(false));
+                CompletableFuture<Collection<MetricGroup>> error = new CompletableFuture<>();
+                error.completeExceptionally(ex);
+                return error;
+            }
         }
-        return successResult(results.stream()
-                .map(GroupCollection::getGroups)
-                .flatMap(Collection::stream)
-                .collect(Collectors.toList()));
+
+        return combineSubTasks(results);
     }
 
     @Override
@@ -152,7 +159,8 @@ public class ResolverGroupGenerator implements GroupGenerator {
         }
         generators.clear();
 
-        if (thrown != null) throw thrown;
+        if (thrown != null)
+            throw thrown;
     }
 
     public static interface GroupGeneratorFactory {

@@ -49,7 +49,12 @@ import java.util.List;
 import java.util.Objects;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -66,7 +71,9 @@ import org.joda.time.Duration;
  * @author ariane
  */
 public abstract class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
-    private static final Logger logger = Logger.getLogger(MetricRegistryInstance.class.getName());
+    public static final long COLLECTOR_TIMEOUT = 30 * 1000; // msec
+    private static final Logger logger = Logger.getLogger(
+            MetricRegistryInstance.class.getName());
     private final Collection<GroupGenerator> generators_ = new ArrayList<>();
     private long failed_collections_ = 0;
     private final boolean has_config_;
@@ -77,6 +84,8 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
     private final Collection<TimeSeriesTransformer> decorators_ = new ArrayList<>();
     private Supplier<DateTime> now_;
     private final ListMetrics list_metrics_;
+    private final static ExecutorService GROUP_GENERATOR_EXECUTOR
+            = Executors.newWorkStealingPool(1000);
 
     protected MetricRegistryInstance(@NonNull Supplier<DateTime> now, boolean has_config, @NonNull EndpointRegistration api) {
         api_ = api;
@@ -92,7 +101,9 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
     }
 
     @Override
-    public EndpointRegistration getApi() { return api_; }
+    public EndpointRegistration getApi() {
+        return api_;
+    }
 
     public synchronized GroupGenerator add(GroupGenerator g) {
         generators_.add(g);
@@ -104,30 +115,50 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
     }
 
     /**
-     * Retrieve the number of collectors that encountered a failure during the last call to streamGroups().
+     * Retrieve the number of collectors that encountered a failure during the
+     * last call to streamGroups().
+     *
      * @return The number of collectors that failed.
      */
-    public long getFailedCollections() { return failed_collections_; }
+    public long getFailedCollections() {
+        return failed_collections_;
+    }
+
     /**
      * Retrieve timing for scrape.
+     *
      * @return The duration it took to complete all scrapes.
      */
-    public Optional<Duration> getScrapeDuration() { return scrape_duration_; }
+    public Optional<Duration> getScrapeDuration() {
+        return scrape_duration_;
+    }
+
     /**
      * Retrieve timing for rule evaluation.
+     *
      * @return The duration it took to evaluate all rules.
      */
-    public Optional<Duration> getRuleEvalDuration() { return rule_eval_duration_; }
+    public Optional<Duration> getRuleEvalDuration() {
+        return rule_eval_duration_;
+    }
+
     /**
      * Retrieve timing for processor to handle the data.
+     *
      * @return The duration it took for the processor, to push all the data out.
      */
-    public Optional<Duration> getProcessorDuration() { return processor_duration_; }
+    public Optional<Duration> getProcessorDuration() {
+        return processor_duration_;
+    }
+
     /**
      * Update the processor duration.
+     *
      * @param duration The time spent in the processor.
      */
-    public void updateProcessorDuration(Duration duration) { processor_duration_ = Optional.of(duration); }
+    public void updateProcessorDuration(Duration duration) {
+        processor_duration_ = Optional.of(duration);
+    }
 
     private Stream<TimeSeriesValue> streamGroups() {
         return streamGroups(now());
@@ -135,32 +166,65 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
 
     private synchronized Stream<TimeSeriesValue> streamGroups(DateTime now) {
         final long t0 = System.nanoTime();
+        failed_collections_ = 0;
 
-        List<GroupGenerator.GroupCollection> collections = generators_.parallelStream()
-                .map(GroupGenerator::getGroups)
+        CompletableFuture<?> timeout = new CompletableFuture<>();
+        List<CompletableFuture<Collection<MetricGroup>>> tasks = generators_.parallelStream()
+                .map(groupGenerator -> groupGenerator.getGroups(
+                        GROUP_GENERATOR_EXECUTOR, timeout))
                 .collect(Collectors.toList());
 
-        /* Count collection failures. */
-        failed_collections_ = collections.stream()
-                .filter((result) -> !result.isSuccessful())
-                .count();
+        List<Collection<MetricGroup>> collections
+                = new ArrayList<>(generators_.size());
+        final long tDeadline = t0 + COLLECTOR_TIMEOUT * 1000 * 1000; // msec to nsec
+        // Start collecting results; if we're lucky, this will complete before the timeout expires.
+        while (!tasks.isEmpty()) {
+            final long tCur = System.nanoTime();
+            if (tCur >= tDeadline) break;  // Time to complete the timeout future.
+            try {
+                Collection<MetricGroup> taskResult = tasks.get(0).get(tDeadline - tCur, TimeUnit.NANOSECONDS);
+                tasks.remove(0);
+                collections.add(taskResult);
+            } catch (InterruptedException | TimeoutException ex) {
+                /* skip */
+            } catch (ExecutionException ex) {
+                logger.log(Level.INFO, "failure executing task", ex);
+                ++failed_collections_;
+                tasks.remove(0);
+            }
+        }
+        timeout.complete(null);  // Inform tasks that they will time out.
+        // Collect anything that has completed so far and mark as failed anything else.
+        for (CompletableFuture<Collection<MetricGroup>> task : tasks) {
+            try {
+                collections.add(task.get(0, TimeUnit.MILLISECONDS));
+            } catch (ExecutionException | InterruptedException | TimeoutException ex) {
+                logger.log(Level.INFO, "failure executing task", ex);
+                ++failed_collections_;
+            }
+        }
+
         /* Measure end time of collections. */
         final long t_collections = System.nanoTime();
-        scrape_duration_ = Optional.of(Duration.millis(TimeUnit.NANOSECONDS.toMillis(t_collections - t0)));
+        scrape_duration_ = Optional.of(Duration.millis(
+                TimeUnit.NANOSECONDS.toMillis(t_collections - t0)));
 
         Stream<TimeSeriesValue> groups = collections.stream()
-                .map(GroupGenerator.GroupCollection::getGroups)
                 .flatMap(Collection::stream)
-                .collect(Collectors.toMap(MetricGroup::getName, Function.identity(), (x, y) -> y))  // Resolve group-name conflict, such that latest metric wins.
+                .collect(Collectors.toMap(MetricGroup::getName,
+                        Function.identity(), (x, y) -> y)) // Resolve group-name conflict, such that latest metric wins.
                 .values()
                 .stream()
-                .map((mg) -> new MutableTimeSeriesValue(now, mg.getName(), Arrays.stream(mg.getMetrics()), Metric::getName, Metric::getValue));
+                .map((mg) -> new MutableTimeSeriesValue(now, mg.getName(),
+                        Arrays.stream(mg.getMetrics()), Metric::getName,
+                        Metric::getValue));
         return groups;
     }
 
     @Override
     public synchronized GroupName[] getGroupNames() {
-        return streamGroups().map(TimeSeriesValue::getGroup).toArray(GroupName[]::new);
+        return streamGroups().map(TimeSeriesValue::getGroup).toArray(
+                GroupName[]::new);
     }
 
     public synchronized void decorate(TimeSeriesTransformer decorator) {
@@ -173,27 +237,35 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
     @Override
     public void close() {
         generators_.forEach((g) -> {
-                    try {
-                        g.close();
-                    } catch (Exception e) {
-                        logger.log(Level.SEVERE, "failed to close group generator " + g, e);
-                    }
-                });
+            try {
+                g.close();
+            } catch (Exception e) {
+                logger.log(Level.SEVERE, "failed to close group generator " + g,
+                        e);
+            }
+        });
         if (api_ instanceof AutoCloseable) {
             try {
-                ((AutoCloseable)api_).close();
+                ((AutoCloseable) api_).close();
             } catch (Exception ex) {
-                logger.log(Level.SEVERE, "unable to close API " + api_.getClass(), ex);
+                logger.log(Level.SEVERE,
+                        "unable to close API " + api_.getClass(), ex);
             }
         }
     }
 
     @Override
-    public boolean hasConfig() { return has_config_; }
-    public DateTime now() { return requireNonNull(now_.get()); }
+    public boolean hasConfig() {
+        return has_config_;
+    }
+
+    public DateTime now() {
+        return requireNonNull(now_.get());
+    }
 
     /**
      * Apply all timeseries decorators.
+     *
      * @param ctx Input timeseries.
      */
     protected void apply_rules_and_decorators_(Context ctx) {
@@ -201,24 +273,25 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
     }
 
     public ExpressionLookBack getDecoratorLookBack() {
-        return ExpressionLookBack.EMPTY.andThen(decorators_.stream().map(TimeSeriesTransformer::getLookBack));
+        return ExpressionLookBack.EMPTY.andThen(decorators_.stream().map(
+                TimeSeriesTransformer::getLookBack));
     }
 
     public static interface CollectionContext {
         public Consumer<Alert> alertManager();
+
         public MutableTimeSeriesCollectionPair tsdata();
+
         public void commit();
     }
 
     protected abstract CollectionContext beginCollection(DateTime now);
 
     /**
-     * Run an update cycle.
-     * An update cycle consists of:
-     * - gathering raw metrics
-     * - creating a new, minimal context
-     * - applying decorators against the current and previous values
-     * - storing the collection values as the most recent capture
+     * Run an update cycle. An update cycle consists of: - gathering raw metrics
+     * - creating a new, minimal context - applying decorators against the
+     * current and previous values - storing the collection values as the most
+     * recent capture
      */
     public TimeSeriesCollection updateCollection() {
         // Scrape metrics from all collectors.
@@ -234,7 +307,8 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
         final long t0 = System.nanoTime();
         apply_rules_and_decorators_(ctx);
         final long t_rule_eval = System.nanoTime();
-        rule_eval_duration_ = Optional.of(Duration.millis(TimeUnit.NANOSECONDS.toMillis(t_rule_eval - t0)));
+        rule_eval_duration_ = Optional.of(Duration.millis(
+                TimeUnit.NANOSECONDS.toMillis(t_rule_eval - t0)));
 
         // Publish new set of metrics.
         list_metrics_.update(tsdata.getCurrentCollection());

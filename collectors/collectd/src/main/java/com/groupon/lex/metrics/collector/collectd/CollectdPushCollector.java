@@ -34,7 +34,6 @@ package com.groupon.lex.metrics.collector.collectd;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.groupon.lex.metrics.GroupGenerator;
-import static com.groupon.lex.metrics.GroupGenerator.successResult;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
@@ -52,6 +51,7 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import static java.util.Collections.EMPTY_MAP;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
@@ -61,7 +61,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -74,10 +76,10 @@ import javax.servlet.http.HttpServletResponse;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NonNull;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
-import lombok.NonNull;
 
 /**
  *
@@ -86,7 +88,8 @@ import lombok.NonNull;
 public class CollectdPushCollector implements GroupGenerator {
     public static final String API_ENDPOINT_BASE = "/collectd/jsonpush/";
     public static final Duration DROP_DURATION = Duration.standardHours(1);
-    private static final Type COLLECTD_TYPE = new TypeToken<List<CollectdMessage>>(){}.getType();
+    private static final Type COLLECTD_TYPE = new TypeToken<List<CollectdMessage>>() {
+    }.getType();
     private static final Metric UP_METRIC = new SimpleMetric(MetricName.valueOf("up"), Boolean.TRUE);
     private static final Metric DOWN_METRIC = new SimpleMetric(MetricName.valueOf("up"), Boolean.FALSE);
 
@@ -117,7 +120,8 @@ public class CollectdPushCollector implements GroupGenerator {
                 return s;
 
             final String tag_string = s.substring(tags_brace_open + 1, s.length() - 1);
-            if (!tag_string.isEmpty()) out_tagmap.putAll(CollectdTags.parse(tag_string));
+            if (!tag_string.isEmpty())
+                out_tagmap.putAll(CollectdTags.parse(tag_string));
 
             return s.substring(0, tags_brace_open);
         }
@@ -139,15 +143,20 @@ public class CollectdPushCollector implements GroupGenerator {
             return new CollectdKey(host, plugin, plugin_instance, type, type_instance);
         }
 
-        public int metricCount() { return values.size(); }
+        public int metricCount() {
+            return values.size();
+        }
 
         /**
-         * Work around for Google gson parser emitting numbers as 'lazily parsed' numbers.
+         * Work around for Google gson parser emitting numbers as 'lazily
+         * parsed' numbers.
+         *
          * @param elem An instance of a gson lazily parsed number.
          * @return A metric value containing the number.
          */
         private static MetricValue number_to_metric_value_(Number elem) {
-            if (elem == null) return MetricValue.EMPTY;
+            if (elem == null)
+                return MetricValue.EMPTY;
 
             final String num = elem.toString();
             try {
@@ -157,7 +166,7 @@ public class CollectdPushCollector implements GroupGenerator {
             }
             try {
                 return MetricValue.fromDblValue(Double.parseDouble(num));
-            } catch (NumberFormatException ex ) {
+            } catch (NumberFormatException ex) {
                 /* SKIP */
             }
             return MetricValue.fromStrValue(num);
@@ -176,20 +185,22 @@ public class CollectdPushCollector implements GroupGenerator {
 
         public MetricGroup toMetricGroup(SimpleGroupPath base_path) {
             final CollectdKey key = getKey();  // Use key, as it parses the tags for us.
-            final Map<String, MetricValue> tag_map = new HashMap<String, MetricValue>() {{
-                put("host", MetricValue.fromStrValue(host));
-                putAll(key.tags.entrySet().stream()
-                        .collect(Collectors.toMap(
-                                Map.Entry::getKey,
-                                (entry -> entry.getValue().mapCombine(MetricValue::fromStrValue, MetricValue::fromNumberValue)))));
-            }};
+            final Map<String, MetricValue> tag_map = new HashMap<String, MetricValue>() {
+                {
+                    put("host", MetricValue.fromStrValue(host));
+                    putAll(key.tags.entrySet().stream()
+                            .collect(Collectors.toMap(
+                                    Map.Entry::getKey,
+                                    (entry -> entry.getValue().mapCombine(MetricValue::fromStrValue, MetricValue::fromNumberValue)))));
+                }
+            };
 
             final GroupName group = GroupName.valueOf(
                     SimpleGroupPath.valueOf(Stream.concat(
                             base_path.getPath().stream(),
                             Stream.of(key.plugin, key.plugin_instance)
-                                    .filter(x -> x != null)
-                                    .filter(s -> !s.isEmpty()))
+                            .filter(x -> x != null)
+                            .filter(s -> !s.isEmpty()))
                             .collect(Collectors.toList())),
                     Tags.valueOf(tag_map));
 
@@ -222,14 +233,19 @@ public class CollectdPushCollector implements GroupGenerator {
     }
 
     public CollectdPushCollector(@NonNull EndpointRegistration er, @NonNull SimpleGroupPath base_path, @NonNull String name) {
-        if (name.isEmpty()) throw new IllegalArgumentException("empty endpoint name");
+        if (name.isEmpty())
+            throw new IllegalArgumentException("empty endpoint name");
 
         er.addEndpoint(API_ENDPOINT_BASE + name, new Endpoint());
         basePath = base_path;
     }
 
     @Override
-    public GroupCollection getGroups() {
+    public CompletableFuture<Collection<MetricGroup>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
+        return CompletableFuture.supplyAsync(this::getGroupsTask, executor);
+    }
+
+    private Collection<MetricGroup> getGroupsTask() {
         final DateTime now = new DateTime(DateTimeZone.UTC);
         final DateTime drop = now.minus(DROP_DURATION);
 
@@ -251,7 +267,7 @@ public class CollectdPushCollector implements GroupGenerator {
                     .collect(Collectors.toSet());
             // Collect the set of hosts that are 'down'.
             final Map<String, DateTime> down_hosts = knownHosts.entrySet().stream()
-                    .filter(entry -> entry.getValue().isAfter(drop))  // Don't remember host names for ever.
+                    .filter(entry -> entry.getValue().isAfter(drop)) // Don't remember host names for ever.
                     .filter(entry -> !up_hosts.contains(entry.getKey())) // No need to remember hosts that emitted metrics.
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
             // Create metrics for all up/down hosts.
@@ -264,17 +280,18 @@ public class CollectdPushCollector implements GroupGenerator {
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
             // Done, return result.
-            return successResult(
-                    Stream.of(msg_stream, up_hosts_stream, down_hosts_stream)
-                            .flatMap(Function.identity())
-                            .collect(Collectors.toList()));
+            return Stream.of(msg_stream, up_hosts_stream, down_hosts_stream)
+                    .flatMap(Function.identity())
+                    .collect(Collectors.toList());
         } finally {
             messages.clear();
             lck.unlock();
         }
     }
 
-    /** Return a metric group indicating if the host is up or down. */
+    /**
+     * Return a metric group indicating if the host is up or down.
+     */
     private MetricGroup up_down_host_(String host, boolean up) {
         final GroupName group = GroupName.valueOf(
                 getBasePath(),

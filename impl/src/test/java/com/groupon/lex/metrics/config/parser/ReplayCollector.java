@@ -32,7 +32,6 @@
 package com.groupon.lex.metrics.config.parser;
 
 import com.groupon.lex.metrics.GroupGenerator;
-import static com.groupon.lex.metrics.GroupGenerator.successResult;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.MetricName;
@@ -53,6 +52,8 @@ import java.util.Map;
 import java.util.Objects;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Stream;
 
 /**
@@ -113,10 +114,10 @@ public class ReplayCollector implements GroupGenerator {
 
         public DataPointIterator(Map<DataPointIdentifier, Stream<Optional<MetricValue>>> input) {
             input.forEach((DataPointIdentifier key, Stream<Optional<MetricValue>> data) -> {
-                        Iterator<Optional<MetricValue>> data_iterator = data.iterator();
-                        if (data_iterator.hasNext())
-                            data_.put(key, data_iterator);
-                    });
+                Iterator<Optional<MetricValue>> data_iterator = data.iterator();
+                if (data_iterator.hasNext())
+                    data_.put(key, data_iterator);
+            });
         }
 
         @Override
@@ -129,7 +130,7 @@ public class ReplayCollector implements GroupGenerator {
             Map<GroupName, SimpleMetricGroup> result = new HashMap<>();
 
             data_.forEach((id, value_iter) -> {
-                assert(value_iter.hasNext());
+                assert (value_iter.hasNext());
                 value_iter.next().ifPresent((v) -> {
                     SimpleMetricGroup smg = result.computeIfAbsent(id.getGroup(), SimpleMetricGroup::new);
                     smg.add(new SimpleMetric(id.getMetric(), v));
@@ -163,7 +164,9 @@ public class ReplayCollector implements GroupGenerator {
             this(identifier, EMPTY_LIST);
         }
 
-        public DataPointIdentifier getIdentifier() { return identifier_; }
+        public DataPointIdentifier getIdentifier() {
+            return identifier_;
+        }
 
         @Override
         public Iterator<Optional<MetricValue>> iterator() {
@@ -174,7 +177,9 @@ public class ReplayCollector implements GroupGenerator {
             return stream_.stream();
         }
 
-        public void add(Optional<MetricValue> value) { stream_.add(requireNonNull(value)); }
+        public void add(Optional<MetricValue> value) {
+            stream_.add(requireNonNull(value));
+        }
 
         public void addAll(Iterable<Optional<MetricValue>> values) {
             values.forEach(this::add);
@@ -203,7 +208,9 @@ public class ReplayCollector implements GroupGenerator {
             this(identifier, EMPTY_LIST);
         }
 
-        public GroupName getIdentifier() { return identifier_; }
+        public GroupName getIdentifier() {
+            return identifier_;
+        }
 
         @Override
         public Iterator<AlertState> iterator() {
@@ -214,7 +221,9 @@ public class ReplayCollector implements GroupGenerator {
             return stream_.stream();
         }
 
-        public void add(AlertState value) { stream_.add(requireNonNull(value)); }
+        public void add(AlertState value) {
+            stream_.add(requireNonNull(value));
+        }
 
         public void addAll(Iterable<AlertState> values) {
             values.forEach(this::add);
@@ -249,7 +258,7 @@ public class ReplayCollector implements GroupGenerator {
     }
 
     @Override
-    public GroupCollection getGroups() {
-        return successResult(data_iter_.next());
+    public CompletableFuture<Collection<MetricGroup>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
+        return CompletableFuture.completedFuture(data_iter_.next());
     }
 }
