@@ -32,14 +32,12 @@
 package com.groupon.lex.metrics.jmx;
 
 import com.groupon.lex.metrics.GroupGenerator;
-import static com.groupon.lex.metrics.GroupGenerator.combineSubTasks;
 import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.jmx.JmxClient.ConnectionDecorator;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import static java.util.Collections.unmodifiableList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,10 +45,11 @@ import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.management.InstanceNotFoundException;
 import javax.management.ListenerNotFoundException;
 import javax.management.MBeanServerConnection;
@@ -69,7 +68,7 @@ import lombok.Getter;
  */
 public class MetricListenerInstance implements MetricListener, GroupGenerator, AutoCloseable {
     private final Collection<ObjectName> filter_;
-    private final Map<ObjectName, MBeanGroupInstance> detected_groups_ = new HashMap<ObjectName, MBeanGroupInstance>();
+    private final Map<ObjectName, MBeanGroupInstance> detected_groups_ = new HashMap<>();
     private boolean is_enabled_ = false;
     @Getter
     private final JmxClient connection;
@@ -97,7 +96,7 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
                 return;
             }
 
-            if (null != mbs.getType())
+            if (null != mbs.getType()) {
                 switch (mbs.getType()) {
                     case MBeanServerNotification.REGISTRATION_NOTIFICATION:
                         Logger.getLogger(getClass().getName()).log(Level.INFO, "MBean Registered [{0}]", mbs.getMBeanName());
@@ -108,6 +107,7 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
                         onRemovedMbean(mbs.getMBeanName());
                         break;
                 }
+            }
         };
 
         decorator_ = (MBeanServerConnection mbsc) -> {
@@ -230,6 +230,20 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
 
     @Override
     public CompletableFuture<Collection<MetricGroup>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
+        CompletableFuture<Collection<MetricGroup>> future
+                = CompletableFuture.supplyAsync(this::readMetricGroups, executor);
+
+        timeout.whenComplete((ignoredValue, ignoredExc) -> {
+            if (!future.isDone()) {
+                future.cancel(false);
+                connection.rejectCurrentConnection();
+            }
+        });
+
+        return future;
+    }
+
+    private synchronized Collection<MetricGroup> readMetricGroups() {
         try {
             /*
              * Force the connection to open, even if there are no groups to scan.
@@ -245,21 +259,10 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
             throw new RuntimeException(ex.getMessage(), ex);
         }
 
-        // Copy collection, to isolate it from mbean events add/removing elements.
-        return combineSubTasks(detected_groups_.values().stream()
-                .map(v -> readAsync(v, executor, timeout))
-                .collect(Collectors.toList()));
-    }
-
-    private static CompletableFuture<Collection<MetricGroup>> readAsync(MBeanGroupInstance detectedGroup, ExecutorService executor, CompletableFuture<?> timeout) {
-        final CompletableFuture<Optional<MetricGroup>> timeoutMG = timeout
-                .thenApply(nullValue -> Optional.empty());
-        return CompletableFuture.supplyAsync(detectedGroup::getMetrics, executor)
-                .applyToEither(timeoutMG, optGroup -> {
-                    final Collection<MetricGroup> implicitCast = optGroup
-                            .map(g -> Collections.singleton(g))
-                            .orElse(Collections.emptySet());
-                    return implicitCast;
-                });
+        return detected_groups_.values().stream()
+                .unordered()
+                .map(MBeanGroupInstance::getMetrics)
+                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
+                .collect(Collectors.toList());
     }
 }
