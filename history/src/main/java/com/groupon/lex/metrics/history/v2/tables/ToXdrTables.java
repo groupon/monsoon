@@ -355,7 +355,11 @@ public class ToXdrTables implements Closeable {
                             groupPathMap.put(grpRef, new ArrayList<>());
                         tagList = groupPathMap.get(grpRef);
                     }
-                    tagList.add(createTagTable(grpEntry.getKey(), grpEntry.getValue(), ctx));
+
+                    final tables_tag tables_tag = createTagTable(grpEntry.getKey(), grpEntry.getValue(), ctx);
+                    synchronized (tagList) {
+                        tagList.add(tables_tag);
+                    }
                 })
                 .join();
 
@@ -365,6 +369,7 @@ public class ToXdrTables implements Closeable {
                     tables_group tg = new tables_group();
                     tg.group_ref = pathIdx;
                     tg.tag_tbl = groupPathMap.get(pathIdx).toArray(new tables_tag[0]);
+                    assert tg.tag_tbl.length > 0;
                     return tg;
                 })
                 .toArray(tables_group[]::new));
