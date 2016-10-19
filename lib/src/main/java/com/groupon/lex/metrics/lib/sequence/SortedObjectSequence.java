@@ -146,8 +146,6 @@ public class SortedObjectSequence<T> implements ObjectSequence<T> {
             if (data.getRight().isPresent())
                 return data.getRight().get();
 
-            System.err.println("makePartition");
-
             final MappedObjectSequence<T> seq = data.getLeft().orElseThrow(IllegalStateException::new);
             int[] partitionMap = new ForwardSequence(0, seq.size()).toArray();
             swap(partitionMap, RANDOM.nextInt(partitionMap.length), 0);  // Choose a pivot and move it to the front.
@@ -170,7 +168,6 @@ public class SortedObjectSequence<T> implements ObjectSequence<T> {
                         makePartition(seq, Arrays.copyOfRange(partitionMap, 0, partitionIdx), comparator),
                         makePartition(seq, Arrays.copyOfRange(partitionMap, partitionIdx, partitionMap.length), comparator)));
             }
-            System.err.println(result);
             return result;
         }
 
@@ -389,7 +386,6 @@ public class SortedObjectSequence<T> implements ObjectSequence<T> {
                 combinedMapping[i] = mapping[index];
             }
 
-            System.err.println("remap on " + Arrays.toString(mapping) + "\n    with new mapping " + Arrays.toString(newMapping) + "\n    resulting in " + Arrays.toString(combinedMapping));
             return new MappedObjectSequence(underlying, combinedMapping);
         }
 
