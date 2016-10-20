@@ -45,12 +45,11 @@ import java.util.List;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Stream;
 import javax.management.InstanceNotFoundException;
 import javax.management.ListenerNotFoundException;
 import javax.management.MBeanServerConnection;
@@ -79,6 +78,7 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
     private final List<String> subPath;
     @Getter
     private final Tags tags;
+    private int failCount = 0;
 
     public MetricListenerInstance(JmxClient conn, Collection<ObjectName> filter, List<String> sub_path, Tags tags) throws IOException, InstanceNotFoundException {
         if (filter.isEmpty())
@@ -232,19 +232,20 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
     @Override
     public Collection<CompletableFuture<Collection<MetricGroup>>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
         CompletableFuture<Collection<MetricGroup>> future
-                = CompletableFuture.supplyAsync(this::readMetricGroups, executor);
+                = CompletableFuture.supplyAsync(() -> readMetricGroups(timeout), executor);
 
         timeout.whenCompleteAsync((ignoredValue, ignoredExc) -> {
             if (!future.isDone()) {
                 future.cancel(true);
-                connection.rejectCurrentConnection();
+                if (++failCount > 5)
+                    connection.rejectCurrentConnection();
             }
         }, executor);
 
         return singleton(future);
     }
 
-    private synchronized Collection<MetricGroup> readMetricGroups() {
+    private synchronized Collection<MetricGroup> readMetricGroups(CompletableFuture<?> timeout) {
         try {
             /*
              * Force the connection to open, even if there are no groups to scan.
@@ -260,10 +261,12 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
             throw new RuntimeException(ex.getMessage(), ex);
         }
 
-        return detected_groups_.values().stream()
-                .unordered()
-                .map(MBeanGroupInstance::getMetrics)
-                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
-                .collect(Collectors.toList());
+        final List<MetricGroup> groups = new ArrayList<>(detected_groups_.size());
+        for (MBeanGroupInstance group : detected_groups_.values()) {
+            if (timeout.isDone())
+                throw new CancellationException("timed out");
+            group.getMetrics().ifPresent(groups::add);
+        }
+        return groups;
     }
 }
