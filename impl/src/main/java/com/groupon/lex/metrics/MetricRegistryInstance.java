@@ -47,7 +47,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
-import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -65,14 +64,17 @@ import java.util.stream.Stream;
 import lombok.NonNull;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
+import static java.util.Objects.requireNonNull;
+import java.util.concurrent.CancellationException;
 
 /**
  *
  * @author ariane
  */
 public abstract class MetricRegistryInstance implements MetricRegistry, AutoCloseable {
-    public static final long COLLECTOR_TIMEOUT = 30 * 1000; // msec
-    private static final Logger logger = Logger.getLogger(
+    public static final long COLLECTOR_TIMEOUT = 29 * 1000; // msec
+    public static final long DELAY_POST_TIMEOUT = 1 * 1000; // msec
+    private static final Logger LOG = Logger.getLogger(
             MetricRegistryInstance.class.getName());
     private final Collection<GroupGenerator> generators_ = new ArrayList<>();
     private long failed_collections_ = 0;
@@ -168,41 +170,52 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
         final long t0 = System.nanoTime();
         failed_collections_ = 0;
 
+        LOG.log(Level.INFO, "creating future for each scrape...");
         CompletableFuture<?> timeout = new CompletableFuture<>();
         List<CompletableFuture<Collection<MetricGroup>>> tasks = generators_.parallelStream()
                 .map(groupGenerator -> groupGenerator.getGroups(
                         GROUP_GENERATOR_EXECUTOR, timeout))
+                .flatMap(Collection::stream)
                 .collect(Collectors.toList());
+        LOG.log(Level.INFO, "created {0} futures", tasks.size());
 
         List<Collection<MetricGroup>> collections
                 = new ArrayList<>(generators_.size());
-        final long tDeadline = t0 + COLLECTOR_TIMEOUT * 1000 * 1000; // msec to nsec
+        long tDeadline = t0 + COLLECTOR_TIMEOUT * 1000 * 1000; // msec to nsec
         // Start collecting results; if we're lucky, this will complete before the timeout expires.
         while (!tasks.isEmpty()) {
             final long tCur = System.nanoTime();
+            LOG.log(Level.INFO, "trying to collect 1 task... tCur = {0}, tDeadline = {1}", new Object[]{tCur, tDeadline});
             if (tCur >= tDeadline) break;  // Time to complete the timeout future.
             try {
                 Collection<MetricGroup> taskResult = tasks.get(0).get(tDeadline - tCur, TimeUnit.NANOSECONDS);
                 tasks.remove(0);
                 collections.add(taskResult);
+                LOG.log(Level.INFO, "collected 1 task");
             } catch (InterruptedException | TimeoutException ex) {
+                LOG.log(Level.INFO, "interrupted/timed out");
                 /* skip */
-            } catch (ExecutionException ex) {
-                logger.log(Level.INFO, "failure executing task", ex);
+            } catch (CancellationException | ExecutionException ex) {
+                LOG.log(Level.INFO, "failure executing task", ex);
                 ++failed_collections_;
                 tasks.remove(0);
             }
         }
+        LOG.log(Level.INFO, "completing timeout... ({0} remaining tasks)", tasks.size());
         timeout.complete(null);  // Inform tasks that they will time out.
+        LOG.log(Level.INFO, "timeout completed");
         // Collect anything that has completed so far and mark as failed anything else.
+        tDeadline += DELAY_POST_TIMEOUT;
         for (CompletableFuture<Collection<MetricGroup>> task : tasks) {
+            final long tCur = System.nanoTime();
             try {
-                collections.add(task.get(0, TimeUnit.MILLISECONDS));
-            } catch (ExecutionException | InterruptedException | TimeoutException ex) {
-                logger.log(Level.INFO, "failure executing task", ex);
+                collections.add(task.get(Long.max(0, tDeadline - tCur), TimeUnit.NANOSECONDS));
+            } catch (CancellationException | ExecutionException | InterruptedException | TimeoutException ex) {
+                LOG.log(Level.INFO, "failure executing task", ex);
                 ++failed_collections_;
             }
         }
+        LOG.log(Level.INFO, "collected tasks into collections: {0} successful, {1} failed", new Object[]{collections.size(), failed_collections_});
 
         /* Measure end time of collections. */
         final long t_collections = System.nanoTime();
@@ -218,6 +231,7 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
                 .map((mg) -> new MutableTimeSeriesValue(now, mg.getName(),
                         Arrays.stream(mg.getMetrics()), Metric::getName,
                         Metric::getValue));
+        LOG.log(Level.INFO, "stream groups done");
         return groups;
     }
 
@@ -240,7 +254,7 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
             try {
                 g.close();
             } catch (Exception e) {
-                logger.log(Level.SEVERE, "failed to close group generator " + g,
+                LOG.log(Level.SEVERE, "failed to close group generator " + g,
                         e);
             }
         });
@@ -248,7 +262,7 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
             try {
                 ((AutoCloseable) api_).close();
             } catch (Exception ex) {
-                logger.log(Level.SEVERE,
+                LOG.log(Level.SEVERE,
                         "unable to close API " + api_.getClass(), ex);
             }
         }

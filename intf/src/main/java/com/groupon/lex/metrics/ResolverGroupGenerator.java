@@ -31,12 +31,12 @@
  */
 package com.groupon.lex.metrics;
 
-import static com.groupon.lex.metrics.GroupGenerator.combineSubTasks;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.Any3;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
 import java.util.ArrayList;
 import java.util.Collection;
+import static java.util.Collections.singleton;
 import static java.util.Collections.unmodifiableCollection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -76,7 +76,7 @@ public class ResolverGroupGenerator implements GroupGenerator {
     }
 
     @Override
-    public CompletableFuture<Collection<MetricGroup>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
+    public Collection<CompletableFuture<Collection<MetricGroup>>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
         final Set<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolvedMaps;
 
         try {
@@ -85,7 +85,7 @@ public class ResolverGroupGenerator implements GroupGenerator {
             LOG.log(Level.WARNING, "unable to resolve", ex);
             CompletableFuture<Collection<MetricGroup>> error = new CompletableFuture<>();
             error.completeExceptionally(ex);
-            return error;
+            return singleton(error);
         }
 
         // Close all generators that are not to run.
@@ -112,24 +112,35 @@ public class ResolverGroupGenerator implements GroupGenerator {
                 LOG.log(Level.WARNING, "unable to create generator", ex);
                 CompletableFuture<Collection<MetricGroup>> error = new CompletableFuture<>();
                 error.completeExceptionally(ex);
-                return error;
+                return singleton(error);
             }
         }
 
         // Evaluate all generators.
         final List<CompletableFuture<Collection<MetricGroup>>> results = new ArrayList<>(generators.size());
-        for (GroupGenerator generator : generators.values()) {
+        for (Map.Entry<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>, GroupGenerator> genEntry : generators.entrySet()) {
+            GroupGenerator generator = genEntry.getValue();
             try {
-                results.add(generator.getGroups(executor, timeout));
+                Collection<CompletableFuture<Collection<MetricGroup>>> futSet = generator.getGroups(executor, timeout);
+                results.addAll(futSet);
+
+                futSet.forEach(fut -> {
+                    fut.handle((collection, exc) -> {
+                        if (collection != null)
+                            LOG.log(Level.INFO, "{0} completed succesfully ({1} groups)", new Object[]{genEntry.getKey(), collection.size()});
+                        if (exc != null)
+                            LOG.log(Level.WARNING, genEntry.getKey() + " failed", exc);
+                        return null;
+                    });
+                });
             } catch (Error | Exception ex) {
-                results.forEach(fut -> fut.cancel(false));
                 CompletableFuture<Collection<MetricGroup>> error = new CompletableFuture<>();
                 error.completeExceptionally(ex);
-                return error;
+                results.add(error);
             }
         }
 
-        return combineSubTasks(results);
+        return results;
     }
 
     @Override

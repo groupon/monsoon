@@ -241,8 +241,8 @@ public class CollectdPushCollector implements GroupGenerator {
     }
 
     @Override
-    public CompletableFuture<Collection<MetricGroup>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
-        return CompletableFuture.supplyAsync(this::getGroupsTask, executor);
+    public Collection<CompletableFuture<Collection<MetricGroup>>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
+        return singleton(CompletableFuture.supplyAsync(this::getGroupsTask, executor));
     }
 
     private Collection<MetricGroup> getGroupsTask() {

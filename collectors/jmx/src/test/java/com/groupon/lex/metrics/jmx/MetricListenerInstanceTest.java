@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.jmx;
 
+import static com.groupon.lex.metrics.GroupGenerator.deref;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.MetricValue;
@@ -127,8 +128,8 @@ public class MetricListenerInstanceTest {
     public void run_with_nothing_found() throws Exception {
         listener.enable();
 
-        CompletableFuture<Collection<MetricGroup>> groups = listener.getGroups(executor, new CompletableFuture<>());
-        assertTrue(groups.get().isEmpty());
+        Collection<MetricGroup> groups = deref(listener.getGroups(executor, new CompletableFuture<>()));
+        assertTrue(groups.isEmpty());
     }
 
     @Test
@@ -138,18 +139,18 @@ public class MetricListenerInstanceTest {
          */
         final TestValueImpl test_value = new TestValueImpl();
 
-        CompletableFuture<Collection<MetricGroup>> groups;
+        Collection<MetricGroup> groups;
         ManagementFactory.getPlatformMBeanServer().registerMBean(test_value, new ObjectName(PREFIX + "something=found"));
         try {
             listener.enable();
-            groups = listener.getGroups(executor, new CompletableFuture<>());
+            groups = deref(listener.getGroups(executor, new CompletableFuture<>()));
 
-            assertFalse(groups.get().isEmpty());
+            assertFalse(groups.isEmpty());
 
             /**
              * Convenience conversion for testing.
              */
-            List<GroupName> names = groups.get().stream()
+            List<GroupName> names = groups.stream()
                     .map(MetricGroup::getName)
                     .collect(Collectors.toList());
             System.err.println(names);
@@ -165,22 +166,22 @@ public class MetricListenerInstanceTest {
          * Test value that is exposed on local JMX.
          */
         final TestValueImpl test_value = new TestValueImpl();
-        CompletableFuture<Collection<MetricGroup>> groups;
+        Collection<MetricGroup> groups;
 
         listener.enable();
 
-        groups = listener.getGroups(executor, new CompletableFuture<>());
-        assertTrue("object hasn't registered yet", groups.get().isEmpty());
+        groups = deref(listener.getGroups(executor, new CompletableFuture<>()));
+        assertTrue("object hasn't registered yet", groups.isEmpty());
 
         ManagementFactory.getPlatformMBeanServer().registerMBean(test_value, new ObjectName(PREFIX + "something=found"));
         try {
-            groups = listener.getGroups(executor, new CompletableFuture<>());
-            assertFalse(groups.get().isEmpty());
+            groups = deref(listener.getGroups(executor, new CompletableFuture<>()));
+            assertFalse(groups.isEmpty());
 
             /**
              * Convenience conversion for testing.
              */
-            List<GroupName> names = groups.get().stream()
+            List<GroupName> names = groups.stream()
                     .map(MetricGroup::getName)
                     .collect(Collectors.toList());
             System.err.println(names);
@@ -197,16 +198,16 @@ public class MetricListenerInstanceTest {
          */
         final TestValueImpl test_value = new TestValueImpl();
 
-        CompletableFuture<Collection<MetricGroup>> groups;
+        Collection<MetricGroup> groups;
         ManagementFactory.getPlatformMBeanServer().registerMBean(test_value, new ObjectName(PREFIX + "something=found"));
         try {
             listener.enable();
-            groups = listener.getGroups(executor, new CompletableFuture<>());
-            assertFalse(groups.get().isEmpty());
+            groups = deref(listener.getGroups(executor, new CompletableFuture<>()));
+            assertFalse(groups.isEmpty());
 
             listener.disable();  // Test starts here.
-            groups = listener.getGroups(executor, new CompletableFuture<>());
-            assertTrue(groups.get().isEmpty());
+            groups = deref(listener.getGroups(executor, new CompletableFuture<>()));
+            assertTrue(groups.isEmpty());
         } finally {
             ManagementFactory.getPlatformMBeanServer().unregisterMBean(new ObjectName(PREFIX + "something=found"));
         }
@@ -219,13 +220,13 @@ public class MetricListenerInstanceTest {
          */
         final TestValueImpl test_value = new TestValueImpl();
 
-        final CompletableFuture<Collection<MetricGroup>> groups;
+        final Collection<MetricGroup> groups;
         ManagementFactory.getPlatformMBeanServer().registerMBean(test_value, new ObjectName(NOT_PREFIX + "something=found"));
         try {
             listener.enable();
-            groups = listener.getGroups(executor, new CompletableFuture<>());
+            groups = deref(listener.getGroups(executor, new CompletableFuture<>()));
 
-            assertTrue("Wrongly named object is not matched by filter", groups.get().isEmpty());
+            assertTrue("Wrongly named object is not matched by filter", groups.isEmpty());
         } finally {
             ManagementFactory.getPlatformMBeanServer().unregisterMBean(new ObjectName(NOT_PREFIX + "something=found"));
         }

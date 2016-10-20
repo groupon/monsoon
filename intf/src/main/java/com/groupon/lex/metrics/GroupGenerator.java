@@ -34,6 +34,7 @@ package com.groupon.lex.metrics;
 import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.EMPTY_LIST;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -96,7 +97,7 @@ public interface GroupGenerator extends AutoCloseable {
         return new GroupCollection(false, EMPTY_LIST);
     }
 
-    public CompletableFuture<Collection<MetricGroup>> getGroups(ExecutorService executor, CompletableFuture<?> timeout);
+    public Collection<CompletableFuture<Collection<MetricGroup>>> getGroups(ExecutorService executor, CompletableFuture<?> timeout);
 
     @Override
     default void close() throws Exception {
@@ -130,5 +131,20 @@ public interface GroupGenerator extends AutoCloseable {
                         throw new RuntimeException(ex);  // Shouldn't happen, as this method is only called on successful return.
                     }
                 });
+    }
+
+    /**
+     * Squash a list of collected metric groups together.
+     * This is mainly intended to make testing a lot easier.
+     * @param groups All the groups returned from a getGroups method.
+     * @return The union of all metric groups contained in the set of futures.
+     * @throws InterruptedException If the future dereference is interrupted.
+     * @throws ExecutionException If any future completed exceptionally.
+     */
+    public static Collection<MetricGroup> deref(Collection<CompletableFuture<Collection<MetricGroup>>> groups) throws InterruptedException, ExecutionException {
+        List<MetricGroup> gathered = new ArrayList<>();
+        for (CompletableFuture<Collection<MetricGroup>> group : groups)
+            gathered.addAll(group.get());
+        return gathered;
     }
 }

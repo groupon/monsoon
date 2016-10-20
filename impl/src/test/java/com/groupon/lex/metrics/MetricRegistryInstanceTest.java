@@ -142,7 +142,7 @@ public class MetricRegistryInstanceTest {
 
     @Test
     public void generator_handling() throws Exception {
-        when(generator.getGroups(any(), any())).thenReturn(CompletableFuture.completedFuture(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17))))));
+        when(generator.getGroups(any(), any())).thenReturn(singleton(CompletableFuture.completedFuture(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17)))))));
         final DateTime now = DateTime.now(DateTimeZone.UTC);
 
         try (MetricRegistryInstance mr = create(false, now)) {
@@ -171,7 +171,7 @@ public class MetricRegistryInstanceTest {
 
     @Test
     public void stream_groups() throws Exception {
-        when(generator.getGroups(any(), any())).thenReturn(CompletableFuture.completedFuture(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17))))));
+        when(generator.getGroups(any(), any())).thenReturn(singleton(CompletableFuture.completedFuture(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17)))))));
 
         try (MetricRegistryInstance mr = create(false)) {
             mr.add(generator);
@@ -185,7 +185,7 @@ public class MetricRegistryInstanceTest {
 
     @Test
     public void group_names_resolution() throws Exception {
-        when(generator.getGroups(any(), any())).thenReturn(CompletableFuture.completedFuture(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17))))));
+        when(generator.getGroups(any(), any())).thenReturn(singleton(CompletableFuture.completedFuture(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17)))))));
 
         try (MetricRegistryInstance mr = create(false)) {
             mr.add(generator);

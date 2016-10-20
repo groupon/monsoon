@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.config;
 
 import com.groupon.lex.metrics.GroupGenerator;
+import static com.groupon.lex.metrics.GroupGenerator.deref;
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.Tags;
@@ -192,7 +193,7 @@ public class JmxListenerMonitorTest {
         mon_oneName.apply(mri);
         for (GroupGenerator gg : listeners) {
             try {
-                gg.getGroups(executor, new CompletableFuture<>()).get();  // Force creation of JMX collectors
+                deref(gg.getGroups(executor, new CompletableFuture<>()));  // Force creation of JMX collectors
             } catch (Exception ex) {
                 /* skip: we just want to start them, we're not interested in the outcome. */
             }
@@ -216,7 +217,7 @@ public class JmxListenerMonitorTest {
         mon_twoNames.apply(mri);
         for (GroupGenerator gg : listeners) {
             try {
-                gg.getGroups(executor, new CompletableFuture<>()).get();  // Force creation of JMX collectors
+                deref(gg.getGroups(executor, new CompletableFuture<>()));  // Force creation of JMX collectors
             } catch (Exception ex) {
                 /* skip: we just want to start them, we're not interested in the outcome. */
             }
@@ -254,7 +255,7 @@ public class JmxListenerMonitorTest {
         mon_oneName.apply(mri);
         for (GroupGenerator gg : listeners) {
             try {
-                gg.getGroups(executor, new CompletableFuture<>()).get();  // Force creation of JMX collectors
+                deref(gg.getGroups(executor, new CompletableFuture<>()));  // Force creation of JMX collectors
             } catch (Exception ex) {
                 /* skip: we just want to start them, we're not interested in the outcome. */
             }
@@ -307,7 +308,7 @@ public class JmxListenerMonitorTest {
         mon_twoNames.apply(mri);
         for (GroupGenerator gg : listeners) {
             try {
-                gg.getGroups(executor, new CompletableFuture<>()).get();  // Force creation of JMX collectors
+                deref(gg.getGroups(executor, new CompletableFuture<>()));  // Force creation of JMX collectors
             } catch (Exception ex) {
                 /* skip: we just want to start them, we're not interested in the outcome. */
             }

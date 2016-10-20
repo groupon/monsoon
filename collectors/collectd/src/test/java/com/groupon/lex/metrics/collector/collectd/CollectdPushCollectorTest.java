@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.collector.collectd;
 
 import com.google.gson.Gson;
+import static com.groupon.lex.metrics.GroupGenerator.deref;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
@@ -166,15 +167,14 @@ public class CollectdPushCollectorTest {
                 new PrintWriter(new StringWriter()));
 
         /* Before data arrives, getGroups is empty. */
-        Collection<MetricGroup> groups = collectd.getGroups(executor,
-                new CompletableFuture<>()).get();
+        Collection<MetricGroup> groups = deref(collectd.getGroups(executor, new CompletableFuture<>()));
         assertTrue(groups.isEmpty());
 
         /* Perform HTTP request. */
         collectd_acceptor.service(request, response);
 
         /* After data arrives, getGroups returns this data. */
-        groups = collectd.getGroups(executor, new CompletableFuture<>()).get();
+        groups = deref(collectd.getGroups(executor, new CompletableFuture<>()));
         // Convenience map for validation.
         Map<GroupName, Metric[]> group_map = groups.stream().map(
                 x -> (MetricGroup) x).collect(Collectors.toMap(
@@ -191,7 +191,7 @@ public class CollectdPushCollectorTest {
         assertEquals(MetricValue.TRUE, group_map.get(BASE_NAME)[0].getValue());
 
         /* After data collection, data must be removed from set, but the base names must still exist. */
-        groups = collectd.getGroups(executor, new CompletableFuture<>()).get();
+        groups = deref(collectd.getGroups(executor, new CompletableFuture<>()));
         // Convenience map for validation.
         group_map = groups.stream().map(x -> (MetricGroup) x).collect(
                 Collectors.toMap(MetricGroup::getName, MetricGroup::getMetrics));

@@ -32,7 +32,6 @@
 package com.groupon.lex.metrics.collector.httpget;
 
 import com.groupon.lex.metrics.GroupGenerator;
-import static com.groupon.lex.metrics.GroupGenerator.combineGroups;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
@@ -50,6 +49,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import static java.util.Collections.singleton;
 import java.util.List;
 import static java.util.Objects.requireNonNull;
@@ -343,17 +343,18 @@ public class UrlGetCollector implements GroupGenerator {
     }
 
     @Override
-    public CompletableFuture<Collection<MetricGroup>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
+    public Collection<CompletableFuture<Collection<MetricGroup>>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
         final CompletableFuture<Collection<Metric>> timeoutResult = timeout
                 .handle((ignoredVal, ignoredExc) -> singleton(new SimpleMetric(MN_UP, MetricValue.FALSE)));
 
         /* Collect all URLs. */
-        final List<CompletableFuture<MetricGroup>> urls;
+        final List<CompletableFuture<Collection<MetricGroup>>> urls;
         try {
             urls = patterns.getUrls()
                     .map(x -> {
-                        CompletableFuture<MetricGroup> fut = do_request_(x.getKey(), x.getValue())
-                                .applyToEither(timeoutResult, metrics -> new SimpleMetricGroup(nameForGroup(x.getKey()), metrics));
+                        CompletableFuture<Collection<MetricGroup>> fut = do_request_(x.getKey(), x.getValue())
+                                .applyToEither(timeoutResult, metrics -> new SimpleMetricGroup(nameForGroup(x.getKey()), metrics))
+                                .thenApply(Collections::singleton);
                         return fut;
                     })
                     .collect(Collectors.toList());
@@ -362,6 +363,6 @@ public class UrlGetCollector implements GroupGenerator {
             throw new RuntimeException("unable to load URLs", ex);
         }
 
-        return combineGroups(urls);
+        return urls;
     }
 }

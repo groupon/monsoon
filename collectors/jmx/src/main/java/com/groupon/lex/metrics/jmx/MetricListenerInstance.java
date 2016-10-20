@@ -38,6 +38,7 @@ import com.groupon.lex.metrics.jmx.JmxClient.ConnectionDecorator;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import static java.util.Collections.singleton;
 import static java.util.Collections.unmodifiableList;
 import java.util.HashMap;
 import java.util.List;
@@ -229,18 +230,18 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
     }
 
     @Override
-    public CompletableFuture<Collection<MetricGroup>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
+    public Collection<CompletableFuture<Collection<MetricGroup>>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
         CompletableFuture<Collection<MetricGroup>> future
                 = CompletableFuture.supplyAsync(this::readMetricGroups, executor);
 
-        timeout.whenComplete((ignoredValue, ignoredExc) -> {
+        timeout.whenCompleteAsync((ignoredValue, ignoredExc) -> {
             if (!future.isDone()) {
-                future.cancel(false);
+                future.cancel(true);
                 connection.rejectCurrentConnection();
             }
-        });
+        }, executor);
 
-        return future;
+        return singleton(future);
     }
 
     private synchronized Collection<MetricGroup> readMetricGroups() {

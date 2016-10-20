@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.collector.httpget;
 
+import static com.groupon.lex.metrics.GroupGenerator.deref;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
@@ -100,7 +101,7 @@ public class UrlGetCollectorTest {
                         .withHeader("Test-Header", "Test-Response")
                         .withHeader("Double-Value", "17.1"));
 
-        Collection<MetricGroup> groups = collector.getGroups(executor, new CompletableFuture<>()).get();
+        Collection<MetricGroup> groups = deref(collector.getGroups(executor, new CompletableFuture<>()));
         mockServerClient.verify(REQUEST, VerificationTimes.once());
 
         assertThat(groups.stream().map(MetricGroup::getName).collect(Collectors.toList()),
@@ -135,7 +136,7 @@ public class UrlGetCollectorTest {
                 .respond(HttpResponse.response("chocoladevla")
                         .withConnectionOptions(ConnectionOptions.connectionOptions().withSuppressContentLengthHeader(true).withCloseSocket(true)));
 
-        Collection<MetricGroup> groups = collector.getGroups(executor, new CompletableFuture<>()).get();
+        Collection<MetricGroup> groups = deref(collector.getGroups(executor, new CompletableFuture<>()));
         mockServerClient.verify(REQUEST, VerificationTimes.once());
 
         assertThat(groups.stream().map(MetricGroup::getName).collect(Collectors.toList()),

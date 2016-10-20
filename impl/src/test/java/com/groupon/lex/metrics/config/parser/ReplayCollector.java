@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import static java.util.Collections.EMPTY_LIST;
+import static java.util.Collections.singleton;
 import static java.util.Collections.unmodifiableCollection;
 import static java.util.Collections.unmodifiableList;
 import java.util.HashMap;
@@ -258,7 +259,7 @@ public class ReplayCollector implements GroupGenerator {
     }
 
     @Override
-    public CompletableFuture<Collection<MetricGroup>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
-        return CompletableFuture.completedFuture(data_iter_.next());
+    public Collection<CompletableFuture<Collection<MetricGroup>>> getGroups(ExecutorService executor, CompletableFuture<?> timeout) {
+        return singleton(CompletableFuture.completedFuture(data_iter_.next()));
     }
 }
