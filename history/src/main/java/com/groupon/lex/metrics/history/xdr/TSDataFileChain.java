@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -158,7 +159,7 @@ public class TSDataFileChain extends SequenceTSData {
         dir_ = dir;
         if (wfile.isPresent()) {
             try {
-                appendFile = Optional.of(new AppendFile(wfile.get(), new RWListFile(new GCCloseable<>(FileChannel.open(wfile.get())), true)));
+                appendFile = Optional.of(new AppendFile(wfile.get(), new RWListFile(new GCCloseable<>(FileChannel.open(wfile.get(), StandardOpenOption.READ, StandardOpenOption.WRITE)), true)));
             } catch (OncRpcException ex) {
                 throw new IOException("decoding failed: " + wfile.get(), ex);
             }
@@ -167,12 +168,6 @@ public class TSDataFileChain extends SequenceTSData {
                 .unordered()
                 .map((md) -> new Key(md.getFileName(), md.getBegin(), md.getEnd(), false))
                 .forEach(readKeys::add);
-        max_filesize_ = max_filesize;
-    }
-
-    private TSDataFileChain(@NonNull Path dir, @NonNull Path wfile, @NonNull RWListFile wfd, long max_filesize) {
-        dir_ = requireNonNull(dir);
-        appendFile = Optional.of(new AppendFile(wfile, wfd));
         max_filesize_ = max_filesize;
     }
 
