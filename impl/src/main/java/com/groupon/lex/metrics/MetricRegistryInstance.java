@@ -51,7 +51,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -66,6 +65,8 @@ import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import static java.util.Objects.requireNonNull;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  *
@@ -87,7 +88,9 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
     private Supplier<DateTime> now_;
     private final ListMetrics list_metrics_;
     private final static ExecutorService GROUP_GENERATOR_EXECUTOR
-            = Executors.newWorkStealingPool(1000);
+            = new ThreadPoolExecutor(0, 1000,
+                                     5L, TimeUnit.MINUTES,
+                                     new SynchronousQueue<>());
 
     protected MetricRegistryInstance(@NonNull Supplier<DateTime> now, boolean has_config, @NonNull EndpointRegistration api) {
         api_ = api;
@@ -181,7 +184,7 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
 
         List<Collection<MetricGroup>> collections
                 = new ArrayList<>(generators_.size());
-        long tDeadline = t0 + COLLECTOR_TIMEOUT * 1000 * 1000; // msec to nsec
+        long tDeadline = t0 + TimeUnit.NANOSECONDS.convert(COLLECTOR_TIMEOUT, TimeUnit.MILLISECONDS); // msec to nsec
         // Start collecting results; if we're lucky, this will complete before the timeout expires.
         while (!tasks.isEmpty()) {
             final long tCur = System.nanoTime();
@@ -205,7 +208,7 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
         timeout.complete(null);  // Inform tasks that they will time out.
         LOG.log(Level.INFO, "timeout completed");
         // Collect anything that has completed so far and mark as failed anything else.
-        tDeadline += DELAY_POST_TIMEOUT;
+        tDeadline += TimeUnit.NANOSECONDS.convert(DELAY_POST_TIMEOUT, TimeUnit.MILLISECONDS);
         for (CompletableFuture<Collection<MetricGroup>> task : tasks) {
             final long tCur = System.nanoTime();
             try {
