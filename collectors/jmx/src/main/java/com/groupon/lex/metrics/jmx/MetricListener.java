@@ -43,6 +43,7 @@ import static java.util.Collections.unmodifiableList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -58,7 +59,6 @@ import javax.management.Notification;
 import javax.management.NotificationListener;
 import javax.management.ObjectName;
 import lombok.Getter;
-import static java.util.Objects.requireNonNull;
 
 /**
  * A JMX bean listener, that detects new MBeans with a given name pattern and
@@ -238,6 +238,8 @@ public class MetricListener implements GroupGenerator {
                         connection.rejectCurrentConnection(executor);
                     }
                 }
+            } else {
+                failCount = 0;
             }
         }, executor);
 
