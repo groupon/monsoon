@@ -71,6 +71,7 @@ import static java.util.Objects.requireNonNull;
  * @author ariane
  */
 public class MetricListenerInstance implements MetricListener, GroupGenerator, AutoCloseable {
+    private static final Logger LOG = Logger.getLogger(MetricListenerInstance.class.getName());
     private final Collection<ObjectName> filter_;
     private final Map<ObjectName, MBeanGroupInstance> detected_groups_ = new HashMap<ObjectName, MBeanGroupInstance>();
     private boolean is_enabled_ = false;
@@ -95,17 +96,17 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
 
                 if (!filter_.stream()
                         .anyMatch((f) -> f.apply(mbs.getMBeanName()))) {
-                    Logger.getLogger(getClass().getName()).log(Level.FINER, "notification for {0} ignored: does not match filter {1}", new Object[]{mbs.getMBeanName(), filter_});
+                    LOG.log(Level.FINER, "notification for {0} ignored: does not match filter {1}", new Object[]{mbs.getMBeanName(), filter_});
                     return;
                 }
 
                 if (null != mbs.getType()) switch (mbs.getType()) {
                     case MBeanServerNotification.REGISTRATION_NOTIFICATION:
-                        Logger.getLogger(getClass().getName()).log(Level.INFO, "MBean Registered [{0}]", mbs.getMBeanName());
+                        LOG.log(Level.INFO, "MBean Registered [{0}]", mbs.getMBeanName());
                         onNewMbean(mbs.getMBeanName());
                         break;
                     case MBeanServerNotification.UNREGISTRATION_NOTIFICATION:
-                        Logger.getLogger(getClass().getName()).log(Level.INFO, "MBean Unregistered [{0}]", mbs.getMBeanName());
+                        LOG.log(Level.INFO, "MBean Unregistered [{0}]", mbs.getMBeanName());
                         onRemovedMbean(mbs.getMBeanName());
                         break;
                 }
@@ -120,7 +121,7 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
                 try {
                     mbsc.addNotificationListener(MBeanServerDelegate.DELEGATE_NAME, listener_, null, null);
                 } catch (InstanceNotFoundException ex) {
-                    Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.SEVERE, "your MBeanServer is not compliant", ex);
+                    LOG.log(Level.SEVERE, "your MBeanServer is not compliant", ex);
                     throw new IOException("your MBeanServer is not compliant", ex);
                 }
 
@@ -138,13 +139,13 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
      */
     private synchronized void onNewMbean(ObjectName obj) {
         if (detected_groups_.keySet().contains(obj)) {
-            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.WARNING, "skipping registration of {0}: already present", obj);
+            LOG.log(Level.WARNING, "skipping registration of {0}: already present", obj);
             return;
         }
 
         MBeanGroupInstance instance = new MBeanGroupInstance(connection, obj, subPath, tags);
         detected_groups_.put(obj, instance);
-        Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.INFO, "registered metrics for {0}: {1}", new Object[]{obj, instance});
+        LOG.log(Level.FINE, "registered metrics for {0}: {1}", new Object[]{obj, instance});
     }
 
     /**
@@ -153,13 +154,13 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
      */
     private synchronized void onRemovedMbean(ObjectName obj) {
         if (!detected_groups_.keySet().contains(obj)) {
-            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.WARNING, "skipping de-registration of {0}: not present", obj);
+            LOG.log(Level.WARNING, "skipping de-registration of {0}: not present", obj);
             return;
         }
 
         MBeanGroupInstance instance = detected_groups_.get(obj);
         detected_groups_.remove(obj);
-        Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.INFO, "de-registered metrics for {0}: {1}", new Object[]{obj, instance});
+        LOG.log(Level.FINE, "de-registered metrics for {0}: {1}", new Object[]{obj, instance});
     }
 
     @Override
@@ -168,7 +169,7 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
 
         connection.addRecoveryCallback(decorator_);
         is_enabled_ = true;
-        Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.INFO, "enabled");
+        LOG.log(Level.FINER, "enabled");
     }
 
     @Override
@@ -183,17 +184,17 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
                 if (optionalConnection.isPresent())
                     optionalConnection.get().removeNotificationListener(MBeanServerDelegate.DELEGATE_NAME, listener_);
             } catch (InstanceNotFoundException ex) {
-                Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.SEVERE, "MBean Platform server has mysteriously disappeared...", ex);
+                LOG.log(Level.SEVERE, "MBean Platform server has mysteriously disappeared...", ex);
                 throw new IllegalStateException("MBean Platform server has mysteriously disappeared", ex);
             } catch (ListenerNotFoundException ex) {
-                Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.SEVERE, "Listener was not found...", ex);
+                LOG.log(Level.SEVERE, "Listener was not found...", ex);
             }
         } finally {
             /* Remove gathered items even if connection logic fails. */
             Collection<ObjectName> allNames = new ArrayList<ObjectName>() {{ addAll(detected_groups_.keySet()); }};
             allNames.forEach(this::onRemovedMbean);
 
-            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.INFO, "disabled");
+            LOG.log(Level.FINER, "disabled");
         }
     }
 
@@ -247,17 +248,17 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
                         try {
                             return fut.get();
                         } catch (InterruptedException ex) {
-                            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.SEVERE, "Should not happen?", ex);
+                            LOG.log(Level.SEVERE, "Should not happen?", ex);
                             return Optional.<MetricGroup>empty();
                         } catch (ExecutionException ex) {
-                            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.WARNING, "Error gathering JMX bean", ex);
+                            LOG.log(Level.WARNING, "Error gathering JMX bean", ex);
                             return Optional.<MetricGroup>empty();
                         }
                     })
                     .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
                     .collect(Collectors.toList());
         } catch (InterruptedException ex) {
-            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.SEVERE, "Interrupted while reading JMX beans", ex);
+            LOG.log(Level.SEVERE, "Interrupted while reading JMX beans", ex);
             return failedResult();
         }
         return successResult(values);
