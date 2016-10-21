@@ -36,9 +36,8 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.lang.management.ManagementFactory;
-import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import java.util.HashMap;
@@ -100,7 +99,7 @@ public class MetricListenerTest {
 
         jmx = new JmxClient();
 
-        listener = new MetricListener(jmx, singleton(new ObjectName(PREFIX + "*")), EMPTY_LIST, Tags.EMPTY);
+        listener = new MetricListener(jmx, singleton(new ObjectName(PREFIX + "*")), NamedResolverMap.EMPTY);
     }
 
     @After

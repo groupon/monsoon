@@ -37,10 +37,11 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.lib.Any2;
+import com.groupon.lex.metrics.lib.Any3;
+import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.lang.management.ManagementFactory;
 import java.util.Arrays;
-import static java.util.Collections.EMPTY_LIST;
-import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import java.util.HashMap;
 import java.util.Map;
@@ -109,12 +110,12 @@ public class MBeanGroupTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void pattern_not_allowed() throws Exception {
-        new MBeanGroup(jmx, new ObjectName("com.groupon.lex.metrics.jmx:type=MBeanGroupInstanceTest,*"), EMPTY_LIST, Tags.EMPTY);
+        new MBeanGroup(jmx, new ObjectName("com.groupon.lex.metrics.jmx:type=MBeanGroupInstanceTest,*"), NamedResolverMap.EMPTY);
     }
 
     @Test
     public void read() throws Exception {
-        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, NamedResolverMap.EMPTY);
         test_value.setBoolval(true);
         test_value.setIntval(7);
         test_value.setStringval("foobar");
@@ -135,14 +136,14 @@ public class MBeanGroupTest {
 
     @Test
     public void remembers_objname() {
-        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, NamedResolverMap.EMPTY);
 
         assertEquals(obj_name, mbg.getMonitoredMBeanName());
     }
 
     @Test
     public void properties() {
-        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, NamedResolverMap.EMPTY);
 
         assertThat(mbg.getMonitoredProperties(),
                 arrayContainingInAnyOrder("Boolval", "Intval", "Stringval", "Nested.dblval"));
@@ -150,7 +151,7 @@ public class MBeanGroupTest {
 
     @Test
     public void groupname() {
-        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, NamedResolverMap.EMPTY);
 
         assertEquals(groupname, mbg.getName());
     }
@@ -159,7 +160,7 @@ public class MBeanGroupTest {
     public void groupname_with_tags() {
         Tags extra_tags = Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar")));
         GroupName expected_groupname = GroupName.valueOf(groupname.getPath(), Tags.valueOf(Stream.concat(groupname.getTags().stream(), extra_tags.stream())));
-        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, EMPTY_LIST, extra_tags);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, new NamedResolverMap(singletonMap(Any2.right("foo"), Any3.create3("bar"))));
 
         assertEquals(expected_groupname, mbg.getName());
     }
@@ -168,7 +169,7 @@ public class MBeanGroupTest {
     public void groupname_with_subpath() {
         SimpleGroupPath expected_path = SimpleGroupPath.valueOf(Stream.concat(groupname.getPath().getPath().stream(), Stream.of("foo")).collect(Collectors.toList()));
         GroupName expected_groupname = GroupName.valueOf(expected_path, groupname.getTags());
-        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, singletonList("foo"), Tags.EMPTY);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, new NamedResolverMap(singletonMap(Any2.left(0), Any3.create3("foo"))));
 
         assertEquals(expected_groupname, mbg.getName());
     }

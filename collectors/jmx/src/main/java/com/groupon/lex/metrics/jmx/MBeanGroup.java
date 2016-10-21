@@ -37,10 +37,9 @@ import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.SimpleMetric;
 import com.groupon.lex.metrics.SimpleMetricGroup;
-import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -127,24 +126,18 @@ public class MBeanGroup {
      * Extract a metric group name from a JMX ObjectName.
      *
      * @param obj_name a JMX object name from which to derive a metric name.
-     * @param sub_path a list of Strings to append to the JMX name.
-     * @param init_tags a list of initial tags.
+     * @param resolvedMap a resolver map to use when generating the group name.
      * @return A metric name for the given ObjectName, with tags.
      */
-    private static GroupName nameFromObjectName(ObjectName obj_name, List<String> sub_path, Tags init_tags) {
+    private static GroupName nameFromObjectName(ObjectName obj_name, NamedResolverMap resolvedMap) {
         String name = obj_name.getKeyProperty("name");
         String type = obj_name.getKeyProperty("type");
         String domain = obj_name.getDomain();
 
-        Map<String, MetricValue> tags
-                = Stream.concat(
-                        init_tags.stream()
-                        .map(entry -> new Tag(entry.getKey(), entry.getValue())),
-                        obj_name.getKeyPropertyList().entrySet().stream()
-                        .filter((entry) -> !entry.getKey().equals("name"))
-                        .filter((entry) -> !entry.getKey().equals("type"))
-                        .map(Tag::valueOf)
-                )
+        Map<String, MetricValue> tags = obj_name.getKeyPropertyList().entrySet().stream()
+                .filter((entry) -> !entry.getKey().equals("name"))
+                .filter((entry) -> !entry.getKey().equals("type"))
+                .map(Tag::valueOf)
                 .collect(Collectors.toMap((Tag t) -> t.getName(), (Tag t) -> t.getValue()));
 
         final List<String> path = new ArrayList<>();
@@ -156,8 +149,7 @@ public class MBeanGroup {
         } else {
             path.addAll(Arrays.asList(domain.split("\\.")));
         }
-        path.addAll(sub_path);
-        return GroupName.valueOf(SimpleGroupPath.valueOf(path), tags);
+        return resolvedMap.getGroupName(path, tags);
     }
 
     public MBeanGroup(JmxClient conn, GroupName name, ObjectName obj_name) {
@@ -169,8 +161,8 @@ public class MBeanGroup {
             throw new IllegalArgumentException("ObjectName may not be a pattern");
     }
 
-    public MBeanGroup(JmxClient client, ObjectName obj_name, List<String> sub_path, Tags tags) {
-        this(client, nameFromObjectName(obj_name, sub_path, tags), obj_name);
+    public MBeanGroup(JmxClient client, ObjectName obj_name, NamedResolverMap resolvedMap) {
+        this(client, nameFromObjectName(obj_name, resolvedMap), obj_name);
     }
 
     private Stream<Map.Entry<MetricName, MetricValue>> resolve_(String attribute) {

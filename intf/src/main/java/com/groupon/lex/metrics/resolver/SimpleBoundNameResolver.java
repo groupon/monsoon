@@ -10,14 +10,29 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import static java.util.Objects.requireNonNull;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.Getter;
 import lombok.NonNull;
+import lombok.ToString;
 import lombok.Value;
 import static java.util.Objects.requireNonNull;
-import lombok.Getter;
-import lombok.ToString;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNull;
 
 @Getter
 @ToString
@@ -36,7 +51,7 @@ public class SimpleBoundNameResolver implements NameBoundResolver {
     }
 
     @Override
-    public Stream<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolve() throws Exception {
+    public Stream<NamedResolverMap> resolve() throws Exception {
         return resolver.getTuples().stream()
                 .map(this::bindNames);
     }
@@ -56,14 +71,14 @@ public class SimpleBoundNameResolver implements NameBoundResolver {
         return names.isEmpty();
     }
 
-    private Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> bindNames(ResolverTuple tuple) {
+    private NamedResolverMap bindNames(ResolverTuple tuple) {
         final Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> result = new HashMap<>();
         final Iterator<Any3<Boolean, Integer, String>> fieldIter = tuple.getFields().iterator();
         final Iterator<Any2<Integer, String>> nameIter = names.getNames().iterator();
 
         while (nameIter.hasNext())
             result.put(nameIter.next(), fieldIter.next());
-        return result;
+        return new NamedResolverMap(result);
     }
 
     @Value
@@ -80,8 +95,13 @@ public class SimpleBoundNameResolver implements NameBoundResolver {
             this(Arrays.asList(names));
         }
 
-        public int getWidth() { return names.size(); }
-        public boolean isEmpty() { return names.isEmpty(); }
+        public int getWidth() {
+            return names.size();
+        }
+
+        public boolean isEmpty() {
+            return names.isEmpty();
+        }
 
         @Override
         public String toString() {

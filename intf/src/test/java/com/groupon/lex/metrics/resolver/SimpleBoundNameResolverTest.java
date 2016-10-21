@@ -2,17 +2,31 @@ package com.groupon.lex.metrics.resolver;
 
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.Any3;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 import static java.util.Collections.EMPTY_LIST;
-import static java.util.Collections.EMPTY_MAP;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 import org.hamcrest.Matchers;
-import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import org.junit.Test;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
+import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
 
 public class SimpleBoundNameResolverTest {
@@ -23,7 +37,7 @@ public class SimpleBoundNameResolverTest {
         assertEquals("() = " + bnr.getResolver().configString(), bnr.configString());
         assertTrue(bnr.isEmpty());
         assertEquals(EMPTY_LIST, bnr.getKeys().collect(Collectors.toList()));
-        assertEquals(singletonList(EMPTY_MAP), bnr.resolve().collect(Collectors.toList()));
+        assertEquals(singletonList(NamedResolverMap.EMPTY), bnr.resolve().collect(Collectors.toList()));
     }
 
     @Test
@@ -34,7 +48,7 @@ public class SimpleBoundNameResolverTest {
                         new ResolverTuple(newTupleElement("one")),
                         new ResolverTuple(newTupleElement("two"))));
 
-        assertThat(bnr.resolve().collect(Collectors.toList()),
+        assertThat(bnr.resolve().map(NamedResolverMap::getRawMap).collect(Collectors.toList()),
                 Matchers.containsInAnyOrder(
                         singletonMap(Any2.right("foo"), Any3.create3("one")),
                         singletonMap(Any2.right("foo"), Any3.create3("two"))));
@@ -49,16 +63,20 @@ public class SimpleBoundNameResolverTest {
                         new ResolverTuple(newTupleElement("x"), newTupleElement("y")),
                         new ResolverTuple(newTupleElement("a"), newTupleElement("b"))));
 
-        assertThat(bnr.resolve().collect(Collectors.toList()),
+        assertThat(bnr.resolve().map(NamedResolverMap::getRawMap).collect(Collectors.toList()),
                 Matchers.containsInAnyOrder(
-                        new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {{
-                            put(Any2.left(0), Any3.create3("x"));
-                            put(Any2.left(1), Any3.create3("y"));
-                        }},
-                        new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {{
-                            put(Any2.left(0), Any3.create3("a"));
-                            put(Any2.left(1), Any3.create3("b"));
-                        }}));
+                        new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {
+                    {
+                        put(Any2.left(0), Any3.create3("x"));
+                        put(Any2.left(1), Any3.create3("y"));
+                    }
+                },
+                        new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {
+                    {
+                        put(Any2.left(0), Any3.create3("a"));
+                        put(Any2.left(1), Any3.create3("b"));
+                    }
+                }));
         assertEquals("(0, 1) = " + bnr.getResolver().configString(), bnr.configString());
     }
 
@@ -70,14 +88,18 @@ public class SimpleBoundNameResolverTest {
                         new ResolverTuple(newTupleElement("x"), newTupleElement("y")),
                         new ResolverTuple(newTupleElement("a"), newTupleElement("b"))));
 
-        assertThat(bnr.resolve().collect(Collectors.toList()),
+        assertThat(bnr.resolve().map(NamedResolverMap::getRawMap).collect(Collectors.toList()),
                 Matchers.containsInAnyOrder(
-                        new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {{
-                            put(Any2.left(0), Any3.create3("x"));
-                        }},
-                        new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {{
-                            put(Any2.left(0), Any3.create3("a"));
-                        }}));
+                        new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {
+                    {
+                        put(Any2.left(0), Any3.create3("x"));
+                    }
+                },
+                        new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {
+                    {
+                        put(Any2.left(0), Any3.create3("a"));
+                    }
+                }));
         assertEquals("0 = " + bnr.getResolver().configString(), bnr.configString());
     }
 
