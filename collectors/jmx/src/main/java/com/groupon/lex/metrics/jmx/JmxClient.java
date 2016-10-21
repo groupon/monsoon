@@ -74,6 +74,7 @@ public class JmxClient implements AutoCloseable {
 
     /**
      * Create a new client, connecting to the specified URL.
+     *
      * @param connection_url the JMX server URL
      * @throws IOException if the connection cannot be established
      */
@@ -102,7 +103,9 @@ public class JmxClient implements AutoCloseable {
 
     /**
      * Create a new client, connecting to the specified URL.
-     * @param connection_url the JMX server URL, example: "service:jmx:rmi:///jndi/rmi://:9999/jmxrmi"
+     *
+     * @param connection_url the JMX server URL, example:
+     * "service:jmx:rmi:///jndi/rmi://:9999/jmxrmi"
      * @throws MalformedURLException if the JMX URL is invalid
      * @throws IOException if the connection cannot be established
      */
@@ -114,6 +117,7 @@ public class JmxClient implements AutoCloseable {
      * Returns a connection to the MBeanServer.
      *
      * Will restore connection if it has broken.
+     *
      * @return A connection to the MBean server.
      * @throws IOException if the connection couldn't be established.
      */
@@ -144,8 +148,11 @@ public class JmxClient implements AutoCloseable {
     }
 
     /**
-     * Get the connection, but don't bother with the recovery protocol if the connection is lost.
-     * @return An optional with a connection, or empty optional indicating there is no connection.
+     * Get the connection, but don't bother with the recovery protocol if the
+     * connection is lost.
+     *
+     * @return An optional with a connection, or empty optional indicating there
+     * is no connection.
      */
     public Optional<MBeanServerConnection> getOptionalConnection() {
         if (conn_ != null) {
@@ -171,6 +178,7 @@ public class JmxClient implements AutoCloseable {
      * Add a recovery callback.
      *
      * The callback will be invoked after adding it.
+     *
      * @param cb the callback that is to be added.
      */
     public void addRecoveryCallback(ConnectionDecorator cb) {
@@ -190,13 +198,12 @@ public class JmxClient implements AutoCloseable {
             Logger.getLogger(getClass().getName()).log(Level.FINE, "connection error while adding callback", ex);
             /* Silently ignore: connection is bad and next time a connection is requested, the callback will be invoked. */
 
-            /* Cleanup on initialization failure. */
-            if (jmx_factory_.isPresent()) {
+            if (jmx_factory_.isPresent()) { // Cleanup on initialization failure.
                 conn_ = null;
                 try {
                     jmx_factory_.get().close();
                 } catch (IOException ex1) {
-                    Logger.getLogger(JmxClient.class.getName()).log(Level.WARNING, "failed to close failing connection", ex1);
+                    LOG.log(Level.WARNING, "failed to close failing connection", ex1);
                 }
             }
         }
@@ -204,8 +211,10 @@ public class JmxClient implements AutoCloseable {
 
     /**
      * Remove a previously registered callback.
+     *
      * @param cb the callback that is to be removed.
-     * @return the callback that was removed, or null is the callback was not found.
+     * @return the callback that was removed, or null is the callback was not
+     * found.
      */
     public ConnectionDecorator removeRecoveryCallback(ConnectionDecorator cb) {
         if (cb == null) throw new NullPointerException("null callback");
@@ -216,5 +225,19 @@ public class JmxClient implements AutoCloseable {
     public synchronized void close() throws IOException {
         if (jmx_factory_.isPresent()) jmx_factory_.get().close();
         conn_ = null;
+    }
+
+    /**
+     * Rejects the current connection. Does nothing if the local JMX is used.
+     */
+    public synchronized void rejectCurrentConnection() {
+        if (jmx_factory_.isPresent()) {
+            conn_ = null;
+            try {
+                jmx_factory_.get().close();
+            } catch (IOException ex) {
+                LOG.log(Level.WARNING, "failed to close failing connection", ex);
+            }
+        }
     }
 }

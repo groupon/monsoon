@@ -34,9 +34,9 @@ package com.groupon.lex.metrics.jmx;
 import com.groupon.lex.metrics.GroupGenerator;
 import static com.groupon.lex.metrics.GroupGenerator.failedResult;
 import static com.groupon.lex.metrics.GroupGenerator.successResult;
-import com.groupon.lex.metrics.jmx.JmxClient.ConnectionDecorator;
 import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.jmx.JmxClient.ConnectionDecorator;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -44,15 +44,16 @@ import static java.util.Collections.unmodifiableList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import static java.util.Objects.requireNonNull;
 import java.util.Optional;
-import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.management.InstanceNotFoundException;
 import javax.management.ListenerNotFoundException;
 import javax.management.MBeanServerConnection;
@@ -62,7 +63,6 @@ import javax.management.Notification;
 import javax.management.NotificationListener;
 import javax.management.ObjectName;
 import lombok.Getter;
-import static java.util.Objects.requireNonNull;
 
 /**
  * A JMX bean listener, that detects new MBeans with a given name pattern and
@@ -72,7 +72,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class MetricListenerInstance implements MetricListener, GroupGenerator, AutoCloseable {
     private final Collection<ObjectName> filter_;
-    private final Map<ObjectName, MBeanGroupInstance> detected_groups_ = new HashMap<ObjectName, MBeanGroupInstance>();
+    private final Map<ObjectName, MBeanGroupInstance> detected_groups_ = new HashMap<>();
     private boolean is_enabled_ = false;
     @Getter
     private final JmxClient connection;
@@ -84,56 +84,62 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
     private final Tags tags;
 
     public MetricListenerInstance(JmxClient conn, Collection<ObjectName> filter, List<String> sub_path, Tags tags) throws IOException, InstanceNotFoundException {
-        if (filter.isEmpty()) throw new IllegalArgumentException("empty filter");
+        if (filter.isEmpty())
+            throw new IllegalArgumentException("empty filter");
         filter_ = filter;
         connection = conn;
         subPath = unmodifiableList(new ArrayList<>(sub_path));
         this.tags = requireNonNull(tags);
 
         listener_ = (Notification notification, Object handback) -> {
-                MBeanServerNotification mbs = (MBeanServerNotification) notification;
+            MBeanServerNotification mbs = (MBeanServerNotification) notification;
 
-                if (!filter_.stream()
-                        .anyMatch((f) -> f.apply(mbs.getMBeanName()))) {
-                    Logger.getLogger(getClass().getName()).log(Level.FINER, "notification for {0} ignored: does not match filter {1}", new Object[]{mbs.getMBeanName(), filter_});
-                    return;
-                }
+            if (!filter_.stream()
+                    .anyMatch((f) -> f.apply(mbs.getMBeanName()))) {
+                Logger.getLogger(getClass().getName()).log(Level.FINER, "notification for {0} ignored: does not match filter {1}", new Object[]{mbs.getMBeanName(), filter_});
+                return;
+            }
 
-                if (null != mbs.getType()) switch (mbs.getType()) {
-                    case MBeanServerNotification.REGISTRATION_NOTIFICATION:
-                        Logger.getLogger(getClass().getName()).log(Level.INFO, "MBean Registered [{0}]", mbs.getMBeanName());
-                        onNewMbean(mbs.getMBeanName());
-                        break;
-                    case MBeanServerNotification.UNREGISTRATION_NOTIFICATION:
-                        Logger.getLogger(getClass().getName()).log(Level.INFO, "MBean Unregistered [{0}]", mbs.getMBeanName());
-                        onRemovedMbean(mbs.getMBeanName());
-                        break;
-                }
-            };
+            if (null != mbs.getType()) switch (mbs.getType()) {
+                case MBeanServerNotification.REGISTRATION_NOTIFICATION:
+                    Logger.getLogger(getClass().getName()).log(Level.INFO, "MBean Registered [{0}]", mbs.getMBeanName());
+                    onNewMbean(mbs.getMBeanName());
+                    break;
+                case MBeanServerNotification.UNREGISTRATION_NOTIFICATION:
+                    Logger.getLogger(getClass().getName()).log(Level.INFO, "MBean Unregistered [{0}]", mbs.getMBeanName());
+                    onRemovedMbean(mbs.getMBeanName());
+                    break;
+            }
+        };
 
         decorator_ = (MBeanServerConnection mbsc) -> {
-                /* Clear gathered metrics, since they'll belong to the old connection and won't function properly. */
-                Collection<ObjectName> allNames = new ArrayList<ObjectName>() {{ addAll(detected_groups_.keySet()); }};
-                allNames.forEach(this::onRemovedMbean);
-
-                /* Initialize listener for new MBean registrations. */
-                try {
-                    mbsc.addNotificationListener(MBeanServerDelegate.DELEGATE_NAME, listener_, null, null);
-                } catch (InstanceNotFoundException ex) {
-                    Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.SEVERE, "your MBeanServer is not compliant", ex);
-                    throw new IOException("your MBeanServer is not compliant", ex);
-                }
-
-                /* Add all objects that the listener misses, due to them existing already. */
-                for (ObjectName f : filter_) {
-                    mbsc.queryNames(f, null)
-                            .forEach((objname) -> onNewMbean(objname));
+            /* Clear gathered metrics, since they'll belong to the old connection and won't function properly. */
+            Collection<ObjectName> allNames = new ArrayList<ObjectName>() {
+                {
+                    addAll(detected_groups_.keySet());
                 }
             };
+            allNames.forEach(this::onRemovedMbean);
+
+            /* Initialize listener for new MBean registrations. */
+            try {
+                mbsc.addNotificationListener(MBeanServerDelegate.DELEGATE_NAME, listener_, null, null);
+            } catch (InstanceNotFoundException ex) {
+                Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.SEVERE, "your MBeanServer is not compliant", ex);
+                throw new IOException("your MBeanServer is not compliant", ex);
+            }
+
+            /* Add all objects that the listener misses, due to them existing already. */
+            for (ObjectName f : filter_) {
+                mbsc.queryNames(f, null)
+                        .forEach((objname) -> onNewMbean(objname));
+            }
+        };
     }
 
     /**
      * Respond to MBeans being added.
+     *
      * @param obj The name of the MBean being added.
      */
     private synchronized void onNewMbean(ObjectName obj) {
@@ -149,6 +155,7 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
 
     /**
      * Respond to MBeans being removed.
+     *
      * @param obj The name of the MBean being removed.
      */
     private synchronized void onRemovedMbean(ObjectName obj) {
@@ -190,7 +197,11 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
             }
         } finally {
             /* Remove gathered items even if connection logic fails. */
-            Collection<ObjectName> allNames = new ArrayList<ObjectName>() {{ addAll(detected_groups_.keySet()); }};
+            Collection<ObjectName> allNames = new ArrayList<ObjectName>() {
+                {
+                    addAll(detected_groups_.keySet());
+                }
+            };
             allNames.forEach(this::onRemovedMbean);
 
             Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.INFO, "disabled");
@@ -198,11 +209,19 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
     }
 
     @Override
-    public ObjectName[] getFilter() { return filter_.toArray(new ObjectName[0]); }
+    public ObjectName[] getFilter() {
+        return filter_.toArray(new ObjectName[0]);
+    }
+
     @Override
-    public boolean isEnabled() { return is_enabled_; }
+    public boolean isEnabled() {
+        return is_enabled_;
+    }
+
     @Override
-    public ObjectName[] getDetectedNames() { return detected_groups_.keySet().toArray(new ObjectName[0]); }
+    public ObjectName[] getDetectedNames() {
+        return detected_groups_.keySet().toArray(new ObjectName[0]);
+    }
 
     @Override
     public void close() throws IOException {
@@ -210,7 +229,23 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
     }
 
     @Override
-    public synchronized GroupCollection getGroups() {
+    public GroupCollection getGroups() {
+        final ExecutorService executor = Executors.newSingleThreadExecutor();
+        CompletableFuture<Collection<MetricGroup>> future
+                = CompletableFuture.supplyAsync(this::readMetricGroups, executor);
+        try {
+            return successResult(future.get(30, TimeUnit.SECONDS));
+        } catch (TimeoutException | InterruptedException | ExecutionException ex) {
+            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.WARNING, "unable to get metrics", ex);
+            connection.rejectCurrentConnection();
+            return failedResult();
+        } finally {
+            future.cancel(true);
+            executor.shutdownNow();
+        }
+    }
+
+    private synchronized Collection<MetricGroup> readMetricGroups() {
         try {
             /*
              * Force the connection to open, even if there are no groups to scan.
@@ -223,43 +258,12 @@ public class MetricListenerInstance implements MetricListener, GroupGenerator, A
             /*
              * Connection down, can't collect any data.
              */
-            return failedResult();
+            throw new RuntimeException(ex.getMessage(), ex);
         }
 
-        // Copy collection, to isolate it from mbean events add/removing elements.
-        final List<MetricGroup> values;
-        try {
-            // Load values, but apply a timeout in case a specific MBean getter blocks for a very long time.
-            values = ForkJoinPool.commonPool()
-                    .invokeAll(
-                            detected_groups_.values().stream()
-                                    .map(v -> new Callable<Optional<MetricGroup>>() {
-                                        @Override
-                                        public Optional<MetricGroup> call() throws Exception {
-                                            return v.getMetrics();
-                                        }
-                                    })
-                                    .collect(Collectors.toList()),
-                            30, TimeUnit.SECONDS
-                    )
-                    .stream()
-                    .map(fut -> {
-                        try {
-                            return fut.get();
-                        } catch (InterruptedException ex) {
-                            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.SEVERE, "Should not happen?", ex);
-                            return Optional.<MetricGroup>empty();
-                        } catch (ExecutionException ex) {
-                            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.WARNING, "Error gathering JMX bean", ex);
-                            return Optional.<MetricGroup>empty();
-                        }
-                    })
-                    .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
-                    .collect(Collectors.toList());
-        } catch (InterruptedException ex) {
-            Logger.getLogger(MetricListenerInstance.class.getName()).log(Level.SEVERE, "Interrupted while reading JMX beans", ex);
-            return failedResult();
-        }
-        return successResult(values);
+        List<MetricGroup> result = new ArrayList<>(detected_groups_.size());
+        for (MBeanGroupInstance group : detected_groups_.values())
+            group.getMetrics().ifPresent(result::add);
+        return result;
     }
 }
