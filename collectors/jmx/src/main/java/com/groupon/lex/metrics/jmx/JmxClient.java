@@ -37,6 +37,7 @@ import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.MBeanServerConnection;
@@ -44,6 +45,7 @@ import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
 import lombok.Getter;
+import lombok.NonNull;
 
 /**
  *
@@ -56,9 +58,9 @@ public class JmxClient implements AutoCloseable {
 
     private static final Logger LOG = Logger.getLogger(JmxClient.class.getName());
     @Getter
-    private final Optional<JMXServiceURL> jmxUrl;
-    private Optional<JMXConnector> jmx_factory_;
-    private MBeanServerConnection conn_;  // conn_ == null -> connection needs recovery
+    private final JMXServiceURL jmxUrl;  // May be null.
+    private JMXConnector jmxFactory;  // May be null.
+    private MBeanServerConnection conn;  // conn == null -> connection needs recovery
     private final Collection<ConnectionDecorator> recovery_callbacks_ = new ArrayList<>();
 
     /**
@@ -67,41 +69,43 @@ public class JmxClient implements AutoCloseable {
      * This client is effectively connected to the JVM it is part of.
      */
     public JmxClient() {
-        jmxUrl = Optional.empty();
-        jmx_factory_ = Optional.empty();
-        conn_ = ManagementFactory.getPlatformMBeanServer();
+        jmxUrl = null;
+        jmxFactory = null;
+        conn = ManagementFactory.getPlatformMBeanServer();
     }
 
     /**
      * Create a new client, connecting to the specified URL.
      *
      * @param connection_url the JMX server URL
-     * @param lazyConnect if true, the connection will not be established at construction time, but once the first time the connection is requested.
+     * @param lazyConnect if true, the connection will not be established at
+     * construction time, but once the first time the connection is requested.
      * @throws IOException if the connection cannot be established
      */
-    public JmxClient(JMXServiceURL connection_url, boolean lazyConnect) throws IOException {
-        jmxUrl = Optional.of(connection_url);
-        jmx_factory_ = Optional.of(JMXConnectorFactory.newJMXConnector(jmxUrl.get(), null));
+    public JmxClient(@NonNull JMXServiceURL connection_url, boolean lazyConnect) throws IOException {
+        jmxUrl = connection_url;
+        jmxFactory = JMXConnectorFactory.newJMXConnector(jmxUrl, null);
         if (lazyConnect) {
-            conn_ = null;
+            conn = null;
         } else {
             try {
-                jmx_factory_.get().connect();
+                jmxFactory.connect();
             } catch (IOException ex) {
                 LOG.log(Level.WARNING, "unable to connect");
-                conn_ = null;
+                conn = null;
+                return;
             }
             try {
-                conn_ = jmx_factory_.get().getMBeanServerConnection();
+                conn = jmxFactory.getMBeanServerConnection();
             } catch (IOException ex) {
                 LOG.log(Level.WARNING, "unable to connect");
                 try {
-                    jmx_factory_.get().close();
+                    jmxFactory.close();
                 } catch (IOException ex1) {
                     LOG.log(Level.WARNING, "unable to close failed connection attempt", ex1);
                     /* Eat exception. */
                 }
-                conn_ = null;
+                conn = null;
             }
         }
     }
@@ -121,7 +125,8 @@ public class JmxClient implements AutoCloseable {
      *
      * @param connection_url the JMX server URL, example:
      * "service:jmx:rmi:///jndi/rmi://:9999/jmxrmi"
-     * @param lazyConnect if true, the connection will not be established at construction time, but once the first time the connection is requested.
+     * @param lazyConnect if true, the connection will not be established at
+     * construction time, but once the first time the connection is requested.
      * @throws MalformedURLException if the JMX URL is invalid
      * @throws IOException if the connection cannot be established
      */
@@ -156,23 +161,26 @@ public class JmxClient implements AutoCloseable {
         }
 
         /* Re-create factory, because apparently they cannot re-create a broken connection. */
-        if (jmxUrl.isPresent())
-            jmx_factory_ = Optional.of(JMXConnectorFactory.newJMXConnector(jmxUrl.get(), null));  // May throw
+        if (jmxUrl != null)
+            jmxFactory = JMXConnectorFactory.newJMXConnector(jmxUrl, null);  // May throw
 
         /* Attempt to recreate the connection and replay the listeners. */
-        JMXConnector factory = jmx_factory_.orElseThrow(() -> new IOException("cannot recover from broken connection to local MBean Server"));
-        factory.connect();  // May throw
+        jmxFactory.connect();  // May throw
         try {
-            conn_ = factory.getMBeanServerConnection();
+            conn = jmxFactory.getMBeanServerConnection();
             for (ConnectionDecorator cb : recovery_callbacks_)
-                cb.apply(conn_);
+                cb.apply(conn);
         } catch (IOException ex) {
             /* Cleanup on initialization failure. */
-            conn_ = null;
-            factory.close();
+            conn = null;
+            try {
+                jmxFactory.close();
+            } catch (Exception ex1) {
+                ex.addSuppressed(ex1);
+            }
             throw ex;
         }
-        return conn_;
+        return conn;
     }
 
     /**
@@ -183,23 +191,21 @@ public class JmxClient implements AutoCloseable {
      * is no connection.
      */
     public Optional<MBeanServerConnection> getOptionalConnection() {
-        if (conn_ != null) {
+        if (conn != null) {
             /* Verify the connection is valid. */
             try {
-                conn_.getMBeanCount();
+                conn.getMBeanCount();
             } catch (IOException ex) {
                 try {
                     /* Connection is bad/lost. */
-                    jmx_factory_
-                            .orElseThrow(() -> new IOException("cannot recover from broken connection to local MBean Server"))
-                            .close();
+                    jmxFactory.close();
                 } catch (IOException ex1) {
                     Logger.getLogger(JmxClient.class.getName()).log(Level.SEVERE, "failed to close failing connection", ex1);
                 }
-                conn_ = null;
+                conn = null;
             }
         }
-        return Optional.ofNullable(conn_);
+        return Optional.ofNullable(conn);
     }
 
     /**
@@ -209,21 +215,20 @@ public class JmxClient implements AutoCloseable {
      *
      * @param cb the callback that is to be added.
      */
-    public void addRecoveryCallback(ConnectionDecorator cb) {
-        if (cb == null) throw new NullPointerException("null callback");
+    public void addRecoveryCallback(@NonNull ConnectionDecorator cb) {
         final MBeanServerConnection conn = getOptionalConnection().orElse(null);
 
         recovery_callbacks_.add(cb);
         try {
             if (conn != null) cb.apply(conn);
         } catch (IOException ex) {
-            Logger.getLogger(getClass().getName()).log(Level.FINE, "connection error while adding callback", ex);
+            LOG.log(Level.FINE, "connection error while adding callback", ex);
             /* Silently ignore: connection is bad and next time a connection is requested, the callback will be invoked. */
 
-            if (jmx_factory_.isPresent()) { // Cleanup on initialization failure.
-                conn_ = null;
+            if (jmxFactory != null) { // Cleanup on initialization failure.
+                this.conn = null;
                 try {
-                    jmx_factory_.get().close();
+                    jmxFactory.close();
                 } catch (IOException ex1) {
                     LOG.log(Level.WARNING, "failed to close failing connection", ex1);
                 }
@@ -245,21 +250,27 @@ public class JmxClient implements AutoCloseable {
 
     @Override
     public synchronized void close() throws IOException {
-        if (jmx_factory_.isPresent()) jmx_factory_.get().close();
-        conn_ = null;
+        if (jmxFactory != null) jmxFactory.close();
+        conn = null;
     }
 
     /**
      * Rejects the current connection. Does nothing if the local JMX is used.
+     *
+     * @param executor A background executor on which to run the connection
+     * cleanup code.
      */
-    public synchronized void rejectCurrentConnection() {
-        if (jmx_factory_.isPresent()) {
-            conn_ = null;
-            try {
-                jmx_factory_.get().close();
-            } catch (IOException ex) {
-                LOG.log(Level.WARNING, "failed to close failing connection", ex);
-            }
+    public void rejectCurrentConnection(Executor executor) {
+        if (jmxFactory != null) {
+            conn = null;
+
+            executor.execute(() -> {
+                try {
+                    jmxFactory.close();
+                } catch (IOException ex) {
+                    LOG.log(Level.WARNING, "failed to close failing connection", ex);
+                }
+            });
         }
     }
 }

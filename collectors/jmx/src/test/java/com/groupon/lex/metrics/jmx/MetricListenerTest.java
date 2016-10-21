@@ -66,7 +66,7 @@ import org.junit.Test;
  *
  * @author ariane
  */
-public class MetricListenerInstanceTest {
+public class MetricListenerTest {
     private static final AtomicInteger SEQUENCE = new AtomicInteger();  // To help us create unique names for each test.
     private int seqno;
     /**
@@ -83,7 +83,7 @@ public class MetricListenerInstanceTest {
      */
     private JmxClient jmx;
 
-    private MetricListenerInstance listener;
+    private MetricListener listener;
     private ExecutorService executor;
 
     @Before
@@ -105,7 +105,7 @@ public class MetricListenerInstanceTest {
 
         jmx = new JmxClient();
 
-        listener = new MetricListenerInstance(jmx, singleton(new ObjectName(PREFIX + "*")), EMPTY_LIST, Tags.EMPTY);
+        listener = new MetricListener(jmx, singleton(new ObjectName(PREFIX + "*")), EMPTY_LIST, Tags.EMPTY);
         executor = Executors.newFixedThreadPool(1);
     }
 

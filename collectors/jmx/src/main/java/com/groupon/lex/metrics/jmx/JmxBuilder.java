@@ -89,7 +89,7 @@ public class JmxBuilder implements CollectorBuilder, MainStringList, AcceptTagSe
                     .collect(Collectors.toList());
             final Tags tags = Tags.valueOf(NameBoundResolver.tagMap(arg));
 
-            MetricListenerInstance listener = new MetricListenerInstance(new JmxClient("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi", true), includes, sublist, tags);
+            MetricListener listener = new MetricListener(new JmxClient("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi", true), includes, sublist, tags);
             listener.enable();
             return listener;
         }
