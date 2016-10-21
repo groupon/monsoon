@@ -88,7 +88,7 @@ public class TcpCollectorTest {
                         hasProperty("metrics", arrayContainingInAnyOrder(
                                 allOf(hasProperty("name", equalTo(MetricName.valueOf("up"))),
                                         hasProperty("value", equalTo(MetricValue.TRUE))),
-                                allOf(hasProperty("name", equalTo(MetricName.valueOf("timing")))),
+                                allOf(hasProperty("name", equalTo(MetricName.valueOf("latency")))),
                                 allOf(hasProperty("name", equalTo(MetricName.valueOf("error", "msg"))),
                                         hasProperty("value", equalTo(MetricValue.EMPTY))),
                                 allOf(hasProperty("name", equalTo(MetricName.valueOf("error", "type"))),

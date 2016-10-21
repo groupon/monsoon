@@ -66,7 +66,7 @@ public class TcpCollector implements GroupGenerator {
     /**
      * MetricName under which the timing is published.
      */
-    private static final MetricName TIMING_METRIC = MetricName.valueOf("timing");
+    private static final MetricName TIMING_METRIC = MetricName.valueOf("latency");
     /**
      * MetricName under which the error message is published.
      */
