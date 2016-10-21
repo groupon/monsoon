@@ -33,9 +33,8 @@ package com.groupon.lex.metrics;
 
 import static com.groupon.lex.metrics.GroupGenerator.failedResult;
 import static com.groupon.lex.metrics.GroupGenerator.successResult;
-import com.groupon.lex.metrics.lib.Any2;
-import com.groupon.lex.metrics.lib.Any3;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.unmodifiableCollection;
@@ -55,15 +54,14 @@ import lombok.RequiredArgsConstructor;
 /**
  * A group generator that manages GroupGenerators based on the active resolver.
  *
- * When a group generator does not exist, for a given argument set,
- * it will create one.
- * When the resolver does not return a given argument set, the associated
- * group generator will be closed.
+ * When a group generator does not exist, for a given argument set, it will
+ * create one. When the resolver does not return a given argument set, the
+ * associated group generator will be closed.
  */
 @RequiredArgsConstructor
 public class ResolverGroupGenerator implements GroupGenerator {
     private static final Logger LOG = Logger.getLogger(ResolverGroupGenerator.class.getName());
-    private final Map<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>, GroupGenerator> generators = new HashMap<>();
+    private final Map<NamedResolverMap, GroupGenerator> generators = new HashMap<>();
     @NonNull
     @Getter
     private final NameBoundResolver resolver;
@@ -77,7 +75,7 @@ public class ResolverGroupGenerator implements GroupGenerator {
 
     @Override
     public GroupCollection getGroups() {
-        final Set<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>> resolvedMaps;
+        final Set<NamedResolverMap> resolvedMaps;
 
         try {
             resolvedMaps = resolver.resolve().collect(Collectors.toSet());
@@ -87,9 +85,9 @@ public class ResolverGroupGenerator implements GroupGenerator {
         }
 
         // Close all generators that are not to run.
-        final Iterator<Map.Entry<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>, GroupGenerator>> genIter = generators.entrySet().iterator();
+        final Iterator<Map.Entry<NamedResolverMap, GroupGenerator>> genIter = generators.entrySet().iterator();
         while (genIter.hasNext()) {
-            final Map.Entry<Map<Any2<Integer, String>, Any3<Boolean, Integer, String>>, GroupGenerator> gen = genIter.next();
+            final Map.Entry<NamedResolverMap, GroupGenerator> gen = genIter.next();
             if (!resolvedMaps.contains(gen.getKey())) {
                 final GroupGenerator toBeClosed = gen.getValue();
                 genIter.remove();
@@ -103,7 +101,7 @@ public class ResolverGroupGenerator implements GroupGenerator {
 
         // Create missing generators.
         resolvedMaps.removeAll(generators.keySet());
-        for (Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> resolvedMap : resolvedMaps) {
+        for (NamedResolverMap resolvedMap : resolvedMaps) {
             try {
                 generators.put(resolvedMap, requireNonNull(createGenerator.create(resolvedMap)));
             } catch (Exception ex) {
@@ -156,6 +154,6 @@ public class ResolverGroupGenerator implements GroupGenerator {
     }
 
     public static interface GroupGeneratorFactory {
-        public GroupGenerator create(Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> args) throws Exception;
+        public GroupGenerator create(NamedResolverMap args) throws Exception;
     }
 }

@@ -35,16 +35,14 @@ import com.groupon.lex.metrics.GroupGenerator;
 import static com.groupon.lex.metrics.GroupGenerator.failedResult;
 import static com.groupon.lex.metrics.GroupGenerator.successResult;
 import com.groupon.lex.metrics.MetricGroup;
-import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.jmx.JmxClient.ConnectionDecorator;
+import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import static java.util.Collections.unmodifiableList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -63,6 +61,7 @@ import javax.management.Notification;
 import javax.management.NotificationListener;
 import javax.management.ObjectName;
 import lombok.Getter;
+import lombok.NonNull;
 
 /**
  * A JMX bean listener, that detects new MBeans with a given name pattern and
@@ -80,17 +79,14 @@ public class MetricListener implements GroupGenerator, AutoCloseable {
     private final ConnectionDecorator decorator_;
     private final NotificationListener listener_;
     @Getter
-    private final List<String> subPath;
-    @Getter
-    private final Tags tags;
+    private final NamedResolverMap resolvedMap;
 
-    public MetricListener(JmxClient conn, Collection<ObjectName> filter, List<String> sub_path, Tags tags) throws IOException, InstanceNotFoundException {
+    public MetricListener(@NonNull JmxClient conn, @NonNull Collection<ObjectName> filter, @NonNull NamedResolverMap resolvedMap) throws IOException, InstanceNotFoundException {
         if (filter.isEmpty())
             throw new IllegalArgumentException("empty filter");
         filter_ = filter;
         connection = conn;
-        subPath = unmodifiableList(new ArrayList<>(sub_path));
-        this.tags = requireNonNull(tags);
+        this.resolvedMap = resolvedMap;
 
         listener_ = (Notification notification, Object handback) -> {
             MBeanServerNotification mbs = (MBeanServerNotification) notification;
@@ -151,7 +147,7 @@ public class MetricListener implements GroupGenerator, AutoCloseable {
             return;
         }
 
-        MBeanGroup instance = new MBeanGroup(connection, obj, subPath, tags);
+        MBeanGroup instance = new MBeanGroup(connection, obj, resolvedMap);
         detected_groups_.put(obj, instance);
         LOG.log(Level.FINE, "registered metrics for {0}: {1}", new Object[]{obj, instance});
     }

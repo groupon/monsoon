@@ -1,7 +1,6 @@
 package com.groupon.lex.metrics.resolver;
 
 import static java.util.Collections.EMPTY_LIST;
-import static java.util.Collections.EMPTY_MAP;
 import static java.util.Collections.singletonList;
 import java.util.stream.Collectors;
 import org.junit.Test;
@@ -14,6 +13,6 @@ public class NameBoundResolverTest {
         assertTrue(NameBoundResolver.EMPTY.isEmpty());
         assertEquals(EMPTY_LIST, NameBoundResolver.EMPTY.getKeys().collect(Collectors.toList()));
         assertEquals("", NameBoundResolver.EMPTY.configString());
-        assertEquals(singletonList(EMPTY_MAP), NameBoundResolver.EMPTY.resolve().collect(Collectors.toList()));
+        assertEquals(singletonList(NamedResolverMap.EMPTY), NameBoundResolver.EMPTY.resolve().collect(Collectors.toList()));
     }
 }

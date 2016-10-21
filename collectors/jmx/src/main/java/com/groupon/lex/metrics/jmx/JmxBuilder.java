@@ -33,21 +33,16 @@ package com.groupon.lex.metrics.jmx;
 
 import com.groupon.lex.metrics.GroupGenerator;
 import com.groupon.lex.metrics.ResolverGroupGenerator;
-import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.builders.collector.AcceptTagSet;
 import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
 import com.groupon.lex.metrics.builders.collector.MainStringList;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
-import com.groupon.lex.metrics.lib.Any2;
-import com.groupon.lex.metrics.lib.Any3;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import static java.util.Collections.unmodifiableSortedSet;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.stream.Collectors;
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 import lombok.Getter;
@@ -79,17 +74,16 @@ public class JmxBuilder implements CollectorBuilder, MainStringList, AcceptTagSe
         private final SortedSet<ObjectName> includes;
 
         @Override
-        public GroupGenerator create(Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> arg) throws Exception {
-            final String host = arg.getOrDefault(Any2.<Integer, String>right("host"), Any3.create3("localhost")).mapCombine(String::valueOf, String::valueOf, String::valueOf);
-            final String port = arg.getOrDefault(Any2.<Integer, String>right("port"), Any3.create2(9999)).mapCombine(String::valueOf, String::valueOf, String::valueOf);
+        public GroupGenerator create(NamedResolverMap arg) throws Exception {
+            final String host = arg.getStringOrDefault("host", "localhost");
+            String port;
+            try {
+                port = Integer.toString(arg.getIntegerOrDefault("port", 9999));
+            } catch (IllegalArgumentException ex) {
+                port = arg.getString("port");  // Backwards compatibility: port used to be a string.
+            }
 
-            final List<String> sublist = NameBoundResolver.indexToStringMap(arg).entrySet().stream()
-                    .sorted(Comparator.comparing(Map.Entry::getKey))
-                    .map(Map.Entry::getValue)
-                    .collect(Collectors.toList());
-            final Tags tags = Tags.valueOf(NameBoundResolver.tagMap(arg));
-
-            MetricListener listener = new MetricListener(new JmxClient("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi"), includes, sublist, tags);
+            MetricListener listener = new MetricListener(new JmxClient("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi"), includes, arg);
             listener.enable();
             return listener;
         }

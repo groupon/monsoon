@@ -33,18 +33,14 @@ package com.groupon.lex.metrics.collector.httpget;
 
 import com.groupon.lex.metrics.lib.StringTemplate;
 import com.groupon.lex.metrics.GroupName;
-import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.lib.Any2;
-import com.groupon.lex.metrics.lib.Any3;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
-import java.util.Comparator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.NonNull;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import lombok.Getter;
 
 /**
@@ -68,19 +64,9 @@ public class UrlPattern {
         this(StringTemplate.fromString(urlTemplate), templateArgs);
     }
 
-    private Map.Entry<GroupName, String> apply_args_(Map<Any2<Integer, String>, Any3<Boolean, Integer, String>> args) {
-        final Map<Any2<Integer, String>, String> stringArgs = args.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().mapCombine(String::valueOf, String::valueOf, String::valueOf)));
-        final SimpleGroupPath path = SimpleGroupPath.valueOf(stringArgs.entrySet().stream()
-                .map(e -> e.getKey().getLeft().map(k -> SimpleMapEntry.create(k, e.getValue())))
-                .flatMap(o -> o.map(Stream::of).orElseGet(Stream::empty))
-                .sorted(Comparator.comparing(Entry::getKey))
-                .map(Entry::getValue)
-                .collect(Collectors.toList()));
-        final Stream<Entry<String, MetricValue>> tagMap = args.entrySet().stream()
-                .map(e -> e.getKey().getRight().map(k -> SimpleMapEntry.create(k, e.getValue().mapCombine(MetricValue::fromBoolean, MetricValue::fromIntValue, MetricValue::fromStrValue))))
-                .flatMap(o -> o.map(Stream::of).orElseGet(Stream::empty));
-        return SimpleMapEntry.create(GroupName.valueOf(path, tagMap), urlTemplate.apply(stringArgs));
+    private Map.Entry<GroupName, String> apply_args_(NamedResolverMap args) {
+        final Map<Any2<Integer, String>, String> stringArgs = args.getStringMap();
+        return SimpleMapEntry.create(args.getGroupName(), urlTemplate.apply(stringArgs));
     }
 
     public Stream<Map.Entry<GroupName, String>> getUrls() throws Exception {
@@ -89,5 +75,7 @@ public class UrlPattern {
     }
 
     @Override
-    public String toString() { return urlTemplate.toString(); }
+    public String toString() {
+        return urlTemplate.toString();
+    }
 }

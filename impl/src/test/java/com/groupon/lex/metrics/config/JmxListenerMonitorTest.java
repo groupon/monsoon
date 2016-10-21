@@ -32,17 +32,19 @@
 package com.groupon.lex.metrics.config;
 
 import com.groupon.lex.metrics.GroupGenerator;
+import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.jmx.JmxBuilder;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.Any3;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.EMPTY_LIST;
-import static java.util.Collections.EMPTY_MAP;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import java.util.HashMap;
@@ -85,7 +87,9 @@ public class JmxListenerMonitorTest {
 
     private Set<ObjectName> one_name, two_names;
     private CollectorBuilderWrapper mon_oneName, mon_twoNames;
-    /** mri.add(GroupGenerator) adds to this collection. */
+    /**
+     * mri.add(GroupGenerator) adds to this collection.
+     */
     private List<GroupGenerator> listeners;
 
     private static JmxBuilder newJmxBuilder(Set<ObjectName> names, NameBoundResolver resolver) {
@@ -98,10 +102,12 @@ public class JmxListenerMonitorTest {
     @Before
     public void setup() throws Exception {
         one_name = singleton(new ObjectName("java.lang.*:*"));
-        two_names = new HashSet<ObjectName>() {{
-            add(new ObjectName("java.lang.*:*"));
-            add(new ObjectName("com.groupon.*:*"));
-        }};
+        two_names = new HashSet<ObjectName>() {
+            {
+                add(new ObjectName("java.lang.*:*"));
+                add(new ObjectName("com.groupon.*:*"));
+            }
+        };
 
         mon_oneName = new CollectorBuilderWrapper("jmx_listener", newJmxBuilder(one_name, nbr));
         mon_twoNames = new CollectorBuilderWrapper("jmx_listener", newJmxBuilder(two_names, nbr));
@@ -175,7 +181,7 @@ public class JmxListenerMonitorTest {
 
     @Test
     public void apply_oneName_noNBR() throws Exception {
-        when(nbr.resolve()).then(invocation -> Stream.of(EMPTY_MAP));
+        when(nbr.resolve()).then(invocation -> Stream.of(NamedResolverMap.EMPTY));
 
         mon_oneName.apply(mri);
         listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
@@ -193,7 +199,7 @@ public class JmxListenerMonitorTest {
 
     @Test
     public void apply_twoNames_noNBR() throws Exception {
-        when(nbr.resolve()).then(invocation -> Stream.of(EMPTY_MAP));
+        when(nbr.resolve()).then(invocation -> Stream.of(NamedResolverMap.EMPTY));
 
         mon_twoNames.apply(mri);
         listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
@@ -212,16 +218,21 @@ public class JmxListenerMonitorTest {
     @Test
     public void apply_oneName_withNBR() throws Exception {
         when(nbr.resolve()).then(invocation -> Stream.of(
-                new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {{
-                    put(Any2.right("host"), Any3.create3("other.host"));
-                    put(Any2.right("port"), Any3.create2(99));
-                    put(Any2.right("extra_tag"), Any3.create3("foobar"));
-                }},
-                new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {{
-                    put(Any2.right("host"), Any3.create3("localhost"));
-                    put(Any2.right("port"), Any3.create3("90"));
-                    put(Any2.right("extra_tag"), Any3.create1(true));
-                }}));
+                new NamedResolverMap(new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {
+                    {
+                        put(Any2.right("host"), Any3.create3("other.host"));
+                        put(Any2.right("port"), Any3.create2(99));
+                        put(Any2.right("extra_tag"), Any3.create3("foobar"));
+                    }
+                }),
+                new NamedResolverMap(new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {
+                    {
+                        put(Any2.right("host"), Any3.create3("localhost"));
+                        put(Any2.right("port"), Any3.create3("90"));
+                        put(Any2.right("extra_tag"), Any3.create1(true));
+                    }
+                })
+        ));
 
         mon_oneName.apply(mri);
         listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
@@ -229,16 +240,20 @@ public class JmxListenerMonitorTest {
         assertThat(listeners,
                 contains(
                         Matchers.hasProperty("currentGenerators", containsInAnyOrder(
-                                listener("other.host", "99", one_name, EMPTY_LIST, Tags.valueOf(new HashMap<String, MetricValue>() {{
-                                    put("host", MetricValue.fromStrValue("other.host"));
-                                    put("port", MetricValue.fromIntValue(99));
-                                    put("extra_tag", MetricValue.fromStrValue("foobar"));
-                                }})),
-                                listener("localhost", "90", one_name, EMPTY_LIST, Tags.valueOf(new HashMap<String, MetricValue>() {{
-                                    put("host", MetricValue.fromStrValue("localhost"));
-                                    put("port", MetricValue.fromStrValue("90"));
-                                    put("extra_tag", MetricValue.TRUE);
-                                }}))
+                                listener("other.host", "99", one_name, EMPTY_LIST, Tags.valueOf(new HashMap<String, MetricValue>() {
+                                    {
+                                        put("host", MetricValue.fromStrValue("other.host"));
+                                        put("port", MetricValue.fromIntValue(99));
+                                        put("extra_tag", MetricValue.fromStrValue("foobar"));
+                                    }
+                                })),
+                                listener("localhost", "90", one_name, EMPTY_LIST, Tags.valueOf(new HashMap<String, MetricValue>() {
+                                    {
+                                        put("host", MetricValue.fromStrValue("localhost"));
+                                        put("port", MetricValue.fromStrValue("90"));
+                                        put("extra_tag", MetricValue.TRUE);
+                                    }
+                                }))
                         ))
                 ));
 
@@ -251,16 +266,21 @@ public class JmxListenerMonitorTest {
     @Test
     public void apply_twoNames_withNBR() throws Exception {
         when(nbr.resolve()).then(invocation -> Stream.of(
-                new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {{
-                    put(Any2.right("host"), Any3.create3("other.host"));
-                    put(Any2.right("port"), Any3.create2(99));
-                    put(Any2.left(0), Any3.create3("foobar"));
-                }},
-                new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {{
-                    put(Any2.right("host"), Any3.create3("localhost"));
-                    put(Any2.right("port"), Any3.create3("90"));
-                    put(Any2.left(0), Any3.create3("foobar"));
-                }}));
+                new NamedResolverMap(new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {
+                    {
+                        put(Any2.right("host"), Any3.create3("other.host"));
+                        put(Any2.right("port"), Any3.create2(99));
+                        put(Any2.left(0), Any3.create3("foobar"));
+                    }
+                }),
+                new NamedResolverMap(new HashMap<Any2<Integer, String>, Any3<Boolean, Integer, String>>() {
+                    {
+                        put(Any2.right("host"), Any3.create3("localhost"));
+                        put(Any2.right("port"), Any3.create3("90"));
+                        put(Any2.left(0), Any3.create3("foobar"));
+                    }
+                })
+        ));
 
         mon_twoNames.apply(mri);
         listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
@@ -268,14 +288,18 @@ public class JmxListenerMonitorTest {
         assertThat(listeners,
                 contains(
                         Matchers.hasProperty("currentGenerators", containsInAnyOrder(
-                                listener("other.host", "99", two_names, singletonList("foobar"), Tags.valueOf(new HashMap<String, MetricValue>() {{
-                                    put("host", MetricValue.fromStrValue("other.host"));
-                                    put("port", MetricValue.fromIntValue(99));
-                                }})),
-                                listener("localhost", "90", two_names, singletonList("foobar"), Tags.valueOf(new HashMap<String, MetricValue>() {{
-                                    put("host", MetricValue.fromStrValue("localhost"));
-                                    put("port", MetricValue.fromStrValue("90"));
-                                }}))
+                                listener("other.host", "99", two_names, singletonList("foobar"), Tags.valueOf(new HashMap<String, MetricValue>() {
+                                    {
+                                        put("host", MetricValue.fromStrValue("other.host"));
+                                        put("port", MetricValue.fromIntValue(99));
+                                    }
+                                })),
+                                listener("localhost", "90", two_names, singletonList("foobar"), Tags.valueOf(new HashMap<String, MetricValue>() {
+                                    {
+                                        put("host", MetricValue.fromStrValue("localhost"));
+                                        put("port", MetricValue.fromStrValue("90"));
+                                    }
+                                }))
                         ))
                 ));
 
@@ -285,7 +309,9 @@ public class JmxListenerMonitorTest {
         verifyNoMoreInteractions(mri, nbr);
     }
 
-    /** Create a Matcher for a listener, checking several properties. */
+    /**
+     * Create a Matcher for a listener, checking several properties.
+     */
     private static Matcher<GroupGenerator> listener(String host, String port, Collection<ObjectName> filter, List<String> subPath, Tags tags) throws Exception {
         final Collection<Matcher<? super ObjectName>> filterMatchers = filter.stream()
                 .map(objName -> Matchers.equalTo(objName))
@@ -295,9 +321,8 @@ public class JmxListenerMonitorTest {
                 Matchers.hasProperty("jmxUrl", Matchers.equalTo(Optional.of(new JMXServiceURL("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi")))));
         final Matcher<Object> filterProperty = Matchers.hasProperty("filter", Matchers.<ObjectName>arrayContainingInAnyOrder(filterMatchers));
         final Matcher<Object> enabled = Matchers.hasProperty("enabled", Matchers.equalTo(true));
-        final Matcher<Object> subPathProperty = Matchers.hasProperty("subPath", Matchers.equalTo(subPath));
-        final Matcher<Object> tagProperty = Matchers.hasProperty("tags", Matchers.equalTo(tags));
+        final Matcher<Object> resolvedMap = Matchers.hasProperty("resolvedMap", Matchers.hasProperty("groupName", Matchers.equalTo(GroupName.valueOf(SimpleGroupPath.valueOf(subPath), tags))));
 
-        return Matchers.allOf(jmxUrl, filterProperty, enabled, subPathProperty, tagProperty);
+        return Matchers.allOf(jmxUrl, filterProperty, enabled, resolvedMap);
     }
 }
