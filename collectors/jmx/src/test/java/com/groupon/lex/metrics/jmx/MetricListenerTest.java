@@ -48,32 +48,38 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 import static org.hamcrest.Matchers.arrayContainingInAnyOrder;
 import static org.hamcrest.Matchers.contains;
+import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  *
  * @author ariane
  */
-public class MetricListenerInstanceTest {
+public class MetricListenerTest {
     private static final AtomicInteger SEQUENCE = new AtomicInteger();  // To help us create unique names for each test.
     private int seqno;
-    /** Group name prefix used during test. */
+    /**
+     * Group name prefix used during test.
+     */
     private String PREFIX;
-    /** Group name prefix that does not match this test. */
+    /**
+     * Group name prefix that does not match this test.
+     */
     private String NOT_PREFIX;
     private Function<Map<String, MetricValue>, GroupName> GROUP_PATH;
-    /** JMX client instance. */
+    /**
+     * JMX client instance.
+     */
     private JmxClient jmx;
 
-    private MetricListenerInstance listener;
+    private MetricListener listener;
 
     @Before
     public void setup() throws Exception {
@@ -83,16 +89,18 @@ public class MetricListenerInstanceTest {
         GROUP_PATH = new Function<Map<String, MetricValue>, GroupName>() {
             public GroupName apply(Map<String, MetricValue> extra_tags) {
                 return GroupName.valueOf(SimpleGroupPath.valueOf("com", "groupon", "lex", "metrics", "jmx", "MetricListenerInstanceTest"),
-                    new HashMap<String, MetricValue>() {{
+                        new HashMap<String, MetricValue>() {
+                    {
                         put("seq", MetricValue.fromIntValue(seqno));
                         putAll(extra_tags);
-                    }});
+                    }
+                });
             }
         };
 
         jmx = new JmxClient();
 
-        listener = new MetricListenerInstance(jmx, singleton(new ObjectName(PREFIX + "*")), EMPTY_LIST, Tags.EMPTY);
+        listener = new MetricListener(jmx, singleton(new ObjectName(PREFIX + "*")), EMPTY_LIST, Tags.EMPTY);
     }
 
     @After
@@ -120,7 +128,9 @@ public class MetricListenerInstanceTest {
 
     @Test
     public void run_with_something_found() throws Exception {
-        /** Test value that is exposed on local JMX. */
+        /**
+         * Test value that is exposed on local JMX.
+         */
         final TestValueImpl test_value = new TestValueImpl();
 
         final GroupGenerator.GroupCollection groups;
@@ -132,7 +142,9 @@ public class MetricListenerInstanceTest {
             assertTrue(groups.isSuccessful());
             assertFalse(groups.getGroups().isEmpty());
 
-            /** Convenience conversion for testing. */
+            /**
+             * Convenience conversion for testing.
+             */
             List<GroupName> names = groups.getGroups().stream()
                     .map(MetricGroup::getName)
                     .collect(Collectors.toList());
@@ -145,7 +157,9 @@ public class MetricListenerInstanceTest {
 
     @Test
     public void run_with_something_found_after_first_collection() throws Exception {
-        /** Test value that is exposed on local JMX. */
+        /**
+         * Test value that is exposed on local JMX.
+         */
         final TestValueImpl test_value = new TestValueImpl();
         GroupGenerator.GroupCollection groups;
 
@@ -161,7 +175,9 @@ public class MetricListenerInstanceTest {
             assertTrue(groups.isSuccessful());
             assertFalse(groups.getGroups().isEmpty());
 
-            /** Convenience conversion for testing. */
+            /**
+             * Convenience conversion for testing.
+             */
             List<GroupName> names = groups.getGroups().stream()
                     .map(MetricGroup::getName)
                     .collect(Collectors.toList());
@@ -174,7 +190,9 @@ public class MetricListenerInstanceTest {
 
     @Test
     public void find_nothing_when_disabled() throws Exception {
-        /** Test value that is exposed on local JMX. */
+        /**
+         * Test value that is exposed on local JMX.
+         */
         final TestValueImpl test_value = new TestValueImpl();
 
         GroupGenerator.GroupCollection groups;
@@ -196,7 +214,9 @@ public class MetricListenerInstanceTest {
 
     @Test
     public void filter_works() throws Exception {
-        /** Test value that is exposed on local JMX. */
+        /**
+         * Test value that is exposed on local JMX.
+         */
         final TestValueImpl test_value = new TestValueImpl();
 
         final GroupGenerator.GroupCollection groups;

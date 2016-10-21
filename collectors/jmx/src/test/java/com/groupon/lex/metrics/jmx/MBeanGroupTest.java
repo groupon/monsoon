@@ -61,16 +61,24 @@ import org.junit.Test;
  *
  * @author ariane
  */
-public class MBeanGroupInstanceTest {
+public class MBeanGroupTest {
     private static final AtomicInteger sequence = new AtomicInteger();  // To help us create unique names for each test.
     private int seqno;
-    /** JMX name under which test value is exposed. */
+    /**
+     * JMX name under which test value is exposed.
+     */
     private ObjectName obj_name;
-    /** Test value that is exposed on local JMX. */
+    /**
+     * Test value that is exposed on local JMX.
+     */
     private final TestValueImpl test_value = new TestValueImpl();
-    /** JMX client instance. */
+    /**
+     * JMX client instance.
+     */
     private JmxClient jmx;
-    /** Groupname under which test value is recorded. */
+    /**
+     * Groupname under which test value is recorded.
+     */
     private GroupName groupname;
 
     @Before
@@ -78,13 +86,15 @@ public class MBeanGroupInstanceTest {
         seqno = sequence.getAndIncrement();
         groupname = GroupName.valueOf(
                 SimpleGroupPath.valueOf("com", "groupon", "lex", "metrics", "jmx", "MBeanGroupInstanceTest"),
-                new HashMap<String, MetricValue>() {{
-                    put("seq", MetricValue.fromIntValue(seqno));
-                    put("booltag", MetricValue.FALSE);
-                    put("inttag", MetricValue.fromIntValue(17));
-                    put("dbltag", MetricValue.fromDblValue(19.0));
-                    put("strtag", MetricValue.fromStrValue("str"));
-                }});
+                new HashMap<String, MetricValue>() {
+            {
+                put("seq", MetricValue.fromIntValue(seqno));
+                put("booltag", MetricValue.FALSE);
+                put("inttag", MetricValue.fromIntValue(17));
+                put("dbltag", MetricValue.fromDblValue(19.0));
+                put("strtag", MetricValue.fromStrValue("str"));
+            }
+        });
 
         obj_name = new ObjectName("com.groupon.lex.metrics.jmx:type=MBeanGroupInstanceTest,seq=" + seqno + ",booltag=false,inttag=17,dbltag=19.0,strtag=str");
         ManagementFactory.getPlatformMBeanServer().registerMBean(test_value, obj_name);
@@ -99,12 +109,12 @@ public class MBeanGroupInstanceTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void pattern_not_allowed() throws Exception {
-        new MBeanGroupInstance(jmx, new ObjectName("com.groupon.lex.metrics.jmx:type=MBeanGroupInstanceTest,*"), EMPTY_LIST, Tags.EMPTY);
+        new MBeanGroup(jmx, new ObjectName("com.groupon.lex.metrics.jmx:type=MBeanGroupInstanceTest,*"), EMPTY_LIST, Tags.EMPTY);
     }
 
     @Test
     public void read() throws Exception {
-        final MBeanGroupInstance mbg = new MBeanGroupInstance(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
         test_value.setBoolval(true);
         test_value.setIntval(7);
         test_value.setStringval("foobar");
@@ -112,7 +122,9 @@ public class MBeanGroupInstanceTest {
 
         Metric[] metrics = mbg.getMetrics().get().getMetrics();
 
-        /** Create metrics map for easy test asserting. */
+        /**
+         * Create metrics map for easy test asserting.
+         */
         Map<MetricName, MetricValue> metrics_map = Arrays.stream(metrics).collect(Collectors.toMap(Metric::getName, Metric::getValue));
         assertThat(metrics_map, allOf(
                 hasEntry(MetricName.valueOf("Boolval"), MetricValue.TRUE),
@@ -123,14 +135,14 @@ public class MBeanGroupInstanceTest {
 
     @Test
     public void remembers_objname() {
-        final MBeanGroupInstance mbg = new MBeanGroupInstance(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
 
         assertEquals(obj_name, mbg.getMonitoredMBeanName());
     }
 
     @Test
     public void properties() {
-        final MBeanGroupInstance mbg = new MBeanGroupInstance(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
 
         assertThat(mbg.getMonitoredProperties(),
                 arrayContainingInAnyOrder("Boolval", "Intval", "Stringval", "Nested.dblval"));
@@ -138,7 +150,7 @@ public class MBeanGroupInstanceTest {
 
     @Test
     public void groupname() {
-        final MBeanGroupInstance mbg = new MBeanGroupInstance(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, EMPTY_LIST, Tags.EMPTY);
 
         assertEquals(groupname, mbg.getName());
     }
@@ -147,7 +159,7 @@ public class MBeanGroupInstanceTest {
     public void groupname_with_tags() {
         Tags extra_tags = Tags.valueOf(singletonMap("foo", MetricValue.fromStrValue("bar")));
         GroupName expected_groupname = GroupName.valueOf(groupname.getPath(), Tags.valueOf(Stream.concat(groupname.getTags().stream(), extra_tags.stream())));
-        final MBeanGroupInstance mbg = new MBeanGroupInstance(jmx, obj_name, EMPTY_LIST, extra_tags);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, EMPTY_LIST, extra_tags);
 
         assertEquals(expected_groupname, mbg.getName());
     }
@@ -156,7 +168,7 @@ public class MBeanGroupInstanceTest {
     public void groupname_with_subpath() {
         SimpleGroupPath expected_path = SimpleGroupPath.valueOf(Stream.concat(groupname.getPath().getPath().stream(), Stream.of("foo")).collect(Collectors.toList()));
         GroupName expected_groupname = GroupName.valueOf(expected_path, groupname.getTags());
-        final MBeanGroupInstance mbg = new MBeanGroupInstance(jmx, obj_name, singletonList("foo"), Tags.EMPTY);
+        final MBeanGroup mbg = new MBeanGroup(jmx, obj_name, singletonList("foo"), Tags.EMPTY);
 
         assertEquals(expected_groupname, mbg.getName());
     }
