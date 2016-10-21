@@ -44,7 +44,6 @@ import javax.management.MBeanServerConnection;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
-import lombok.Getter;
 import lombok.NonNull;
 
 /**
@@ -57,7 +56,6 @@ public class JmxClient implements AutoCloseable {
     }
 
     private static final Logger LOG = Logger.getLogger(JmxClient.class.getName());
-    @Getter
     private final JMXServiceURL jmxUrl;  // May be null.
     private JMXConnector jmxFactory;  // May be null.
     private MBeanServerConnection conn;  // conn == null -> connection needs recovery
@@ -144,6 +142,16 @@ public class JmxClient implements AutoCloseable {
      */
     public JmxClient(String connection_url) throws MalformedURLException, IOException {
         this(connection_url, false);
+    }
+
+    /**
+     * The JMX URL that this connector connects to. Optional.empty() represents
+     * the JMX server in the local JVM.
+     *
+     * @return the JMX URL that this connector connects to.
+     */
+    public Optional<JMXServiceURL> getJmxUrl() {
+        return Optional.ofNullable(jmxUrl);
     }
 
     /**
