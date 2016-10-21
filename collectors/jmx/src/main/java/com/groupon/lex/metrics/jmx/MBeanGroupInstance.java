@@ -71,7 +71,7 @@ import org.joda.time.Duration;
  * @author ariane
  */
 public class MBeanGroupInstance implements MBeanGroup {
-    private static final Logger logger = Logger.getLogger(MBeanGroupInstance.class.getName());
+    private static final Logger LOG = Logger.getLogger(MBeanGroupInstance.class.getName());
     private static final Duration SILENCE_EXCEPTION_LOG = Duration.standardHours(4);
     private final Map<String, DateTime> last_exception_log_ = new HashMap<>();
 
@@ -179,18 +179,18 @@ public class MBeanGroupInstance implements MBeanGroup {
             /* Don't spam continuously this error, just emit it every once in a while. */
             final DateTime now_ts = DateTime.now(DateTimeZone.UTC);
             if (new Duration(last_exception_log, now_ts).isLongerThan(SILENCE_EXCEPTION_LOG)) {
-                logger.log(Level.WARNING, "exception while reading property, skipping", ex.getCause());
+                LOG.log(Level.WARNING, "exception while reading property, skipping", ex.getCause());
                 last_exception_log_.put(attribute, now_ts);
             }
             return Stream.empty();
         } catch (AttributeNotFoundException ex) {
-            logger.log(Level.WARNING, "MBean present, but property not found, skipping");
+            LOG.log(Level.WARNING, "MBean present, but property not found, skipping");
             return Stream.empty();
         } catch (InstanceNotFoundException ex) {
-            logger.log(Level.WARNING, "MBean not present, skipping");
+            LOG.log(Level.WARNING, "MBean not present, skipping");
             return Stream.empty();
         } catch (ReflectionException ex) {
-            logger.log(Level.WARNING, "exception invoking the setter (huh?)", ex);
+            LOG.log(Level.WARNING, "exception invoking the setter (huh?)", ex);
             return Stream.empty();
         }
 
@@ -204,7 +204,7 @@ public class MBeanGroupInstance implements MBeanGroup {
         } catch (InstanceNotFoundException ex) {
             return Optional.empty();
         } catch (IntrospectionException | ReflectionException | IOException ex) {
-            logger.log(Level.WARNING, "failed to load properties on " + obj_name_, ex);
+            LOG.log(Level.WARNING, "failed to load properties on " + obj_name_, ex);
             return Optional.empty();
         }
 

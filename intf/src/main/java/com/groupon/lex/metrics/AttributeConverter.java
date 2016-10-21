@@ -56,7 +56,7 @@ public class AttributeConverter {
          * Handle null values.
          */
         if (attrObj == null) {
-            LOG.log(Level.WARNING, "expected a {0} or {1}, but got null", new Object[]{Number.class.getName(), String.class.getName()});
+            LOG.log(Level.FINE, "expected a {0} or {1}, but got null", new Object[]{Number.class.getName(), String.class.getName()});
             return Stream.empty();
         }
 
@@ -100,7 +100,7 @@ public class AttributeConverter {
          * try to handle a collection type, by failing it.
          */
         if (attrObj instanceof Collection) {
-            LOG.log(Level.WARNING, "expected a {0} or {1}, but got a Collection: {2}", new Object[]{Number.class.getName(), String.class.getName(), attrObj.getClass().getName()});
+            LOG.log(Level.FINE, "expected a {0} or {1}, but got a Collection: {2}", new Object[]{Number.class.getName(), String.class.getName(), attrObj.getClass().getName()});
             return Stream.empty();
         }
 
@@ -115,7 +115,7 @@ public class AttributeConverter {
          * Step 5:
          * return an empty Optional if the value is null.
          */
-        LOG.log(Level.WARNING, "{1}: measured unparsable value {1}", new Object[]{attrPath, attrObj});
+        LOG.log(Level.FINE, "{1}: measured unparsable value {1}", new Object[]{attrPath, attrObj});
         return Stream.empty();
     }
 
