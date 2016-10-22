@@ -155,16 +155,14 @@ public class JmxClient implements AutoCloseable {
      * connection creation, cancel the future with the interruption flag set to
      * true.
      */
-    public synchronized CompletableFuture<MBeanServerConnection> getConnection(Executor threadpool) {
-        {
-            Optional<MBeanServerConnection> optionalConnection = getOptionalConnection();
-            if (optionalConnection.isPresent())
-                return CompletableFuture.completedFuture(optionalConnection.get());
-        }
-
+    public CompletableFuture<MBeanServerConnection> getConnection(Executor threadpool) {
         return CompletableFuture.supplyAsync(
                 () -> {
                     synchronized (this) {
+                        Optional<MBeanServerConnection> optionalConnection = getOptionalConnection();
+                        if (optionalConnection.isPresent())
+                            return optionalConnection.get();
+
                         try {
                             /* Re-create factory, because apparently they cannot re-create a broken connection. */
                             if (jmxUrl.isPresent())
