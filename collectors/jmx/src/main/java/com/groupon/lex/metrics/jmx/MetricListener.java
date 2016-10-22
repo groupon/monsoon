@@ -218,7 +218,7 @@ public class MetricListener implements GroupGenerator {
     }
 
     @Override
-    public synchronized Collection<CompletableFuture<? extends Collection<? extends MetricGroup>>> getGroups(Executor threadpool, CompletableFuture<TimeoutObject> timeout) {
+    public Collection<CompletableFuture<? extends Collection<? extends MetricGroup>>> getGroups(Executor threadpool, CompletableFuture<TimeoutObject> timeout) {
         /*
          * Force the connection to open, even if there are no groups to scan.
          *
@@ -232,13 +232,16 @@ public class MetricListener implements GroupGenerator {
                             if (conn == null)
                                 throw new RuntimeException("connection unavailable");
 
-                            List<MetricGroup> result = new ArrayList<>();
-                            for (MBeanGroup group : detected_groups_.values()) {
-                                if (timeout.isDone())
-                                    throw new RuntimeException("timed out");
-                                group.getMetrics(conn).ifPresent(result::add);
+                            synchronized (this) {
+                                List<MetricGroup> result = new ArrayList<>();
+                                for (MBeanGroup group
+                                     : detected_groups_.values()) {
+                                    if (timeout.isDone())
+                                        throw new RuntimeException("timed out");
+                                    group.getMetrics(conn).ifPresent(result::add);
+                                }
+                                return result;
                             }
-                            return result;
                         },
                         threadpool);
         timeout.thenAccept(timeoutObject -> future.cancel(true));

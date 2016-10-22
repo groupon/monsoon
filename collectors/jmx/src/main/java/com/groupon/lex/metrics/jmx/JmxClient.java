@@ -81,25 +81,41 @@ public class JmxClient implements AutoCloseable {
      * @throws IOException if the connection cannot be established
      */
     public JmxClient(JMXServiceURL connection_url) throws IOException {
+        this(connection_url, false);
+    }
+
+    /**
+     * Create a new client, connecting to the specified URL.
+     *
+     * @param connection_url the JMX server URL
+     * @param lazy if set, connection creation will be deferred
+     * @throws IOException if the connection cannot be established
+     */
+    public JmxClient(JMXServiceURL connection_url, boolean lazy) throws IOException {
         jmxUrl = Optional.of(connection_url);
         jmx_factory_ = Optional.of(JMXConnectorFactory.newJMXConnector(jmxUrl.get(), null));
-        try {
-            jmx_factory_.get().connect();
-        } catch (IOException ex) {
-            LOG.log(Level.WARNING, "unable to connect");
+        if (lazy) {
             conn_ = null;
-        }
-        try {
-            conn_ = jmx_factory_.get().getMBeanServerConnection();
-        } catch (IOException ex) {
-            LOG.log(Level.WARNING, "unable to connect");
+        } else {
             try {
-                jmx_factory_.get().close();
-            } catch (IOException ex1) {
-                LOG.log(Level.WARNING, "unable to close failed connection attempt", ex1);
-                /* Eat exception. */
+                jmx_factory_.get().connect();
+            } catch (IOException ex) {
+                LOG.log(Level.WARNING, "unable to connect");
+                conn_ = null;
+                return;
             }
-            conn_ = null;
+            try {
+                conn_ = jmx_factory_.get().getMBeanServerConnection();
+            } catch (IOException ex) {
+                LOG.log(Level.WARNING, "unable to connect");
+                try {
+                    jmx_factory_.get().close();
+                } catch (IOException ex1) {
+                    LOG.log(Level.WARNING, "unable to close failed connection attempt", ex1);
+                    /* Eat exception. */
+                }
+                conn_ = null;
+            }
         }
     }
 
@@ -113,6 +129,19 @@ public class JmxClient implements AutoCloseable {
      */
     public JmxClient(String connection_url) throws MalformedURLException, IOException {
         this(new JMXServiceURL(connection_url));
+    }
+
+    /**
+     * Create a new client, connecting to the specified URL.
+     *
+     * @param connection_url the JMX server URL, example:
+     * "service:jmx:rmi:///jndi/rmi://:9999/jmxrmi"
+     * @param lazy if set, connection creation will be deferred
+     * @throws MalformedURLException if the JMX URL is invalid
+     * @throws IOException if the connection cannot be established
+     */
+    public JmxClient(String connection_url, boolean lazy) throws MalformedURLException, IOException {
+        this(new JMXServiceURL(connection_url), lazy);
     }
 
     /**
