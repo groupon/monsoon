@@ -46,7 +46,6 @@ import org.hamcrest.Matchers;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 import org.junit.Rule;
 import org.junit.Test;
 import org.mockserver.client.server.MockServerClient;
@@ -55,34 +54,52 @@ import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
 import org.mockserver.verify.VerificationTimes;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.junit.After;
+import org.junit.Before;
 
 /**
  *
  * @author ariane
  */
 public class UrlJsonCollectorTest {
-    private static final String JSON =
-            "{" +
-            "  \"bool\": true," +
-            "  \"int\": 7," +
-            "  \"dbl\": 3.1415," +
-            "  \"map\": { \"key\": \"value\" }," +
-            "  \"list\": [ \"item\" ]," +
-            "  \"null\": null," +
-            "  \"str\": \"foobar\"" +
-            "}";
+    private static final String JSON
+            = "{"
+            + "  \"bool\": true,"
+            + "  \"int\": 7,"
+            + "  \"dbl\": 3.1415,"
+            + "  \"map\": { \"key\": \"value\" },"
+            + "  \"list\": [ \"item\" ],"
+            + "  \"null\": null,"
+            + "  \"str\": \"foobar\""
+            + "}";
 
     @Rule
     public MockServerRule mockServerRule = new MockServerRule(this);
 
     private MockServerClient mockServerClient;
 
+    private ExecutorService threadpool;
+
     private UrlJsonCollector endpoint(String path) {
         return new UrlJsonCollector(SimpleGroupPath.valueOf("test"), new UrlPattern(StringTemplate.fromString("http://localhost:" + mockServerRule.getPort() + path), NameBoundResolver.EMPTY));
     }
 
+    @Before
+    public void setup() {
+        threadpool = Executors.newSingleThreadExecutor();
+    }
+
+    @After
+    public void cleanup() {
+        threadpool.shutdownNow();
+    }
+
     @Test(timeout = 10000)
-    public void scrape() {
+    public void scrape() throws Exception {
         final HttpRequest REQUEST = HttpRequest.request("/json_scrape")
                 .withMethod("GET");
         final UrlJsonCollector collector = endpoint("/json_scrape");
@@ -90,20 +107,19 @@ public class UrlJsonCollectorTest {
                 .when(REQUEST)
                 .respond(HttpResponse.response(JSON));
 
-        GroupGenerator.GroupCollection groups = collector.getGroups();
+        Collection<MetricGroup> groups = GroupGenerator.deref(collector.getGroups(threadpool, new CompletableFuture<>()));
         mockServerClient.verify(REQUEST, VerificationTimes.once());
-        assertTrue(groups.isSuccessful());
 
-        assertThat(groups.getGroups().stream().map(MetricGroup::getName).collect(Collectors.toList()),
+        assertThat(groups.stream().map(MetricGroup::getName).collect(Collectors.toList()),
                 Matchers.contains(GroupName.valueOf("test")));
 
         // Verify data in test_group.
-        final Map<MetricName, MetricValue> metrics = Arrays.stream(groups.getGroups().stream()
-                        .filter(mg -> mg.getName().equals(GroupName.valueOf("test")))
-                        .findFirst()
-                        .get()
-                        .getMetrics()
-                )
+        final Map<MetricName, MetricValue> metrics = Arrays.stream(groups.stream()
+                .filter(mg -> mg.getName().equals(GroupName.valueOf("test")))
+                .findFirst()
+                .get()
+                .getMetrics()
+        )
                 .collect(Collectors.toMap(Metric::getName, Metric::getValue));
         System.err.println(metrics);
         assertThat(metrics, allOf(
