@@ -25,8 +25,12 @@ public class DirCollectHistory extends AbstractCollectHistory<TSDataFileChain> {
         return TSDataFileChain.openDir(dir, max_filesize.orElse(TSDataFileChain.MAX_FILESIZE));
     }
 
+    private static long automaticFileSizeBasedOnDiskUsage(long diskUsage) {
+        return Long.max(64 * 1024 * 1024, diskUsage / 16);
+    }
+
     public DirCollectHistory(Path dir, Optional<Long> disk_usage_limit, Optional<Long> max_filesize) throws IOException {
-        super(scan_dir_(requireNonNull(dir), max_filesize));
+        super(scan_dir_(requireNonNull(dir), max_filesize.isPresent() ? max_filesize : disk_usage_limit.map(DirCollectHistory::automaticFileSizeBasedOnDiskUsage)));
         disk_usage_limit_ = requireNonNull(disk_usage_limit);
     }
 
