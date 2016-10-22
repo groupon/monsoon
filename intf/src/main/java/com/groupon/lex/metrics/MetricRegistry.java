@@ -40,20 +40,16 @@ import com.groupon.lex.metrics.httpd.EndpointRegistration;
 public interface MetricRegistry {
     /**
      * Returns the exposed API.
+     *
      * @return The exposed API.
      */
     public EndpointRegistration getApi();
 
     /**
-     * Return a list of all groups in the registry.
-     * @return All groups currently known by the MetricRegistry.
-     */
-    public GroupName[] getGroupNames();
-
-    /**
      * Tests if the metric registry has a configuration.
-     * @return True if the metric has a configuration,
-     *     or false if the metric registry is unconfigured/uses a default configuration.
+     *
+     * @return True if the metric has a configuration, or false if the metric
+     * registry is unconfigured/uses a default configuration.
      */
     public boolean hasConfig();
 }

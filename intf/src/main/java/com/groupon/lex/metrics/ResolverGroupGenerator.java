@@ -31,8 +31,6 @@
  */
 package com.groupon.lex.metrics;
 
-import static com.groupon.lex.metrics.GroupGenerator.failedResult;
-import static com.groupon.lex.metrics.GroupGenerator.successResult;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
 import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.util.ArrayList;
@@ -44,6 +42,8 @@ import java.util.List;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -74,15 +74,8 @@ public class ResolverGroupGenerator implements GroupGenerator {
     }
 
     @Override
-    public GroupCollection getGroups() {
-        final Set<NamedResolverMap> resolvedMaps;
-
-        try {
-            resolvedMaps = resolver.resolve().collect(Collectors.toSet());
-        } catch (Exception ex) {
-            LOG.log(Level.WARNING, "unable to resolve", ex);
-            return failedResult();
-        }
+    public Collection<CompletableFuture<? extends Collection<? extends MetricGroup>>> getGroups(Executor threadpool, CompletableFuture<TimeoutObject> timeout) throws Exception {
+        final Set<NamedResolverMap> resolvedMaps = resolver.resolve().collect(Collectors.toSet());
 
         // Close all generators that are not to run.
         final Iterator<Map.Entry<NamedResolverMap, GroupGenerator>> genIter = generators.entrySet().iterator();
@@ -91,11 +84,13 @@ public class ResolverGroupGenerator implements GroupGenerator {
             if (!resolvedMaps.contains(gen.getKey())) {
                 final GroupGenerator toBeClosed = gen.getValue();
                 genIter.remove();
-                try {
-                    toBeClosed.close();
-                } catch (Exception ex) {
-                    LOG.log(Level.WARNING, "unable to close " + toBeClosed, ex);
-                }
+                threadpool.execute(() -> {
+                    try {
+                        toBeClosed.close();
+                    } catch (Exception ex) {
+                        LOG.log(Level.WARNING, "unable to close " + toBeClosed, ex);
+                    }
+                });
             }
         }
 
@@ -106,21 +101,20 @@ public class ResolverGroupGenerator implements GroupGenerator {
                 generators.put(resolvedMap, requireNonNull(createGenerator.create(resolvedMap)));
             } catch (Exception ex) {
                 LOG.log(Level.WARNING, "unable to create generator", ex);
-                return failedResult();
+                throw ex;
             }
         }
 
         // Evaluate all generators.
-        final List<GroupCollection> results = new ArrayList<>(generators.size());
-        for (GroupGenerator generator : generators.values()) {
-            final GroupCollection groups = generator.getGroups();
-            if (!groups.isSuccessful()) return failedResult();
-            results.add(groups);
+        final List<CompletableFuture<? extends Collection<? extends MetricGroup>>> results = new ArrayList<>(generators.size());
+        try {
+            for (GroupGenerator generator : generators.values())
+                results.addAll(generator.getGroups(threadpool, timeout));
+        } catch (Exception ex) {
+            results.forEach(future -> future.cancel(false));
+            throw ex;
         }
-        return successResult(results.stream()
-                .map(GroupCollection::getGroups)
-                .flatMap(Collection::stream)
-                .collect(Collectors.toList()));
+        return results;
     }
 
     @Override

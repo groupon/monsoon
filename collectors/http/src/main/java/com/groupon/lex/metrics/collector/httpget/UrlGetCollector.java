@@ -32,8 +32,6 @@
 package com.groupon.lex.metrics.collector.httpget;
 
 import com.groupon.lex.metrics.GroupGenerator;
-import static com.groupon.lex.metrics.GroupGenerator.failedResult;
-import static com.groupon.lex.metrics.GroupGenerator.successResult;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
@@ -51,18 +49,18 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import static java.util.Collections.singleton;
 import java.util.List;
+import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.Getter;
 import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
@@ -73,8 +71,6 @@ import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.joda.time.Instant;
 import org.joda.time.Interval;
-import static java.util.Objects.requireNonNull;
-import lombok.Getter;
 
 /**
  *
@@ -127,7 +123,7 @@ public class UrlGetCollector implements GroupGenerator {
 
     private synchronized GCCloseable<CloseableHttpAsyncClient> httpClient() {
         GCCloseable<CloseableHttpAsyncClient> result = httpClient;
-        if (!result.get().isRunning())  // Reactor appears to spontaneously shut down.
+        if (!result.get().isRunning()) // Reactor appears to spontaneously shut down.
             httpClient = result = get_http_client_();
         return result;
     }
@@ -157,8 +153,10 @@ public class UrlGetCollector implements GroupGenerator {
         return Stream.empty();
     }
 
-    /** Generate metrics from response. */
-    private Stream<Metric> do_response_(Instant begin_ts, GroupName name, HttpResponse response) throws IOException {
+    /**
+     * Generate metrics from response.
+     */
+    private Stream<Metric> do_response_(Instant begin_ts, HttpResponse response) throws IOException {
         final Instant end_ts = Instant.now();  // Record end of operation.
 
         try (final InputStream entity_stream = response.getEntity().getContent()) {
@@ -186,71 +184,71 @@ public class UrlGetCollector implements GroupGenerator {
             final Stream<SimpleMetric> response_stream = Stream.of(
                     new SimpleMetric(MN_STATUS_CODE,
                             Optional.ofNullable(response.getStatusLine().getStatusCode())
-                                    .map(MetricValue::fromIntValue)
-                                    .orElse(MetricValue.EMPTY)),
+                            .map(MetricValue::fromIntValue)
+                            .orElse(MetricValue.EMPTY)),
                     new SimpleMetric(MN_STATUS_LINE,
                             Optional.ofNullable(response.getStatusLine().getReasonPhrase())
-                                    .map(MetricValue::fromStrValue)
-                                    .orElse(MetricValue.EMPTY)),
+                            .map(MetricValue::fromStrValue)
+                            .orElse(MetricValue.EMPTY)),
                     new SimpleMetric(MN_PROTOCOL_NAME,
                             Optional.ofNullable(response.getProtocolVersion().getProtocol())
-                                    .map(MetricValue::fromStrValue)
-                                    .orElse(MetricValue.EMPTY)),
+                            .map(MetricValue::fromStrValue)
+                            .orElse(MetricValue.EMPTY)),
                     new SimpleMetric(MN_PROTOCOL_MAJOR,
                             Optional.ofNullable(response.getProtocolVersion().getMajor())
-                                    .map(MetricValue::fromIntValue)
-                                    .orElse(MetricValue.EMPTY)),
+                            .map(MetricValue::fromIntValue)
+                            .orElse(MetricValue.EMPTY)),
                     new SimpleMetric(MN_PROTOCOL_MINOR,
                             Optional.ofNullable(response.getProtocolVersion().getMinor())
-                                    .map(MetricValue::fromIntValue)
-                                    .orElse(MetricValue.EMPTY)),
+                            .map(MetricValue::fromIntValue)
+                            .orElse(MetricValue.EMPTY)),
                     new SimpleMetric(MN_LATENCY,
                             MetricValue.fromIntValue(new Interval(begin_ts, end_ts).toDurationMillis())),
                     new SimpleMetric(MN_LOCALE_COUNTRY,
                             Optional.ofNullable(response.getLocale().getCountry())
-                                    .map(MetricValue::fromStrValue)
-                                    .orElse(MetricValue.EMPTY)),
+                            .map(MetricValue::fromStrValue)
+                            .orElse(MetricValue.EMPTY)),
                     new SimpleMetric(MN_LOCALE_LANGUAGE,
                             Optional.ofNullable(response.getLocale().getLanguage())
-                                    .map(MetricValue::fromStrValue)
-                                    .orElse(MetricValue.EMPTY)));
+                            .map(MetricValue::fromStrValue)
+                            .orElse(MetricValue.EMPTY)));
             /* Collect stream processing data. */
             final Stream<Metric> stream_result = processStream(response.getAllHeaders(), ContentType.get(response.getEntity()).getMimeType(), Optional.ofNullable(ContentType.get(response.getEntity()).getCharset()), byte_counting_stream);
 
             final Optional<Long> content_len = Optional.ofNullable(Optional.of(response.getEntity().getContentLength())
-                            .filter(len -> len > 0)  // 0 may indicate no data, or perhaps no known length.
-                            .orElseGet(() -> {
-                                try {
-                                    return get_len_from_stream_(byte_counting_stream);
-                                } catch (IOException ex) {
-                                    return null;
-                                }
-                            }));
+                    .filter(len -> len > 0) // 0 may indicate no data, or perhaps no known length.
+                    .orElseGet(() -> {
+                        try {
+                            return get_len_from_stream_(byte_counting_stream);
+                        } catch (IOException ex) {
+                            return null;
+                        }
+                    }));
             final ContentType content_type = ContentType.get(response.getEntity());
             final Stream<SimpleMetric> content_stream = Stream.of(
                     new SimpleMetric(MN_CONTENT_CHUNKED,
-                             Optional.ofNullable(response.getEntity().isChunked())
-                                    .map(MetricValue::fromBoolean)
-                                    .orElse(MetricValue.EMPTY)),
+                            Optional.ofNullable(response.getEntity().isChunked())
+                            .map(MetricValue::fromBoolean)
+                            .orElse(MetricValue.EMPTY)),
                     new SimpleMetric(MN_CONTENT_LENGTH, content_len.map(MetricValue::fromIntValue).orElse(MetricValue.EMPTY)),
                     new SimpleMetric(MN_CONTENT_TYPE,
                             Optional.ofNullable(response.getEntity().getContentType())
-                                    .map(Header::getValue)
-                                    .map(MetricValue::fromStrValue)
-                                    .orElse(MetricValue.EMPTY)),
+                            .map(Header::getValue)
+                            .map(MetricValue::fromStrValue)
+                            .orElse(MetricValue.EMPTY)),
                     new SimpleMetric(MN_CONTENT_CHARSET,
                             Optional.ofNullable(content_type.getCharset())
-                                    .map(Charset::name)
-                                    .map(MetricValue::fromStrValue)
-                                    .orElse(MetricValue.EMPTY)),
+                            .map(Charset::name)
+                            .map(MetricValue::fromStrValue)
+                            .orElse(MetricValue.EMPTY)),
                     new SimpleMetric(MN_CONTENT_MIMETYPE,
                             Optional.ofNullable(content_type.getMimeType())
-                                    .map(MetricValue::fromStrValue)
-                                    .orElse(MetricValue.EMPTY))
-                    );
+                            .map(MetricValue::fromStrValue)
+                            .orElse(MetricValue.EMPTY))
+            );
             final Stream<SimpleMetric> up_stream = Stream.of(
                     new SimpleMetric(MN_UP, MetricValue.TRUE)
-                    );
+            );
 
             return Stream.of(hdr_stream, response_stream, content_stream, stream_result, up_stream).flatMap(Function.identity());
         }
@@ -261,30 +259,24 @@ public class UrlGetCollector implements GroupGenerator {
      */
     private class HttpResponseConsumer implements FutureCallback<HttpResponse> {
         private final Instant begin_ts = Instant.now();  // Record begin of operation.
-        private final CompletableFuture<MetricGroup> output_;
-        private final GroupName name_;
+        private final CompletableFuture<Stream<Metric>> output_;
         private final GroupName args_;
         private final String url_;
-        /** Objects that need to be kept referenced until the request completes. */
+        /**
+         * Objects that need to be kept referenced until the request completes.
+         */
         private final Collection<Object> keep_live_;
 
-        public HttpResponseConsumer(CompletableFuture<MetricGroup> output, GroupName args, String url, Object... keepLive) {
+        public HttpResponseConsumer(CompletableFuture<Stream<Metric>> output, GroupName args, String url, Object... keepLive) {
             output_ = requireNonNull(output);
             args_ = requireNonNull(args);
             url_ = requireNonNull(url);
-            name_ = GroupName.valueOf(SimpleGroupPath.valueOf(Stream.of(baseGroupName, args.getPath())
-                            .map(SimpleGroupPath::getPath)
-                            .flatMap(List::stream)
-                            .collect(Collectors.toList())),
-                    args.getTags());
             this.keep_live_ = new ArrayList<>(Arrays.asList(keepLive));
         }
 
         private void fail_() {
-            final Stream<Metric> metrics = Stream.of(
-                        new SimpleMetric(MN_UP, MetricValue.FALSE)
-                        );
-            output_.complete(new SimpleMetricGroup(name_, metrics));
+            final Stream<Metric> metrics = Stream.of(new SimpleMetric(MN_UP, MetricValue.FALSE));
+            output_.complete(metrics);
             keep_live_.clear();  // No need to keep objects alive anymore.
         }
 
@@ -292,16 +284,13 @@ public class UrlGetCollector implements GroupGenerator {
         public void completed(HttpResponse response) {
             Stream<Metric> metrics;
             try {
-                metrics = do_response_(begin_ts, name_, response);
+                metrics = do_response_(begin_ts, response);
             } catch (IOException ex) {
                 LOG.log(Level.WARNING, "error processing response for " + url_ + ", args " + args_, ex);
-                metrics = Stream.of(
-                        new SimpleMetric(MN_UP, MetricValue.FALSE)
-                        );
+                metrics = Stream.of(new SimpleMetric(MN_UP, MetricValue.FALSE));
             }
 
-            final MetricGroup group = new SimpleMetricGroup(name_, metrics);
-            output_.complete(group);
+            output_.complete(metrics);
             keep_live_.clear();  // No need to keep objects alive anymore.
         }
 
@@ -317,7 +306,7 @@ public class UrlGetCollector implements GroupGenerator {
         }
     };
 
-    private Future<MetricGroup> do_request_(GroupName args, String url) {
+    private CompletableFuture<Stream<Metric>> do_request_(GroupName args, String url) {
         /*
          * Client seems to spontaneously stop its reactor.
          * No idea why, so in order to keep the reactor shutdown from disabling
@@ -329,7 +318,7 @@ public class UrlGetCollector implements GroupGenerator {
          */
         final GCCloseable<CloseableHttpAsyncClient> client = httpClient();
 
-        final CompletableFuture<MetricGroup> result = new CompletableFuture<>();  // Filled in by HttpResponseConsumer instance.
+        final CompletableFuture<Stream<Metric>> result = new CompletableFuture<>();  // Filled in by HttpResponseConsumer instance.
         final HttpGet request = new HttpGet(url);
         request.setConfig(request_config_);
         client.get().execute(request, new HttpResponseConsumer(result, args, url, client));
@@ -337,33 +326,37 @@ public class UrlGetCollector implements GroupGenerator {
     }
 
     @Override
-    public GroupCollection getGroups() {
+    public Collection<CompletableFuture<? extends Collection<? extends MetricGroup>>> getGroups(Executor threadpool, CompletableFuture<TimeoutObject> timeout) throws Exception {
+        CompletableFuture<Stream<Metric>> timeoutMetric = timeout
+                .thenApply(ignored -> {
+                    return Stream.of(new SimpleMetric(MN_UP, MetricValue.FALSE));
+                });
+
         /* Collect all URLs. */
-        final List<Future<MetricGroup>> urls;
+        final List<CompletableFuture<? extends Collection<? extends MetricGroup>>> urls;
         try {
-            urls = patterns.getUrls()
-                    .map(x -> do_request_(x.getKey(), x.getValue()))
+            return patterns.getUrls()
+                    .map(x -> {
+                        CompletableFuture<Stream<Metric>> reqMetrics
+                                = do_request_(x.getKey(), x.getValue());
+                        return reqMetrics.applyToEither(
+                                timeoutMetric,
+                                metrics -> {
+                                    final GroupName groupName = groupNameFromArgs(x.getKey());
+                                    return singleton(new SimpleMetricGroup(groupName, metrics));
+                                });
+                    })
                     .collect(Collectors.toList());
         } catch (Exception ex) {
-            LOG.log(Level.WARNING, "unable to load URLs", ex);
-            return failedResult();
+            throw new Exception("unable to load URLs", ex);
         }
+    }
 
-        /* Collect. */
-        return successResult(urls.stream()
-                .map(f -> {
-                    try {
-                        return Optional.of(f.get(OVERALL_TIMEOUT_SECONDS, TimeUnit.SECONDS));
-                    } catch (TimeoutException ex) {
-                        LOG.log(Level.SEVERE, "Http Request never completed", ex);
-                        f.cancel(true);
-                        return Optional.<MetricGroup>empty();
-                    } catch (InterruptedException | ExecutionException ex) {
-                        LOG.log(Level.SEVERE, "Error collecting Http Request", ex);
-                        return Optional.<MetricGroup>empty();
-                    }
-                })
-                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
+    private GroupName groupNameFromArgs(GroupName args) {
+        final SimpleGroupPath path = SimpleGroupPath.valueOf(Stream.of(baseGroupName, args.getPath())
+                .map(SimpleGroupPath::getPath)
+                .flatMap(List::stream)
                 .collect(Collectors.toList()));
+        return GroupName.valueOf(path, args.getTags());
     }
 }

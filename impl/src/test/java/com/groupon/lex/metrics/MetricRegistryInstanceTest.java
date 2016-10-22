@@ -41,9 +41,9 @@ import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import static org.hamcrest.Matchers.arrayContaining;
 import static org.hamcrest.Matchers.hasItem;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -140,7 +140,8 @@ public class MetricRegistryInstanceTest {
 
     @Test
     public void generator_handling() throws Exception {
-        when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17))))));
+        when(generator.getGroups(Mockito.any(), Mockito.any()))
+                .thenReturn(singleton(CompletableFuture.completedFuture(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17)))))));
         final DateTime now = DateTime.now(DateTimeZone.UTC);
 
         try (MetricRegistryInstance mr = create(false, now)) {
@@ -151,7 +152,7 @@ public class MetricRegistryInstanceTest {
                     hasItem(new MutableTimeSeriesValue(GroupName.valueOf("test"), singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(17)))));
         }
 
-        verify(generator, times(1)).getGroups();
+        verify(generator, times(1)).getGroups(Mockito.any(), Mockito.any());
         verify(generator, times(1)).close();
     }
 
@@ -169,27 +170,17 @@ public class MetricRegistryInstanceTest {
 
     @Test
     public void stream_groups() throws Exception {
-        when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17))))));
+        when(generator.getGroups(Mockito.any(), Mockito.any()))
+                .thenReturn(singleton(CompletableFuture.completedFuture(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17)))))));
 
         try (MetricRegistryInstance mr = create(false)) {
             mr.add(generator);
             mr.updateCollection();
         }
 
-        verify(generator, times(1)).getGroups();
+        verify(generator, times(1)).getGroups(Mockito.any(), Mockito.any());
         verify(generator, times(1)).close();
         verifyNoMoreInteractions(generator);
-    }
-
-    @Test
-    public void group_names_resolution() throws Exception {
-        when(generator.getGroups()).thenReturn(GroupGenerator.successResult(singleton(new SimpleMetricGroup(GroupName.valueOf("test"), Stream.of(new SimpleMetric(MetricName.valueOf("x"), 17))))));
-
-        try (MetricRegistryInstance mr = create(false)) {
-            mr.add(generator);
-            assertThat(mr.getGroupNames(),
-                    arrayContaining(GroupName.valueOf("test")));
-        }
     }
 
     @Test
