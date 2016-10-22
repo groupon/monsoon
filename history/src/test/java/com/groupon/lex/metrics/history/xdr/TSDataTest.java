@@ -147,10 +147,10 @@ public class TSDataTest {
                 .map(new Function<Integer, TimeSeriesCollection>() {
                     public TimeSeriesCollection apply(Integer i) {
                         return new SimpleTimeSeriesCollection(now.plusMinutes(i), Stream.of(
-                                new MutableTimeSeriesValue(now.plusMinutes(i),
+                                new MutableTimeSeriesValue(
                                         GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
                                         singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))),
-                                new MutableTimeSeriesValue(now.plusMinutes(i),
+                                new MutableTimeSeriesValue(
                                         GroupName.valueOf(SimpleGroupPath.valueOf("h", "i", "s", "t", "o", "g", "r", "a", "m")),
                                         singletonMap(MetricName.valueOf("x"), MetricValue.fromHistValue(hist)))
                         ));

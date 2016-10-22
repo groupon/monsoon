@@ -35,6 +35,7 @@ import java.util.Objects;
 
 /**
  * Provides hashCode, equality functions.
+ *
  * @author ariane
  */
 public abstract class AbstractTimeSeriesValue implements TimeSeriesValue {
@@ -57,7 +58,7 @@ public abstract class AbstractTimeSeriesValue implements TimeSeriesValue {
 
     @Override
     public String toString() {
-        return "TimeSeriesValue{" + "timestamp=" + getTimestamp() + ", group=" + getGroup() + ", metrics=" + getMetrics() + '}';
+        return "TimeSeriesValue{" + "group=" + getGroup() + ", metrics=" + getMetrics() + '}';
     }
 
     @Override
@@ -70,9 +71,6 @@ public abstract class AbstractTimeSeriesValue implements TimeSeriesValue {
     }
 
     public static boolean equals(TimeSeriesValue a, TimeSeriesValue b) {
-        if (!Objects.equals(a.getTimestamp(), b.getTimestamp())) {
-            return false;
-        }
         if (!Objects.equals(a.getGroup(), b.getGroup())) {
             return false;
         }

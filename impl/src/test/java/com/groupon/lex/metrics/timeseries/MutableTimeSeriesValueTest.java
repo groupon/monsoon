@@ -42,7 +42,6 @@ import java.util.Optional;
 import java.util.stream.Stream;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.Duration;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -60,9 +59,8 @@ public class MutableTimeSeriesValueTest {
 
     @Test
     public void constructor() {
-        TimeSeriesValue tsv = new MutableTimeSeriesValue(t0, group_name, values);
+        TimeSeriesValue tsv = new MutableTimeSeriesValue(group_name, values);
 
-        assertEquals(t0, tsv.getTimestamp());
         assertEquals(group_name, tsv.getGroup());
         assertEquals(new HashMap<>(values), new HashMap<>(tsv.getMetrics()));
         assertEquals(Optional.of(MetricValue.fromIntValue(7)), tsv.findMetric(metric_key));
@@ -70,9 +68,8 @@ public class MutableTimeSeriesValueTest {
 
     @Test
     public void constructor_from_stream() {
-        TimeSeriesValue tsv = new MutableTimeSeriesValue(t0, group_name, Stream.of(new Object()), (xx) -> metric_key, (xx) -> MetricValue.fromIntValue(7));
+        TimeSeriesValue tsv = new MutableTimeSeriesValue(group_name, Stream.of(new Object()), (xx) -> metric_key, (xx) -> MetricValue.fromIntValue(7));
 
-        assertEquals(t0, tsv.getTimestamp());
         assertEquals(group_name, tsv.getGroup());
         assertEquals(new HashMap<>(values), new HashMap<>(tsv.getMetrics()));
         assertEquals(Optional.of(MetricValue.fromIntValue(7)), tsv.findMetric(metric_key));
@@ -80,8 +77,8 @@ public class MutableTimeSeriesValueTest {
 
     @Test
     public void equality() {
-        TimeSeriesValue x = new MutableTimeSeriesValue(t0, group_name, values);
-        TimeSeriesValue y = new MutableTimeSeriesValue(t0, group_name, Stream.of(new Object()), (xx) -> metric_key, (xx) -> MetricValue.fromIntValue(7));
+        TimeSeriesValue x = new MutableTimeSeriesValue(group_name, values);
+        TimeSeriesValue y = new MutableTimeSeriesValue(group_name, Stream.of(new Object()), (xx) -> metric_key, (xx) -> MetricValue.fromIntValue(7));
 
         assertTrue(x.hashCode() == y.hashCode());
         assertTrue(x.equals(y));
@@ -89,20 +86,18 @@ public class MutableTimeSeriesValueTest {
 
     @Test
     public void inequality() {
-        TimeSeriesValue base = new MutableTimeSeriesValue(t0, group_name, values);
-        TimeSeriesValue a = new MutableTimeSeriesValue(t0, group_name, EMPTY_MAP);
-        TimeSeriesValue b = new MutableTimeSeriesValue(t0, GroupName.valueOf("abracadabra"), values);
-        TimeSeriesValue c = new MutableTimeSeriesValue(t0.minus(Duration.standardSeconds(1)), group_name, values);
+        TimeSeriesValue base = new MutableTimeSeriesValue(group_name, values);
+        TimeSeriesValue a = new MutableTimeSeriesValue(group_name, EMPTY_MAP);
+        TimeSeriesValue b = new MutableTimeSeriesValue(GroupName.valueOf("abracadabra"), values);
 
         assertFalse(base.equals(a));
         assertFalse(base.equals(b));
-        assertFalse(base.equals(c));
     }
 
     @Test
     public void map_is_not_shared() {
         Map<MetricName, MetricValue> local = new HashMap<>(values);
-        TimeSeriesValue tsv = new MutableTimeSeriesValue(t0, group_name, local);
+        TimeSeriesValue tsv = new MutableTimeSeriesValue(group_name, local);
         local.remove(metric_key);  // Modifying local may not affect the TimeSeriesValue.
 
         assertEquals(values, new HashMap<>(tsv.getMetrics()));
@@ -110,7 +105,7 @@ public class MutableTimeSeriesValueTest {
 
     @Test
     public void equals_across_types() {
-        TimeSeriesValue tsv = new MutableTimeSeriesValue(t0, group_name, values);
+        TimeSeriesValue tsv = new MutableTimeSeriesValue(group_name, values);
 
         assertFalse(tsv.equals(null));
         assertFalse(tsv.equals(new Object()));

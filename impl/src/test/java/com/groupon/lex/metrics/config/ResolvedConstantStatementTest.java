@@ -48,8 +48,6 @@ import static java.util.Collections.EMPTY_MAP;
 import static java.util.Collections.singletonMap;
 import java.util.HashMap;
 import java.util.stream.Stream;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -74,20 +72,24 @@ public class ResolvedConstantStatementTest {
 
     private final ResolvedConstantStatement stmt_multi = new ResolvedConstantStatement(
             new LiteralGroupExpression(new LiteralNameResolver("foo")),
-            new HashMap<NameResolver, MetricValue>() {{
-                put(new LiteralNameResolver("x"), MetricValue.fromIntValue(17));
-                put(new LiteralNameResolver("y"), MetricValue.fromIntValue(19));
-            }});
+            new HashMap<NameResolver, MetricValue>() {
+        {
+            put(new LiteralNameResolver("x"), MetricValue.fromIntValue(17));
+            put(new LiteralNameResolver("y"), MetricValue.fromIntValue(19));
+        }
+    });
 
     private final ResolvedConstantStatement copy_of_stmt_single = new ResolvedConstantStatement(
             new LiteralGroupExpression(new LiteralNameResolver("foo")),
             singletonMap(new LiteralNameResolver("x"), MetricValue.fromIntValue(17)));
     private final ResolvedConstantStatement copy_of_stmt_multi = new ResolvedConstantStatement(
             new LiteralGroupExpression(new LiteralNameResolver("foo")),
-            new HashMap<NameResolver, MetricValue>() {{
-                put(new LiteralNameResolver("x"), MetricValue.fromIntValue(17));
-                put(new LiteralNameResolver("y"), MetricValue.fromIntValue(19));
-            }});
+            new HashMap<NameResolver, MetricValue>() {
+        {
+            put(new LiteralNameResolver("x"), MetricValue.fromIntValue(17));
+            put(new LiteralNameResolver("y"), MetricValue.fromIntValue(19));
+        }
+    });
     private final ResolvedConstantStatement copy_of_stmt_single_with_other_group = new ResolvedConstantStatement(
             new LiteralGroupExpression(new LiteralNameResolver("bar")),
             singletonMap(new LiteralNameResolver("x"), MetricValue.fromIntValue(17)));
@@ -101,15 +103,15 @@ public class ResolvedConstantStatementTest {
     @Mock
     private Context<MutableTimeSeriesCollectionPair> ctx;
 
-    private final TimeSeriesValue tsv = new MutableTimeSeriesValue(DateTime.now(DateTimeZone.UTC), GroupName.valueOf("foo"), EMPTY_MAP);
+    private final TimeSeriesValue tsv = new MutableTimeSeriesValue(GroupName.valueOf("foo"), EMPTY_MAP);
 
     @Test
     public void config_string() {
         assertEquals("constant foo x 17;\n", stmt_single.configString().toString());
         assertEquals("constant foo {\n"
-                   + "  x 17;\n"
-                   + "  y 19;\n"
-                   + "}\n",
+                + "  x 17;\n"
+                + "  y 19;\n"
+                + "}\n",
                 stmt_multi.configString().toString());
     }
 

@@ -102,7 +102,9 @@ public class EncDec {
 
     public static interface IterSuccessResponse<T> {
         public List<T> getData();
+
         public boolean isLast();
+
         public long getCookie();
     }
 
@@ -227,7 +229,6 @@ public class EncDec {
 
     private static TimeSeriesValue decodeTSV(ActiveDict dict, DateTime ts, tsfile_record tsv) {
         return new ImmutableTimeSeriesValue(
-                ts,
                 GroupName.valueOf(dict.getGroup(tsv.group_ref), dict.getTags(tsv.tag_ref)),
                 Arrays.stream(tsv.metrics),
                 m -> dict.getMetricName(m.metric_ref),

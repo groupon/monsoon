@@ -149,7 +149,7 @@ public class MetricRegistryInstanceTest {
             List<TimeSeriesValue> sgroups = mr.updateCollection().getTSValues().stream().collect(Collectors.toList());
 
             assertThat(sgroups,
-                    hasItem(new MutableTimeSeriesValue(now, GroupName.valueOf("test"), singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(17)))));
+                    hasItem(new MutableTimeSeriesValue(GroupName.valueOf("test"), singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(17)))));
         }
 
         verify(generator, times(1)).getGroups(Mockito.any(), Mockito.any());

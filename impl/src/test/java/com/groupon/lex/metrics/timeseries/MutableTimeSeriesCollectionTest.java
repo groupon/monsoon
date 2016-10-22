@@ -60,8 +60,8 @@ public class MutableTimeSeriesCollectionTest {
     private static final DateTime t0 = new DateTime(2015, 10, 21, 11, 28, 7, DateTimeZone.UTC);
     private static final DateTime t0_ts = t0.minus(Duration.standardSeconds(5));
     private static final SimpleGroupPath group_name = SimpleGroupPath.valueOf("com", "groupon", "lex", "jmx-monitord", "Awesomoium");
-    private static final MutableTimeSeriesValue ts_value = new MutableTimeSeriesValue(t0_ts, GroupName.valueOf(group_name, EMPTY_MAP), singletonMap(ts_metric_value__name, ts_metric_value__value));
-    private static final MutableTimeSeriesValue absent_value = new MutableTimeSeriesValue(t0, GroupName.valueOf("not", "here"), singletonMap(MetricName.valueOf("foo"), MetricValue.TRUE));
+    private static final MutableTimeSeriesValue ts_value = new MutableTimeSeriesValue(GroupName.valueOf(group_name, EMPTY_MAP), singletonMap(ts_metric_value__name, ts_metric_value__value));
+    private static final MutableTimeSeriesValue absent_value = new MutableTimeSeriesValue(GroupName.valueOf("not", "here"), singletonMap(MetricName.valueOf("foo"), MetricValue.TRUE));
 
     @Test
     public void constructor() {
@@ -79,7 +79,7 @@ public class MutableTimeSeriesCollectionTest {
 
         assertEquals(t0, ts_data.getTimestamp());
         assertThat(ts_data.getTSValues().stream()
-                        .collect(Collectors.toList()),
+                .collect(Collectors.toList()),
                 hasItem(ts_value));
         assertThat(ts_data.getGroups(),
                 hasItem(GroupName.valueOf(group_name, EMPTY_MAP)));
@@ -130,10 +130,10 @@ public class MutableTimeSeriesCollectionTest {
     @Test
     public void overwrite_existing_group() {
         MutableTimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
-        ts_data.add(new MutableTimeSeriesValue(t0, GroupName.valueOf(group_name), singletonMap(MetricName.valueOf("foo"), MetricValue.fromStrValue("bar"))));
+        ts_data.add(new MutableTimeSeriesValue(GroupName.valueOf(group_name), singletonMap(MetricName.valueOf("foo"), MetricValue.fromStrValue("bar"))));
 
         assertThat(ts_data.getTSValue(group_name).stream().collect(Collectors.toList()),
-                hasItem(new MutableTimeSeriesValue(t0, GroupName.valueOf(group_name), singletonMap(MetricName.valueOf("foo"), MetricValue.fromStrValue("bar")))));
+                hasItem(new MutableTimeSeriesValue(GroupName.valueOf(group_name), singletonMap(MetricName.valueOf("foo"), MetricValue.fromStrValue("bar")))));
     }
 
     @Test
@@ -144,23 +144,23 @@ public class MutableTimeSeriesCollectionTest {
 
         assertTrue(!group.isEmpty());
         assertThat(group.findMetric(MetricName.valueOf("foo")).streamValues()
-                        .collect(Collectors.toList()),
+                .collect(Collectors.toList()),
                 hasItem(MetricValue.fromStrValue("bar")));
         assertThat(group.findMetric(ts_metric_value__name).streamValues()
-                        .collect(Collectors.toList()),
+                .collect(Collectors.toList()),
                 hasItem(ts_metric_value__value));
     }
 
     @Test
     public void rename_group() {
         MutableTimeSeriesCollection ts_data = new MutableTimeSeriesCollection(t0, Stream.of(ts_value));
-        final TimeSeriesValue EXPECT_TS_AFTER_RENAME = new MutableTimeSeriesValue(t0_ts, GroupName.valueOf("post", "rename"), singletonMap(ts_metric_value__name, ts_metric_value__value));
+        final TimeSeriesValue EXPECT_TS_AFTER_RENAME = new MutableTimeSeriesValue(GroupName.valueOf("post", "rename"), singletonMap(ts_metric_value__name, ts_metric_value__value));
 
         ts_data.renameGroup(GroupName.valueOf(group_name), GroupName.valueOf("post", "rename"));
 
         assertEquals(t0, ts_data.getTimestamp());
         assertThat(ts_data.getTSValues().stream()
-                        .collect(Collectors.toList()),
+                .collect(Collectors.toList()),
                 hasItem(EXPECT_TS_AFTER_RENAME));
         assertThat(ts_data.getGroups(),
                 hasItem(GroupName.valueOf("post", "rename")));

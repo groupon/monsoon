@@ -36,15 +36,21 @@ import org.joda.time.DateTimeZone;
 
 /**
  * Utilities for creating and compressing TSData files.
+ *
  * @author ariane
  */
 @RequiredArgsConstructor
 public class FileSupport {
     public static interface Writer {
         public void create_file(Releaseable<FileChannel> fd, Collection<? extends TimeSeriesCollection> tsdata, boolean compress) throws IOException;
+
         public short getMajor();
+
         public short getMinor();
-        public default boolean isEmptyAllowed() { return true; }
+
+        public default boolean isEmptyAllowed() {
+            return true;
+        }
     }
 
     public static final Writer NO_WRITER = new Writer() {
@@ -70,11 +76,21 @@ public class FileSupport {
     private final boolean compressed;
     public final DateTime NOW = new DateTime(DateTimeZone.UTC);
 
-    public short getMajor() { return writer.getMajor(); }
-    public short getMinor() { return writer.getMinor(); }
-    public boolean isEmptyAllowed() { return writer.isEmptyAllowed(); }
+    public short getMajor() {
+        return writer.getMajor();
+    }
 
-    /** Create a file. */
+    public short getMinor() {
+        return writer.getMinor();
+    }
+
+    public boolean isEmptyAllowed() {
+        return writer.isEmptyAllowed();
+    }
+
+    /**
+     * Create a file.
+     */
     public void create_file(Path file, Collection<? extends TimeSeriesCollection> tsdata) throws IOException {
         try (Releaseable<FileChannel> fd = new Releaseable<>(FileChannel.open(file, READ, WRITE, CREATE))) {
             writer.create_file(fd, tsdata, compressed);
@@ -84,9 +100,11 @@ public class FileSupport {
         }
     }
 
-    /** Generates an endless stream of TimeSeriesCollections. */
+    /**
+     * Generates an endless stream of TimeSeriesCollections.
+     */
     public StreamedCollection<TimeSeriesCollection> create_tsdata(int width) {
-        int metric_width = (int)sqrt(width) + 1;
+        int metric_width = (int) sqrt(width) + 1;
         int group_width = (width + metric_width - 1) / metric_width;
 
         final SimpleGroupPath base_path = SimpleGroupPath.valueOf("foo", "bar");
@@ -108,7 +126,6 @@ public class FileSupport {
                     final Stream<TimeSeriesValue> tsv_stream = group_names.stream()
                             .map(name -> {
                                 return new MutableTimeSeriesValue(
-                                        now,
                                         name,
                                         metric_names.stream(),
                                         Function.identity(),

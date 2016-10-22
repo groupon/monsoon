@@ -86,7 +86,7 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
     }
 
     private TimeSeriesValue newTSV(GroupName group, RTFGroupTable table) {
-        return new RTFTimeSeriesValue(timestamp, index, group, table);
+        return new RTFTimeSeriesValue(index, group, table);
     }
 
     @Override

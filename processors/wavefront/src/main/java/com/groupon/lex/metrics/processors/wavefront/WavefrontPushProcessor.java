@@ -75,7 +75,7 @@ public class WavefrontPushProcessor implements PushProcessor {
 
             try (OutputStreamWriter out = new OutputStreamWriter(socket.getOutputStream(), CHARSET)) {
                 final Iterator<String> wavefrontStrings = tsdata.getTSValues().stream()
-                        .flatMap(WavefrontStrings::wavefrontLine)
+                        .flatMap(tsv -> WavefrontStrings.wavefrontLine(tsdata.getTimestamp(), tsv))
                         .iterator();
                 while (wavefrontStrings.hasNext()) {
                     final String line = wavefrontStrings.next();

@@ -59,8 +59,8 @@ public class MutableTimeSeriesValueSetTest {
     private static final GroupName group_name = GroupName.valueOf("foo", "bar");
     private static final SimpleGroupPath group_path = SimpleGroupPath.valueOf("foo", "bar");
     private static final Map<MetricName, MetricValue> values = singletonMap(metric_key, metric_value);
-    private static final TimeSeriesValue tsv0 = new MutableTimeSeriesValue(t0, group_name, values);
-    private final static TimeSeriesValue tsv1 = new MutableTimeSeriesValue(t0, GroupName.valueOf(group_name.getPath(), singletonMap("x", MetricValue.TRUE)), values);
+    private static final TimeSeriesValue tsv0 = new MutableTimeSeriesValue(group_name, values);
+    private final static TimeSeriesValue tsv1 = new MutableTimeSeriesValue(GroupName.valueOf(group_name.getPath(), singletonMap("x", MetricValue.TRUE)), values);
 
     @Test
     public void empty_constructor() {

@@ -70,17 +70,17 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import org.junit.After;
+import static org.junit.Assert.assertEquals;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import org.mockito.runners.MockitoJUnitRunner;
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.verify;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ClientServerTest {
@@ -107,7 +107,7 @@ public class ClientServerTest {
                 transport = new OncRpcUdpServerTransport(server, Inet4Address.getLoopbackAddress(), 0, server.info, 32768);
                 transport.setCharacterEncoding("UTF-8");
                 portFuture.complete(transport.getPort());
-                server.run(new OncRpcServerTransport[] { transport });
+                server.run(new OncRpcServerTransport[]{transport});
             } catch (IOException | OncRpcException ex) {
                 LOG.log(Level.SEVERE, "server " + server + " failed to start", ex);
                 portFuture.completeExceptionally(ex);
@@ -425,7 +425,9 @@ public class ClientServerTest {
             private int i;
 
             @Override
-            public Integer get() { return i++; }
+            public Integer get() {
+                return i++;
+            }
         }
 
         return Stream.generate(new Generator());
@@ -440,7 +442,7 @@ public class ClientServerTest {
                 .map(i -> {
                     final DateTime t = T0.plus(Duration.standardSeconds(10 * i));
                     final MetricValue counter = MetricValue.fromIntValue(i);
-                    return new SimpleTimeSeriesCollection(t, Stream.of(new ImmutableTimeSeriesValue(t, groupName, singletonMap(metricName, counter))));
+                    return new SimpleTimeSeriesCollection(t, Stream.of(new ImmutableTimeSeriesValue(groupName, singletonMap(metricName, counter))));
                 });
     }
 
@@ -461,7 +463,7 @@ public class ClientServerTest {
         @Override
         public boolean matches(Object item) {
             if (!(item instanceof TimeSeriesMetricExpression)) return false;
-            TimeSeriesMetricExpression itemExpr = (TimeSeriesMetricExpression)item;
+            TimeSeriesMetricExpression itemExpr = (TimeSeriesMetricExpression) item;
             LOG.log(Level.FINE, "comparing {0} with {1}", new Object[]{expr.configString(), itemExpr.configString()});
             return Objects.equals(expr.configString().toString(), itemExpr.configString().toString());
         }

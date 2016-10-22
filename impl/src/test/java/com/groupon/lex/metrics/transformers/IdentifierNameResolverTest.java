@@ -31,10 +31,11 @@ public class IdentifierNameResolverTest {
     public void setup() {
         final GroupName group_name = GroupName.valueOf(group_path);
         final TimeSeriesCollectionPairInstance ts_data = new TimeSeriesCollectionPairInstance(DateTime.now(DateTimeZone.UTC));
-        tsv0 = new MutableTimeSeriesValue(ts_data.getCurrentCollection().getTimestamp(), group_name, EMPTY_MAP);
+        tsv0 = new MutableTimeSeriesValue(group_name, EMPTY_MAP);
         ts_data.getCurrentCollection().add(tsv0);
 
-        final MutableContext<?> m_ctx = new MutableContext<>(ts_data, (alert) -> {});
+        final MutableContext<?> m_ctx = new MutableContext<>(ts_data, (alert) -> {
+        });
         m_ctx.putGroupAlias(IDENTIFIER, group_path);
 
         ctx = m_ctx;

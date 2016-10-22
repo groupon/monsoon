@@ -199,7 +199,7 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
                 .collect(Collectors.toMap(MetricGroup::getName, Function.identity(), (x, y) -> y)) // Resolve group-name conflict, such that latest metric wins.
                 .values()
                 .stream()
-                .map((mg) -> new MutableTimeSeriesValue(now, mg.getName(), Arrays.stream(mg.getMetrics()), Metric::getName, Metric::getValue));
+                .map((mg) -> new MutableTimeSeriesValue(mg.getName(), Arrays.stream(mg.getMetrics()), Metric::getName, Metric::getValue));
         return groups;
     }
 
