@@ -257,11 +257,37 @@ public class NamedResolverMap {
      *
      * @param prefixPath Additional path elements to put in front of the
      * returned path.
+     * @param extraTags Additional tags to put in the tag set. The extraTags
+     * argument will override any values present in the NamedResolverMap.
+     * @return A group name derived from this NamedResolverMap and the supplied
+     * arguments.
+     */
+    public GroupName getGroupName(@NonNull SimpleGroupPath prefixPath, @NonNull Map<String, MetricValue> extraTags) {
+        return getGroupName(prefixPath.getPath(), extraTags);
+    }
+
+    /**
+     * Create a GroupName from this NamedResolverMap.
+     *
+     * @param prefixPath Additional path elements to put in front of the
+     * returned path.
      * @return A group name derived from this NamedResolverMap and the supplied
      * arguments.
      */
     public GroupName getGroupName(@NonNull List<String> prefixPath) {
-        return NamedResolverMap.this.getGroupName(prefixPath, EMPTY_MAP);
+        return getGroupName(prefixPath, EMPTY_MAP);
+    }
+
+    /**
+     * Create a GroupName from this NamedResolverMap.
+     *
+     * @param prefixPath Additional path elements to put in front of the
+     * returned path.
+     * @return A group name derived from this NamedResolverMap and the supplied
+     * arguments.
+     */
+    public GroupName getGroupName(@NonNull SimpleGroupPath prefixPath) {
+        return getGroupName(prefixPath.getPath());
     }
 
     /**
@@ -273,7 +299,7 @@ public class NamedResolverMap {
      * arguments.
      */
     public GroupName getGroupName(@NonNull Map<String, MetricValue> extraTags) {
-        return NamedResolverMap.this.getGroupName(EMPTY_LIST, extraTags);
+        return getGroupName(EMPTY_LIST, extraTags);
     }
 
     /**
@@ -282,7 +308,7 @@ public class NamedResolverMap {
      * @return A group name derived from this NamedResolverMap.
      */
     public GroupName getGroupName() {
-        return NamedResolverMap.this.getGroupName(EMPTY_LIST, EMPTY_MAP);
+        return getGroupName(EMPTY_LIST, EMPTY_MAP);
     }
 
     /**

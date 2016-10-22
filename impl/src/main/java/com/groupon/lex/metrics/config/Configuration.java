@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.config;
 
+import com.github.groupon.monsoon.tcp.TcpBuilder;
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
 import com.groupon.lex.metrics.collector.collectd.CollectdPushBuilder;
@@ -84,6 +85,7 @@ public class Configuration {
         COLLECTORS.put("json_url", UrlJsonBuilder.class);
         COLLECTORS.put("jmx_listener", JmxBuilder.class);
         COLLECTORS.put("collectd_push", CollectdPushBuilder.class);
+        COLLECTORS.put("tcp", TcpBuilder.class);
     }
 
     private static Configuration defaultConfiguration_() {

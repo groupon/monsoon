@@ -8,3 +8,5 @@ Collectors
   (Note that the contents of URL are not processed.)
 - [json\_url](json_url.md)
   Reads json metrics by downloading a URL.
+- [tcp](tcp.md)
+  Gathers timing and availability based on a TCP connect attempt.

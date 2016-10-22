@@ -11,6 +11,7 @@ Features:
 - Frontend evaluation logic moved into separate component.
 - Created file format 2.0, which is better at not reading data that is not requested during expression evaluation.
 - Changed collectors to run in parallel, allowing us to scrape more services in a short time.
+- A new [tcp collector](doc/collectors/tcp.md) can be used to monitor if a port is accepting connections.
 
 Bug fixes:
 - Fix RPC timeout caused by BufferedIterator reading underlying iterator in the constructor.  This caused RPC calls to time out if the underlying iterator required more than 30 seconds for its first element to be available.
