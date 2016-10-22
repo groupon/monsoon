@@ -83,7 +83,7 @@ public class JmxBuilder implements CollectorBuilder, MainStringList, AcceptTagSe
                 port = arg.getString("port");  // Backwards compatibility: port used to be a string.
             }
 
-            MetricListener listener = new MetricListener(new JmxClient("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi"), includes, arg);
+            MetricListener listener = new MetricListener(new JmxClient("service:jmx:rmi:///jndi/rmi://" + host + ":" + port + "/jmxrmi", true), includes, arg);
             listener.enable();
             return listener;
         }

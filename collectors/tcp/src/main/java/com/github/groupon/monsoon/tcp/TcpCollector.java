@@ -31,7 +31,6 @@
  */
 package com.github.groupon.monsoon.tcp;
 
-import com.groupon.lex.metrics.GroupGenerator;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
@@ -39,6 +38,7 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleMetric;
 import com.groupon.lex.metrics.SimpleMetricGroup;
+import com.groupon.lex.metrics.SynchronousGroupGenerator;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ConnectException;
@@ -46,15 +46,17 @@ import java.net.InetSocketAddress;
 import java.net.NoRouteToHostException;
 import java.net.PortUnreachableException;
 import java.net.ProtocolException;
-import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.net.UnknownServiceException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.singleton;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
 import lombok.Getter;
 import lombok.NonNull;
@@ -62,7 +64,7 @@ import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 @Getter
-public class TcpCollector implements GroupGenerator {
+public class TcpCollector extends SynchronousGroupGenerator {
     /**
      * MetricName under which the timing is published.
      */
@@ -75,10 +77,6 @@ public class TcpCollector implements GroupGenerator {
      * MetricName under which the error type is published.
      */
     private static final MetricName ERROR_TYPE = MetricName.valueOf("error", "type");
-    /**
-     * Timeout for connect attempts.
-     */
-    public static final int CONNECT_TIMEOUT_MSEC = 5000;  // 5 seconds
 
     /**
      * Destination address to check.
@@ -125,9 +123,14 @@ public class TcpCollector implements GroupGenerator {
     }
 
     @Override
-    public GroupCollection getGroups() {
+    public Collection<MetricGroup> getGroups(CompletableFuture<TimeoutObject> timeout) {
+        // Install interruption handler to interrupt the tryConnect method on timeout.
+        final Thread currentThread = Thread.currentThread();
+        timeout.thenAccept((timeoutObject) -> currentThread.interrupt());
+
+        // Perform the actual connect attempt.
         final ConnectDatum connect = tryConnect();
-        return GroupGenerator.successResult(singleton(mainGroup(connect)));
+        return singleton(mainGroup(connect));
     }
 
     private MetricGroup mainGroup(ConnectDatum connect) {
@@ -148,19 +151,19 @@ public class TcpCollector implements GroupGenerator {
      * optional error message.
      */
     private ConnectDatum tryConnect() {
-        try (Socket dstSocket = new Socket()) {
+        try (SocketChannel dstSocket = SocketChannel.open()) {
             return tryConnect(dstSocket);
         } catch (IOException ex) {
             throw new RuntimeException("socket creation failed", ex);
         }
     }
 
-    ConnectDatum tryConnect(Socket dstSocket) {  // Package visibility for testing purposes.
+    ConnectDatum tryConnect(SocketChannel dstSocket) {  // Package visibility for testing purposes.
         final Timer timer = new Timer();
         try {
-            dstSocket.connect(dst, CONNECT_TIMEOUT_MSEC);
+            dstSocket.connect(dst);
             return new ConnectDatum(ConnectResult.OK, timer.getAsLong(), Optional.empty());
-        } catch (SocketTimeoutException ex) {
+        } catch (SocketTimeoutException | ClosedByInterruptException ex) {
             return new ConnectDatum(ConnectResult.TIMED_OUT, timer.getAsLong(), Optional.ofNullable(ex.getMessage()));
         } catch (NoRouteToHostException ex) {
             return new ConnectDatum(ConnectResult.NO_ROUTE_TO_HOST, timer.getAsLong(), Optional.ofNullable(ex.getMessage()));
