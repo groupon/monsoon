@@ -225,10 +225,10 @@ public class MetricListener implements GroupGenerator {
          * If there are no groups registered, the connection opening won't be triggered otherwise.
          * And if that isn't triggered, registering groups won't happen either.
          */
-        return singleton(connection.getConnection(threadpool)
-                .applyToEither(
+        CompletableFuture<List<MetricGroup>> future = connection.getConnection(threadpool)
+                .applyToEitherAsync(
                         timeout.thenApply(timeoutObject -> (MBeanServerConnection) null),
-                        (conn -> {
+                        conn -> {
                             if (conn == null)
                                 throw new RuntimeException("connection unavailable");
 
@@ -239,6 +239,9 @@ public class MetricListener implements GroupGenerator {
                                 group.getMetrics(conn).ifPresent(result::add);
                             }
                             return result;
-                        })));
+                        },
+                        threadpool);
+        timeout.thenAccept(timeoutObject -> future.cancel(true));
+        return singleton(future);
     }
 }
