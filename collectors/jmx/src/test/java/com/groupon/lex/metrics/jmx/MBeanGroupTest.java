@@ -45,6 +45,8 @@ import java.util.Arrays;
 import static java.util.Collections.singletonMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -81,6 +83,8 @@ public class MBeanGroupTest {
      */
     private GroupName groupname;
 
+    private ExecutorService threadpool;
+
     @Before
     public void setup() throws Exception {
         seqno = sequence.getAndIncrement();
@@ -99,12 +103,15 @@ public class MBeanGroupTest {
         obj_name = new ObjectName("com.groupon.lex.metrics.jmx:type=MBeanGroupInstanceTest,seq=" + seqno + ",booltag=false,inttag=17,dbltag=19.0,strtag=str");
         ManagementFactory.getPlatformMBeanServer().registerMBean(test_value, obj_name);
         jmx = new JmxClient();
+
+        threadpool = Executors.newSingleThreadExecutor();
     }
 
     @After
     public void cleanup() throws Exception {
         ManagementFactory.getPlatformMBeanServer().unregisterMBean(obj_name);
         jmx.close();
+        threadpool.shutdownNow();
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -120,7 +127,7 @@ public class MBeanGroupTest {
         test_value.setStringval("foobar");
         test_value.getNested().setDblval(17);
 
-        Metric[] metrics = mbg.getMetrics(jmx.getConnection(null).get()).get().getMetrics();
+        Metric[] metrics = mbg.getMetrics(jmx.getConnection(threadpool).get()).get().getMetrics();
 
         /**
          * Create metrics map for easy test asserting.
