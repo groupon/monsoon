@@ -24,7 +24,7 @@ Create a single metric group ``google`` containing metrics on the TCP connect ti
 This creates the following metrics:
 
     google{host="www.google.com", port=80} {
-      timing = 43,                                                     # 1
+      latency = 43,                                                    # 1
       up = true,                                                       # 2
       error.msg = (none),                                              # 3
       error.type = "OK",                                               # 4
@@ -40,7 +40,7 @@ This creates the following metrics:
       error.io_error = false
     }
 
-1. ``timing`` indicates the time until the connection was set up.
+1. ``latency`` indicates the time until the connection was set up.
 2. ``up`` indicates the connection succeeded.
 3. ``error.msg`` indicates a (java) error message, explaining why the connect attempt failed.
 4. ``error.type`` is the type of the error; ``"OK"`` indicates everything was fine.  Otherwise it will correspond to one of the error types.
