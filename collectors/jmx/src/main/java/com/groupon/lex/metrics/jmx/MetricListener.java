@@ -31,10 +31,8 @@
  */
 package com.groupon.lex.metrics.jmx;
 
-import com.groupon.lex.metrics.GroupGenerator;
-import static com.groupon.lex.metrics.GroupGenerator.failedResult;
-import static com.groupon.lex.metrics.GroupGenerator.successResult;
 import com.groupon.lex.metrics.MetricGroup;
+import com.groupon.lex.metrics.SynchronousGroupGenerator;
 import com.groupon.lex.metrics.jmx.JmxClient.ConnectionDecorator;
 import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.io.IOException;
@@ -45,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
@@ -69,7 +68,7 @@ import lombok.NonNull;
  *
  * @author ariane
  */
-public class MetricListener implements GroupGenerator, AutoCloseable {
+public class MetricListener extends SynchronousGroupGenerator {
     private static final Logger LOG = Logger.getLogger(MetricListener.class.getName());
     private final Collection<ObjectName> filter_;
     private final Map<ObjectName, MBeanGroup> detected_groups_ = new HashMap<ObjectName, MBeanGroup>();
@@ -223,7 +222,7 @@ public class MetricListener implements GroupGenerator, AutoCloseable {
     }
 
     @Override
-    public synchronized GroupCollection getGroups() {
+    public synchronized Collection<? extends MetricGroup> getGroups(CompletableFuture<TimeoutObject> timeout) {
         try {
             /*
              * Force the connection to open, even if there are no groups to scan.
@@ -236,7 +235,7 @@ public class MetricListener implements GroupGenerator, AutoCloseable {
             /*
              * Connection down, can't collect any data.
              */
-            return failedResult();
+            throw new RuntimeException("connection unavailable", ex);
         }
 
         // Copy collection, to isolate it from mbean events add/removing elements.
@@ -270,9 +269,8 @@ public class MetricListener implements GroupGenerator, AutoCloseable {
                     .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
                     .collect(Collectors.toList());
         } catch (InterruptedException ex) {
-            LOG.log(Level.SEVERE, "Interrupted while reading JMX beans", ex);
-            return failedResult();
+            throw new RuntimeException("interrupted while reading JMX beans", ex);
         }
-        return successResult(values);
+        return values;
     }
 }

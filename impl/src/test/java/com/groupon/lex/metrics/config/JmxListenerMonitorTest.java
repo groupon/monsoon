@@ -52,6 +52,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -91,6 +94,7 @@ public class JmxListenerMonitorTest {
      * mri.add(GroupGenerator) adds to this collection.
      */
     private List<GroupGenerator> listeners;
+    private ExecutorService threadpool;
 
     private static JmxBuilder newJmxBuilder(Set<ObjectName> names, NameBoundResolver resolver) {
         JmxBuilder builder = new JmxBuilder();
@@ -118,6 +122,8 @@ public class JmxListenerMonitorTest {
             listeners.add(g);
             return g;
         });
+
+        threadpool = Executors.newSingleThreadExecutor();
     }
 
     @After
@@ -129,6 +135,8 @@ public class JmxListenerMonitorTest {
                 LOG.log(Level.WARNING, "unable to close listener " + g, ex);
             }
         }
+
+        threadpool.shutdownNow();
     }
 
     @Test
@@ -184,7 +192,13 @@ public class JmxListenerMonitorTest {
         when(nbr.resolve()).then(invocation -> Stream.of(NamedResolverMap.EMPTY));
 
         mon_oneName.apply(mri);
-        listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
+        listeners.forEach(gg -> {
+            try {
+                gg.getGroups(threadpool, new CompletableFuture<>());  // Force creation of JMX collectors
+            } catch (Exception ex) {
+                // Ignore
+            }
+        });
 
         assertThat(listeners,
                 contains(
@@ -202,7 +216,13 @@ public class JmxListenerMonitorTest {
         when(nbr.resolve()).then(invocation -> Stream.of(NamedResolverMap.EMPTY));
 
         mon_twoNames.apply(mri);
-        listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
+        listeners.forEach(gg -> {
+            try {
+                gg.getGroups(threadpool, new CompletableFuture<>());  // Force creation of JMX collectors
+            } catch (Exception ex) {
+                // Ignore
+            }
+        });
 
         assertThat(listeners,
                 contains(
@@ -235,7 +255,13 @@ public class JmxListenerMonitorTest {
         ));
 
         mon_oneName.apply(mri);
-        listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
+        listeners.forEach(gg -> {
+            try {
+                gg.getGroups(threadpool, new CompletableFuture<>());  // Force creation of JMX collectors
+            } catch (Exception ex) {
+                // Ignore
+            }
+        });
 
         assertThat(listeners,
                 contains(
@@ -283,7 +309,13 @@ public class JmxListenerMonitorTest {
         ));
 
         mon_twoNames.apply(mri);
-        listeners.forEach(GroupGenerator::getGroups);  // Force creation of JMX collectors
+        listeners.forEach(gg -> {
+            try {
+                gg.getGroups(threadpool, new CompletableFuture<>());  // Force creation of JMX collectors
+            } catch (Exception ex) {
+                // Ignore
+            }
+        });
 
         assertThat(listeners,
                 contains(

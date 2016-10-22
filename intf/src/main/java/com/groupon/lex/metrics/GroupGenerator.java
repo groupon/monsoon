@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -31,8 +31,11 @@
  */
 package com.groupon.lex.metrics;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import static java.util.Collections.EMPTY_LIST;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 
 /**
  * Provides multiple groups.
@@ -40,51 +43,24 @@ import static java.util.Collections.EMPTY_LIST;
  * @author ariane
  */
 public interface GroupGenerator extends AutoCloseable {
-    /**
-     * The result of a collection.
-     * Holds groups and an indicator of success.
-     */
-    public static final class GroupCollection {
-        private final boolean successful_;
-        private final Collection<? extends MetricGroup> groups_;
-
-        private GroupCollection(boolean successful, Collection<? extends MetricGroup> groups) {
-            successful_ = successful;
-            groups_ = groups;
-        }
-
-        /**
-         * Check if the collection was successful.
-         * @return True iff the collection was successful, false otherwise.
-         */
-        public boolean isSuccessful() { return successful_; }
-        /**
-         * Returns the groups collected by the collector.
-         * @return The groups collected by the collector if the collection succeeded.
-         *     An empty set is returned if the collection failed.
-         */
-        public Collection<? extends MetricGroup> getGroups() { return groups_; }
-    }
-
-    /**
-     * Create a new success result.
-     * @param groups The groups collected.
-     * @return A GroupCollection holding the collection.
-     */
-    public static GroupCollection successResult(Collection<? extends MetricGroup> groups) {
-        return new GroupCollection(true, groups);
-    }
-
-    /**
-     * Create a new failure result.
-     * @return A GroupCollection instance that indicates the collection failed.
-     */
-    public static GroupCollection failedResult() {
-        return new GroupCollection(false, EMPTY_LIST);
-    }
-
-    public GroupCollection getGroups();
+    public Collection<CompletableFuture<? extends Collection<? extends MetricGroup>>> getGroups(Executor threadpool, CompletableFuture<TimeoutObject> timeout) throws Exception;
 
     @Override
-    default void close() throws Exception {}
+    default void close() throws Exception {
+    }
+
+    public static class TimeoutObject {
+    }
+
+    public static Collection<MetricGroup> deref(Collection<CompletableFuture<? extends Collection<? extends MetricGroup>>> futures) throws InterruptedException, ExecutionException {
+        ArrayList<MetricGroup> result = new ArrayList<>();
+        for (CompletableFuture<? extends Collection<? extends MetricGroup>> future
+             : futures)
+            result.addAll(deref(future));
+        return result;
+    }
+
+    public static Collection<MetricGroup> deref(CompletableFuture<? extends Collection<? extends MetricGroup>> futures) throws InterruptedException, ExecutionException {
+        return new ArrayList<>(futures.get());
+    }
 }

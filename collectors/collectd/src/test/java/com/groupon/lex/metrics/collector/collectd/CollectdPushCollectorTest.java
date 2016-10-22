@@ -44,9 +44,13 @@ import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Arrays;
+import java.util.Collection;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -55,6 +59,7 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.hasKey;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -90,6 +95,8 @@ public class CollectdPushCollectorTest {
     @Mock
     private HttpServletResponse response;
 
+    private ExecutorService threadpool;
+
     @Before
     public void setup() throws Exception {
         collectd = new CollectdPushCollector(
@@ -124,6 +131,13 @@ public class CollectdPushCollectorTest {
         msg2.interval = 60;
         msg2.time = NOW.getMillis() / 1000d;
         json = gson.toJson(Arrays.asList(msg1, msg2));
+
+        threadpool = Executors.newSingleThreadExecutor();
+    }
+
+    @After
+    public void cleanup() {
+        threadpool.shutdownNow();
     }
 
     @Test
@@ -145,18 +159,16 @@ public class CollectdPushCollectorTest {
         when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
 
         /* Before data arrives, getGroups is empty. */
-        GroupGenerator.GroupCollection groups = collectd.getGroups();
-        assertTrue(groups.isSuccessful());
-        assertTrue(groups.getGroups().isEmpty());
+        Collection<MetricGroup> groups = GroupGenerator.deref(collectd.getGroups(threadpool, new CompletableFuture<>()));
+        assertTrue(groups.isEmpty());
 
         /* Perform HTTP request. */
         collectd_acceptor.service(request, response);
 
         /* After data arrives, getGroups returns this data. */
-        groups = collectd.getGroups();
-        assertTrue(groups.isSuccessful());
+        groups = GroupGenerator.deref(collectd.getGroups(threadpool, new CompletableFuture<>()));
         // Convenience map for validation.
-        Map<GroupName, Metric[]> group_map = groups.getGroups().stream().map(x -> (MetricGroup)x).collect(Collectors.toMap(MetricGroup::getName, MetricGroup::getMetrics));
+        Map<GroupName, Metric[]> group_map = groups.stream().map(x -> (MetricGroup) x).collect(Collectors.toMap(MetricGroup::getName, MetricGroup::getMetrics));
         assertThat(group_map, allOf(hasKey(UPTIME_NAME), hasKey(DOWNTIME_NAME), hasKey(BASE_NAME)));
         assertEquals(UPTIME_METRIC, group_map.get(UPTIME_NAME)[0].getName());
         assertEquals(MetricValue.fromIntValue(17), group_map.get(UPTIME_NAME)[0].getValue());
@@ -166,10 +178,9 @@ public class CollectdPushCollectorTest {
         assertEquals(MetricValue.TRUE, group_map.get(BASE_NAME)[0].getValue());
 
         /* After data collection, data must be removed from set, but the base names must still exist. */
-        groups = collectd.getGroups();
+        groups = GroupGenerator.deref(collectd.getGroups(threadpool, new CompletableFuture<>()));
         // Convenience map for validation.
-        group_map = groups.getGroups().stream().map(x -> (MetricGroup)x).collect(Collectors.toMap(MetricGroup::getName, MetricGroup::getMetrics));
-        assertTrue(groups.isSuccessful());
+        group_map = groups.stream().map(x -> (MetricGroup) x).collect(Collectors.toMap(MetricGroup::getName, MetricGroup::getMetrics));
         assertEquals(group_map.keySet(), singleton(BASE_NAME));
         assertEquals(UP_METRIC, group_map.get(BASE_NAME)[0].getName());
         assertEquals(MetricValue.FALSE, group_map.get(BASE_NAME)[0].getValue());
@@ -179,6 +190,7 @@ public class CollectdPushCollectorTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void empty_api_name_is_disallowed() throws Exception {
-        new CollectdPushCollector((path, handler) -> {}, SimpleGroupPath.valueOf("foo"), "");
+        new CollectdPushCollector((path, handler) -> {
+        }, SimpleGroupPath.valueOf("foo"), "");
     }
 }
