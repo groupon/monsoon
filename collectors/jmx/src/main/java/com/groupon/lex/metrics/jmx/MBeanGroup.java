@@ -33,7 +33,6 @@ package com.groupon.lex.metrics.jmx;
 
 import static com.groupon.lex.metrics.AttributeConverter.resolve_property;
 import com.groupon.lex.metrics.GroupName;
-import com.groupon.lex.metrics.Metric;
 import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
@@ -57,6 +56,7 @@ import javax.management.InstanceNotFoundException;
 import javax.management.IntrospectionException;
 import javax.management.MBeanAttributeInfo;
 import javax.management.MBeanException;
+import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
 import javax.management.ReflectionException;
 import javax.management.RuntimeErrorException;
@@ -118,7 +118,6 @@ public class MBeanGroup {
         }
     }
 
-    private final JmxClient conn_;
     private final GroupName name_;
     private final ObjectName obj_name_;
 
@@ -152,8 +151,7 @@ public class MBeanGroup {
         return resolvedMap.getGroupName(path, tags);
     }
 
-    public MBeanGroup(JmxClient conn, GroupName name, ObjectName obj_name) {
-        conn_ = conn;
+    public MBeanGroup(GroupName name, ObjectName obj_name) {
         name_ = name;
         obj_name_ = obj_name;
 
@@ -161,11 +159,11 @@ public class MBeanGroup {
             throw new IllegalArgumentException("ObjectName may not be a pattern");
     }
 
-    public MBeanGroup(JmxClient client, ObjectName obj_name, NamedResolverMap resolvedMap) {
-        this(client, nameFromObjectName(obj_name, resolvedMap), obj_name);
+    public MBeanGroup(ObjectName obj_name, NamedResolverMap resolvedMap) {
+        this(nameFromObjectName(obj_name, resolvedMap), obj_name);
     }
 
-    private Stream<Map.Entry<MetricName, MetricValue>> resolve_(String attribute) {
+    private Stream<Map.Entry<MetricName, MetricValue>> resolve_(MBeanServerConnection conn, String attribute) {
         final DateTime last_exception_log = last_exception_log_.computeIfAbsent(attribute, (ignored) -> new DateTime(0L, DateTimeZone.UTC));
 
         /*
@@ -174,7 +172,7 @@ public class MBeanGroup {
          */
         Object property;
         try {
-            property = conn_.getConnection().getAttribute(obj_name_, attribute);
+            property = conn.getAttribute(obj_name_, attribute);
         } catch (MBeanException | IOException | RuntimeMBeanException | RuntimeErrorException ex) {
             /* Don't spam continuously this error, just emit it every once in a while. */
             final DateTime now_ts = DateTime.now(DateTimeZone.UTC);
@@ -197,10 +195,10 @@ public class MBeanGroup {
         return resolve_property(Arrays.asList(attribute), property);
     }
 
-    public Optional<MetricGroup> getMetrics() {
+    public Optional<MetricGroup> getMetrics(MBeanServerConnection conn) {
         MBeanAttributeInfo[] attributes;
         try {
-            attributes = conn_.getConnection().getMBeanInfo(obj_name_).getAttributes();
+            attributes = conn.getMBeanInfo(obj_name_).getAttributes();
         } catch (InstanceNotFoundException ex) {
             return Optional.empty();
         } catch (IntrospectionException | ReflectionException | IOException ex) {
@@ -213,7 +211,7 @@ public class MBeanGroup {
                 Arrays.stream(attributes)
                 .map(MBeanAttributeInfo::getName)
                 .distinct()
-                .flatMap(this::resolve_)
+                .flatMap(attribute -> resolve_(conn, attribute))
                 .map(m -> new SimpleMetric(m.getKey(), m.getValue()))));
     }
 
@@ -223,16 +221,5 @@ public class MBeanGroup {
 
     public ObjectName getMonitoredMBeanName() {
         return obj_name_;
-    }
-
-    public String[] getMonitoredProperties() {
-        return Stream.of(getMetrics())
-                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
-                .map(MetricGroup::getMetrics)
-                .flatMap(Arrays::stream)
-                .map(Metric::getName)
-                .map(MetricName::configString)
-                .map(StringBuilder::toString)
-                .toArray(String[]::new);
     }
 }

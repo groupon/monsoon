@@ -31,26 +31,22 @@
  */
 package com.groupon.lex.metrics.jmx;
 
+import com.groupon.lex.metrics.GroupGenerator;
 import com.groupon.lex.metrics.MetricGroup;
-import com.groupon.lex.metrics.SynchronousGroupGenerator;
 import com.groupon.lex.metrics.jmx.JmxClient.ConnectionDecorator;
 import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import static java.util.Collections.singleton;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.management.InstanceNotFoundException;
 import javax.management.ListenerNotFoundException;
 import javax.management.MBeanServerConnection;
@@ -68,7 +64,7 @@ import lombok.NonNull;
  *
  * @author ariane
  */
-public class MetricListener extends SynchronousGroupGenerator {
+public class MetricListener implements GroupGenerator {
     private static final Logger LOG = Logger.getLogger(MetricListener.class.getName());
     private final Collection<ObjectName> filter_;
     private final Map<ObjectName, MBeanGroup> detected_groups_ = new HashMap<ObjectName, MBeanGroup>();
@@ -146,7 +142,7 @@ public class MetricListener extends SynchronousGroupGenerator {
             return;
         }
 
-        MBeanGroup instance = new MBeanGroup(connection, obj, resolvedMap);
+        MBeanGroup instance = new MBeanGroup(obj, resolvedMap);
         detected_groups_.put(obj, instance);
         LOG.log(Level.FINE, "registered metrics for {0}: {1}", new Object[]{obj, instance});
     }
@@ -222,55 +218,27 @@ public class MetricListener extends SynchronousGroupGenerator {
     }
 
     @Override
-    public synchronized Collection<? extends MetricGroup> getGroups(CompletableFuture<TimeoutObject> timeout) {
-        try {
-            /*
-             * Force the connection to open, even if there are no groups to scan.
-             *
-             * If there are no groups registered, the connection opening won't be triggered otherwise.
-             * And if that isn't triggered, registering groups won't happen either.
-             */
-            connection.getConnection();
-        } catch (IOException ex) {
-            /*
-             * Connection down, can't collect any data.
-             */
-            throw new RuntimeException("connection unavailable", ex);
-        }
+    public synchronized Collection<CompletableFuture<? extends Collection<? extends MetricGroup>>> getGroups(Executor threadpool, CompletableFuture<TimeoutObject> timeout) {
+        /*
+         * Force the connection to open, even if there are no groups to scan.
+         *
+         * If there are no groups registered, the connection opening won't be triggered otherwise.
+         * And if that isn't triggered, registering groups won't happen either.
+         */
+        return singleton(connection.getConnection(threadpool)
+                .applyToEither(
+                        timeout.thenApply(timeoutObject -> (MBeanServerConnection) null),
+                        (conn -> {
+                            if (conn == null)
+                                throw new RuntimeException("connection unavailable");
 
-        // Copy collection, to isolate it from mbean events add/removing elements.
-        final List<MetricGroup> values;
-        try {
-            // Load values, but apply a timeout in case a specific MBean getter blocks for a very long time.
-            values = ForkJoinPool.commonPool()
-                    .invokeAll(
-                            detected_groups_.values().stream()
-                            .map(v -> new Callable<Optional<MetricGroup>>() {
-                                @Override
-                                public Optional<MetricGroup> call() throws Exception {
-                                    return v.getMetrics();
-                                }
-                            })
-                            .collect(Collectors.toList()),
-                            30, TimeUnit.SECONDS
-                    )
-                    .stream()
-                    .map(fut -> {
-                        try {
-                            return fut.get();
-                        } catch (InterruptedException ex) {
-                            LOG.log(Level.SEVERE, "Should not happen?", ex);
-                            return Optional.<MetricGroup>empty();
-                        } catch (ExecutionException ex) {
-                            LOG.log(Level.WARNING, "Error gathering JMX bean", ex);
-                            return Optional.<MetricGroup>empty();
-                        }
-                    })
-                    .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty))
-                    .collect(Collectors.toList());
-        } catch (InterruptedException ex) {
-            throw new RuntimeException("interrupted while reading JMX beans", ex);
-        }
-        return values;
+                            List<MetricGroup> result = new ArrayList<>();
+                            for (MBeanGroup group : detected_groups_.values()) {
+                                if (timeout.isDone())
+                                    throw new RuntimeException("timed out");
+                                group.getMetrics(conn).ifPresent(result::add);
+                            }
+                            return result;
+                        })));
     }
 }

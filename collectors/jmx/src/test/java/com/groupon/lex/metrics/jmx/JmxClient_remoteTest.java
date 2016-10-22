@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -44,6 +44,9 @@ import java.rmi.server.RMISocketFactory;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.management.MBeanServer;
 import javax.management.MBeanServerConnection;
@@ -95,7 +98,7 @@ public class JmxClient_remoteTest {
         private JMXConnectorServer cs;
         public final JMXServiceURL url;
         private boolean started = false;
-        private final Map<String,Object> env;
+        private final Map<String, Object> env;
         private final MBeanServer mbs;
 
         public JmxServer() throws RemoteException, IOException {
@@ -113,7 +116,6 @@ public class JmxClient_remoteTest {
 //            final RMIServerSocketFactory ssf = new LoopbackSocketFactory();
 //            env.put(RMIConnectorServer.RMI_CLIENT_SOCKET_FACTORY_ATTRIBUTE, csf);
 //            env.put(RMIConnectorServer.RMI_SERVER_SOCKET_FACTORY_ATTRIBUTE, ssf);
-
             env.put("jmx.remote.local.only", Boolean.TRUE);
             env.put("jmx.remote.authenticate", Boolean.FALSE);
             env.put("jmx.remote.ssl", Boolean.FALSE);
@@ -136,42 +138,55 @@ public class JmxClient_remoteTest {
             }
         }
 
-        public synchronized boolean isStarted() { return started; }
+        public synchronized boolean isStarted() {
+            return started;
+        }
 
         @Override
         public void close() throws IOException {
             stop();
         }
     }
-    
+
     private JmxServer jmx_server = null;
+    private ExecutorService threadpool;
 
     @Before
     public void setup() throws Exception {
         jmx_server = new JmxServer();
+        threadpool = Executors.newSingleThreadExecutor();
     }
 
     @After
     public void cleanup() throws Exception {
-        if (jmx_server != null)
-            jmx_server.close();
+        try {
+            if (jmx_server != null)
+                jmx_server.close();
+        } finally {
+            threadpool.shutdownNow();
+        }
     }
 
     @Test
     public void connection() throws Exception {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
-            MBeanServerConnection connection = jmx_client.getConnection();
+            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get();
 
             assertNotNull(connection);
         }
     }
 
-    @Test(expected = IOException.class)
-    public void connect_no_server() throws Exception {
-        assert(!jmx_server.isStarted());
+    @Test(expected = Exception.class)  // IOException, wrapped under many exception wrappers. :P
+    public void connect_no_server() throws Exception, Throwable {
+        assert (!jmx_server.isStarted());
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
-            MBeanServerConnection connection = jmx_client.getConnection();  // Must throw IOException
+            MBeanServerConnection connection = null;
+            try {
+                connection = jmx_client.getConnection(threadpool).get();  // Must throw IOException (wrapped inside ExecutionException, because future).
+            } catch (ExecutionException ex) {
+                throw ex.getCause();
+            }
 
             assertNull(connection);
         }
@@ -179,37 +194,42 @@ public class JmxClient_remoteTest {
 
     @Test
     public void connect_late_server() throws Exception {
-        assert(!jmx_server.isStarted());
+        assert (!jmx_server.isStarted());
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             /* First, start client, while server isn't up yet. */
             Exception first_connect_exception = null;
             try {
-                jmx_client.getConnection();
+                jmx_client.getConnection(threadpool).get();
             } catch (Exception ex) {
                 first_connect_exception = ex;
             }
-            if (first_connect_exception == null) fail("Test requires connection to fail initially.");
+            if (first_connect_exception == null)
+                fail("Test requires connection to fail initially.");
 
             jmx_server.start();
-            MBeanServerConnection connection = jmx_client.getConnection();
+            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get();
 
             assertNotNull(connection);
         }
     }
 
-    @Test(expected = IOException.class)
-    public void connect_and_server_goes_away() throws Exception {
+    @Test(expected = Exception.class)  // IOException, wrapped under many exception wrappers. :P
+    public void connect_and_server_goes_away() throws Exception, Throwable {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             try {
-                jmx_client.getConnection();  // Ensure connection exists.
+                jmx_client.getConnection(threadpool).get();  // Ensure connection exists.
             } catch (Exception e) {
                 /* Ensure we catch any exception from getConnection, just in case. */
                 throw new AssertionError("getConnection() may not throw at this point", e);
             }
 
             jmx_server.stop();  // Server going down...
-            jmx_client.getConnection();
+            try {
+                jmx_client.getConnection(threadpool).get();
+            } catch (ExecutionException ex) {
+                throw ex.getCause();
+            }
         }
     }
 
@@ -217,13 +237,13 @@ public class JmxClient_remoteTest {
     public void connect_and_server_restarts() throws Exception {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
-            jmx_client.getConnection();
+            jmx_client.getConnection(threadpool).get();
 
             /* Restart JMX server. */
             jmx_server.stop();
             jmx_server.start();
 
-            MBeanServerConnection connection = jmx_client.getConnection();
+            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get();
             assertNotNull(connection);
         }
     }
@@ -240,7 +260,7 @@ public class JmxClient_remoteTest {
 
     @Test
     public void opt_connect_no_server() throws Exception {
-        assert(!jmx_server.isStarted());
+        assert (!jmx_server.isStarted());
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             Optional<MBeanServerConnection> connection = jmx_client.getOptionalConnection();  // May not throw.
 
@@ -250,22 +270,23 @@ public class JmxClient_remoteTest {
 
     @Test
     public void opt_connect_late_server() throws Exception {
-        assert(!jmx_server.isStarted());
+        assert (!jmx_server.isStarted());
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             /* First, start client, while server isn't up yet. */
             Exception first_connect_exception = null;
             try {
-                jmx_client.getConnection();
+                jmx_client.getConnection(threadpool).get();
             } catch (Exception ex) {
                 first_connect_exception = ex;
             }
-            if (first_connect_exception == null) fail("Test requires connection to fail initially.");
+            if (first_connect_exception == null)
+                fail("Test requires connection to fail initially.");
 
             jmx_server.start();
             Optional<MBeanServerConnection> connection = jmx_client.getOptionalConnection();
             assertEquals("Asked for connection only if one was thought to exist -- it didn't exist, so no connection shall be returned.", Optional.empty(), connection);
 
-            jmx_client.getConnection();  // Force construction of connection.
+            jmx_client.getConnection(threadpool).get();  // Force construction of connection.
             connection = jmx_client.getOptionalConnection();
             assertNotEquals("Since the server is up and a new connection was forcibly created, the connection must now be present.", Optional.empty(), connection);
         }
@@ -276,7 +297,7 @@ public class JmxClient_remoteTest {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             try {
-                jmx_client.getConnection();  // Ensure connection exists.
+                jmx_client.getConnection(threadpool).get();  // Ensure connection exists.
             } catch (Exception e) {
                 /* Ensure we catch any exception from getConnection, just in case. */
                 throw new AssertionError("getConnection() may not throw at this point", e);
@@ -293,7 +314,7 @@ public class JmxClient_remoteTest {
     public void opt_connect_and_server_restarts() throws Exception {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
-            MBeanServerConnection old_connection = jmx_client.getConnection();
+            MBeanServerConnection old_connection = jmx_client.getConnection(threadpool).get();
 
             /* Restart JMX server. */
             jmx_server.stop();
@@ -329,7 +350,7 @@ public class JmxClient_remoteTest {
         }
         InitCount_ init_count = new InitCount_();
 
-        assert(!jmx_server.isStarted());
+        assert (!jmx_server.isStarted());
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             jmx_client.addRecoveryCallback((conn) -> ++init_count.count);
         }
@@ -344,13 +365,13 @@ public class JmxClient_remoteTest {
         }
         InitCount_ init_count = new InitCount_();
 
-        assert(!jmx_server.isStarted());
+        assert (!jmx_server.isStarted());
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             jmx_client.addRecoveryCallback((conn) -> ++init_count.count);
             assertEquals("Initialization callback was not yet called", 0, init_count.count);
 
             jmx_server.start();  // Start server.
-            jmx_client.getConnection();  // Force connection to come into existence.
+            jmx_client.getConnection(threadpool).get();  // Force connection to come into existence.
         }
 
         assertEquals("Initialization callback was called exactly once", 1, init_count.count);
@@ -366,14 +387,14 @@ public class JmxClient_remoteTest {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             jmx_client.addRecoveryCallback((conn) -> ++init_count.count);
-            MBeanServerConnection old_connection = jmx_client.getConnection();
+            MBeanServerConnection old_connection = jmx_client.getConnection(threadpool).get();
             assertEquals("1 connection, 1 callback", 1, init_count.count);
 
             /* Restart JMX server. */
             jmx_server.stop();
             jmx_server.start();
 
-            MBeanServerConnection connection = jmx_client.getConnection(); // Force reconnect.
+            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get(); // Force reconnect.
             if (old_connection != connection)
                 assertEquals("Callback was invoked upon reconnect", 2, init_count.count);
         }
@@ -400,7 +421,7 @@ public class JmxClient_remoteTest {
         }
         InitCount_ init_count = new InitCount_();
 
-        assert(!jmx_server.isStarted());
+        assert (!jmx_server.isStarted());
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             jmx_client.addRecoveryCallback((conn) -> ++init_count.count);
         }
@@ -427,7 +448,9 @@ public class JmxClient_remoteTest {
     public void connect_callback_throws() throws Exception {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
-            jmx_client.addRecoveryCallback((conn) -> { throw new IOException("muhahaha"); });
+            jmx_client.addRecoveryCallback((conn) -> {
+                throw new IOException("muhahaha");
+            });
 
             assertEquals("Connection only exists if all callbacks were successful", Optional.empty(), jmx_client.getOptionalConnection());
         }
@@ -436,12 +459,14 @@ public class JmxClient_remoteTest {
     @Test
     public void connect_callback_late_server_throws() throws Exception {
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
-            jmx_client.addRecoveryCallback((conn) -> { throw new IOException("muhahaha"); });
+            jmx_client.addRecoveryCallback((conn) -> {
+                throw new IOException("muhahaha");
+            });
 
             jmx_server.start();
             try {
-                jmx_client.getConnection();  // Force connection to start.
-            } catch (IOException ex) {
+                jmx_client.getConnection(threadpool).get();  // Force connection to start.
+            } catch (Exception ex) {
                 /* ignore */
             }
             assertEquals("Connection only exists if all callbacks were successful", Optional.empty(), jmx_client.getOptionalConnection());

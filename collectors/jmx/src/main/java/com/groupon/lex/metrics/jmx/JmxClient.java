@@ -37,6 +37,8 @@ import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.management.MBeanServerConnection;
@@ -74,6 +76,7 @@ public class JmxClient implements AutoCloseable {
 
     /**
      * Create a new client, connecting to the specified URL.
+     *
      * @param connection_url the JMX server URL
      * @throws IOException if the connection cannot be established
      */
@@ -102,7 +105,9 @@ public class JmxClient implements AutoCloseable {
 
     /**
      * Create a new client, connecting to the specified URL.
-     * @param connection_url the JMX server URL, example: "service:jmx:rmi:///jndi/rmi://:9999/jmxrmi"
+     *
+     * @param connection_url the JMX server URL, example:
+     * "service:jmx:rmi:///jndi/rmi://:9999/jmxrmi"
      * @throws MalformedURLException if the JMX URL is invalid
      * @throws IOException if the connection cannot be established
      */
@@ -114,38 +119,57 @@ public class JmxClient implements AutoCloseable {
      * Returns a connection to the MBeanServer.
      *
      * Will restore connection if it has broken.
-     * @return A connection to the MBean server.
-     * @throws IOException if the connection couldn't be established.
+     *
+     * @param threadpool The threadpool on which to asynchronously create the
+     * connection.
+     * @return A future for a connection to the MBean server. To cancel the
+     * connection creation, cancel the future with the interruption flag set to
+     * true.
      */
-    public synchronized MBeanServerConnection getConnection() throws IOException {
+    public synchronized CompletableFuture<MBeanServerConnection> getConnection(Executor threadpool) {
         {
             Optional<MBeanServerConnection> optionalConnection = getOptionalConnection();
-            if (optionalConnection.isPresent()) return optionalConnection.get();
+            if (optionalConnection.isPresent())
+                return CompletableFuture.completedFuture(optionalConnection.get());
         }
 
-        /* Re-create factory, because apparently they cannot re-create a broken connection. */
-        if (jmxUrl.isPresent())
-            jmx_factory_ = Optional.of(JMXConnectorFactory.newJMXConnector(jmxUrl.get(), null));  // May throw
+        return CompletableFuture.supplyAsync(
+                () -> {
+                    synchronized (this) {
+                        try {
+                            /* Re-create factory, because apparently they cannot re-create a broken connection. */
+                            if (jmxUrl.isPresent())
+                                jmx_factory_ = Optional.of(JMXConnectorFactory.newJMXConnector(jmxUrl.get(), null));  // May throw
 
-        /* Attempt to recreate the connection and replay the listeners. */
-        JMXConnector factory = jmx_factory_.orElseThrow(() -> new IOException("cannot recover from broken connection to local MBean Server"));
-        factory.connect();  // May throw
-        try {
-            conn_ = factory.getMBeanServerConnection();
-            for (ConnectionDecorator cb : recovery_callbacks_)
-                cb.apply(conn_);
-        } catch (IOException ex) {
-            /* Cleanup on initialization failure. */
-            conn_ = null;
-            factory.close();
-            throw ex;
-        }
-        return conn_;
+                            /* Attempt to recreate the connection and replay the listeners. */
+                            JMXConnector factory = jmx_factory_.orElseThrow(() -> new IOException("cannot recover from broken connection to local MBean Server"));
+                            factory.connect();  // May throw
+                            try {
+                                conn_ = factory.getMBeanServerConnection();
+                                for (ConnectionDecorator cb
+                                             : recovery_callbacks_)
+                                    cb.apply(conn_);
+                            } catch (IOException ex) {
+                                /* Cleanup on initialization failure. */
+                                conn_ = null;
+                                factory.close();
+                                throw ex;
+                            }
+                            return conn_;
+                        } catch (IOException ex) {
+                            throw new RuntimeException(ex.getMessage(), ex);
+                        }
+                    }
+                },
+                threadpool);
     }
 
     /**
-     * Get the connection, but don't bother with the recovery protocol if the connection is lost.
-     * @return An optional with a connection, or empty optional indicating there is no connection.
+     * Get the connection, but don't bother with the recovery protocol if the
+     * connection is lost.
+     *
+     * @return An optional with a connection, or empty optional indicating there
+     * is no connection.
      */
     public Optional<MBeanServerConnection> getOptionalConnection() {
         if (conn_ != null) {
@@ -171,17 +195,12 @@ public class JmxClient implements AutoCloseable {
      * Add a recovery callback.
      *
      * The callback will be invoked after adding it.
+     *
      * @param cb the callback that is to be added.
      */
-    public void addRecoveryCallback(ConnectionDecorator cb) {
+    public synchronized void addRecoveryCallback(ConnectionDecorator cb) {
         if (cb == null) throw new NullPointerException("null callback");
-        MBeanServerConnection conn;
-        try {
-            conn = getConnection();
-        } catch (IOException ex) {
-            Logger.getLogger(JmxClient.class.getName()).log(Level.FINE, "connection error while adding callback", ex);
-            conn = null;
-        }
+        final MBeanServerConnection conn = getOptionalConnection().orElse(null);
 
         recovery_callbacks_.add(cb);
         try {
@@ -190,8 +209,8 @@ public class JmxClient implements AutoCloseable {
             Logger.getLogger(getClass().getName()).log(Level.FINE, "connection error while adding callback", ex);
             /* Silently ignore: connection is bad and next time a connection is requested, the callback will be invoked. */
 
-            /* Cleanup on initialization failure. */
             if (jmx_factory_.isPresent()) {
+                // Cleanup on initialization failure.
                 conn_ = null;
                 try {
                     jmx_factory_.get().close();
@@ -204,10 +223,12 @@ public class JmxClient implements AutoCloseable {
 
     /**
      * Remove a previously registered callback.
+     *
      * @param cb the callback that is to be removed.
-     * @return the callback that was removed, or null is the callback was not found.
+     * @return the callback that was removed, or null is the callback was not
+     * found.
      */
-    public ConnectionDecorator removeRecoveryCallback(ConnectionDecorator cb) {
+    public synchronized ConnectionDecorator removeRecoveryCallback(ConnectionDecorator cb) {
         if (cb == null) throw new NullPointerException("null callback");
         return (recovery_callbacks_.remove(cb) ? cb : null);
     }
