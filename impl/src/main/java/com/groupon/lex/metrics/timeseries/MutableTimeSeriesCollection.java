@@ -70,7 +70,7 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
         final Optional<MutableTimeSeriesValue> removed = Optional.ofNullable(data_.put(name, tsv));
         removed.ifPresent(r -> {
             final boolean is_removed = data_by_path_.get(path).remove(r);
-            assert(is_removed);
+            assert (is_removed);
         });
         data_by_path_.computeIfAbsent(path, (p) -> new HashSet<>())
                 .add(tsv);
@@ -83,7 +83,7 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
         removed.ifPresent(r -> {
             Set<MutableTimeSeriesValue> set = data_by_path_.get(path);
             final boolean is_removed = set.remove(r);
-            assert(is_removed);
+            assert (is_removed);
             if (set.isEmpty())
                 data_by_path_.remove(path);
         });
@@ -129,7 +129,7 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
     public TimeSeriesCollection addMetrics(GroupName group, Map<MetricName, MetricValue> metrics) {
         final Optional<MutableTimeSeriesValue> opt_tsv = remove_(group);  // Unlink, since we may alter the hash bucket.
         if (!opt_tsv.isPresent()) {
-            add_(new MutableTimeSeriesValue(getTimestamp(), group, metrics));
+            add_(new MutableTimeSeriesValue(group, metrics));
         } else {
             final MutableTimeSeriesValue tsv = opt_tsv.get();
             tsv.addMetrics(metrics);
@@ -139,7 +139,9 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
     }
 
     @Override
-    public DateTime getTimestamp() { return timestamp_; }
+    public DateTime getTimestamp() {
+        return timestamp_;
+    }
 
     public MutableTimeSeriesCollection setTimestamp(DateTime timestamp) {
         timestamp_ = requireNonNull(timestamp);
@@ -147,7 +149,9 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
     }
 
     @Override
-    public boolean isEmpty() { return data_.isEmpty(); }
+    public boolean isEmpty() {
+        return data_.isEmpty();
+    }
 
     @Override
     public Set<GroupName> getGroups() {

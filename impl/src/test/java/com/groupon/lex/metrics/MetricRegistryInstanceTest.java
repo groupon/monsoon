@@ -76,10 +76,12 @@ public class MetricRegistryInstanceTest {
     private MetricRegistryInstance.CollectionContext cctx;
 
     private MetricRegistryInstance create(boolean has_config) {
-        return new MetricRegistryInstance(has_config, (pattern, handler) -> {}) {
+        return new MetricRegistryInstance(has_config, (pattern, handler) -> {
+        }) {
             @Override
             protected MetricRegistryInstance.CollectionContext beginCollection(DateTime now) {
-                when(cctx.alertManager()).thenReturn((Alert alert) -> {});
+                when(cctx.alertManager()).thenReturn((Alert alert) -> {
+                });
                 when(cctx.tsdata()).thenAnswer(new Answer<TimeSeriesCollectionPair>() {
                     @Override
                     public TimeSeriesCollectionPair answer(InvocationOnMock invocation) throws Throwable {
@@ -93,10 +95,12 @@ public class MetricRegistryInstanceTest {
     }
 
     private MetricRegistryInstance create(boolean has_config, DateTime now) {
-        return new MetricRegistryInstance(() -> now, has_config, (pattern, handler) -> {}) {
+        return new MetricRegistryInstance(() -> now, has_config, (pattern, handler) -> {
+        }) {
             @Override
             protected MetricRegistryInstance.CollectionContext beginCollection(DateTime now) {
-                when(cctx.alertManager()).thenReturn((Alert alert) -> {});
+                when(cctx.alertManager()).thenReturn((Alert alert) -> {
+                });
                 when(cctx.tsdata()).thenAnswer(new Answer<TimeSeriesCollectionPair>() {
                     @Override
                     public TimeSeriesCollectionPair answer(InvocationOnMock invocation) throws Throwable {
@@ -144,7 +148,7 @@ public class MetricRegistryInstanceTest {
             List<TimeSeriesValue> sgroups = mr.updateCollection().getTSValues().stream().collect(Collectors.toList());
 
             assertThat(sgroups,
-                    hasItem(new MutableTimeSeriesValue(now, GroupName.valueOf("test"), singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(17)))));
+                    hasItem(new MutableTimeSeriesValue(GroupName.valueOf("test"), singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(17)))));
         }
 
         verify(generator, times(1)).getGroups();

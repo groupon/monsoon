@@ -75,10 +75,15 @@ public class ListTSC extends AbstractTimeSeriesCollection {
     private final SegmentReader<Map<GroupName, TimeSeriesValue>> data;
 
     private static <T> BinaryOperator<T> throwing_merger_() {
-        return (x, y) -> { throw new IllegalStateException("duplicate key " + x); };
+        return (x, y) -> {
+            throw new IllegalStateException("duplicate key " + x);
+        };
     }
 
-    /** HashMap constructor, so we can create hash maps with an altered load factor. */
+    /**
+     * HashMap constructor, so we can create hash maps with an altered load
+     * factor.
+     */
     private static <K, V> Supplier<Map<K, V>> hashmap_constructor_() {
         return () -> new THashMap<>(1, 1);
     }
@@ -153,29 +158,26 @@ public class ListTSC extends AbstractTimeSeriesCollection {
                     .map(rt -> {
                         final Tags tags = dictionary.getTags(rt.tag_ref);
                         final GroupName group = GroupName.valueOf(path, tags);
-                        return SimpleMapEntry.create(group, createTsv(ts, group, segmentFactory.get(record_metrics::new, FromXdr.filePos(rt.pos)), dictSegment));
+                        return SimpleMapEntry.create(group, createTsv(group, segmentFactory.get(record_metrics::new, FromXdr.filePos(rt.pos)), dictSegment));
                     });
         }
 
-        private static TimeSeriesValue createTsv(DateTime ts, GroupName group, SegmentReader<record_metrics> rmSegment, SegmentReader<DictionaryDelta> dictSegment) {
+        private static TimeSeriesValue createTsv(GroupName group, SegmentReader<record_metrics> rmSegment, SegmentReader<DictionaryDelta> dictSegment) {
             return new ListTimeSeriesValue(
-                    ts,
                     group,
                     rmSegment
-                            .combine(
-                                    dictSegment,  // Using dictionary segment, to allow dictionary to be released by GC.
-                                    (metrics, dict) -> {
-                                        return Arrays.stream(metrics.value)
-                                                .collect(Collectors.toMap(r -> MetricName.valueOf(dict.getPath(r.path_ref)), r -> FromXdr.metricValue(r.v, dict::getString), throwing_merger_(), hashmap_constructor_()));
-                                    })
-                                    .cache());
+                    .combine(
+                            dictSegment, // Using dictionary segment, to allow dictionary to be released by GC.
+                            (metrics, dict) -> {
+                                return Arrays.stream(metrics.value)
+                                .collect(Collectors.toMap(r -> MetricName.valueOf(dict.getPath(r.path_ref)), r -> FromXdr.metricValue(r.v, dict::getString), throwing_merger_(), hashmap_constructor_()));
+                            })
+                    .cache());
         }
     }
 
     @AllArgsConstructor
     private static class ListTimeSeriesValue extends AbstractTimeSeriesValue {
-        @Getter
-        private final DateTime timestamp;
         @Getter
         private final GroupName group;
         private final SegmentReader<Map<MetricName, MetricValue>> data;
@@ -194,7 +196,7 @@ public class ListTSC extends AbstractTimeSeriesCollection {
             try {
                 return sr.decode();
             } catch (IOException | OncRpcException ex) {
-                throw new DecodingException("unable to extract metrics for " + timestamp, ex);
+                throw new DecodingException("unable to extract metrics", ex);
             }
         }
     }

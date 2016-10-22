@@ -49,13 +49,14 @@ public class WavefrontStrings {
     public final static int MAX_TAG_KEY_VAL_CHARS = 254;  // Max of 255 chars, but need to exclude the '=' sign between tag name and tag value.
     public final static int TRUNCATE_TAG_NAME = 127;  // We truncate tag names to 128 chars, so we don't have to truncate values so much.
 
-    private WavefrontStrings() {}
+    private WavefrontStrings() {
+    }
 
     /**
      * Convert a name to a name that wavefront will accept.
      *
-     * Wavefront documentation specifies a metric consists of the characters [-a-zA-Z_0-9.]
-     * Any disallowed characters are replaced with underscores.
+     * Wavefront documentation specifies a metric consists of the characters
+     * [-a-zA-Z_0-9.] Any disallowed characters are replaced with underscores.
      */
     public static final String name(String name) {
         return name
@@ -66,15 +67,15 @@ public class WavefrontStrings {
     /**
      * Convert a group+metric to a wavefront name.
      *
-     * Concatenates the paths of a Group and a Metric, separating each path element with a dot ('.').
+     * Concatenates the paths of a Group and a Metric, separating each path
+     * element with a dot ('.').
      *
-     * Example:
-     * - group path: [ 'example', 'group', 'path' ]
-     * - and metric: [ 'metric', 'name' ]
-     * are concatenated into "example.group.path.metric.name".
+     * Example: - group path: [ 'example', 'group', 'path' ] - and metric: [
+     * 'metric', 'name' ] are concatenated into
+     * "example.group.path.metric.name".
      *
-     * The concatenated name is cleaned to only contain characters allowed by wavefront.
-     * (See the WavefrontString.name(String) function.)
+     * The concatenated name is cleaned to only contain characters allowed by
+     * wavefront. (See the WavefrontString.name(String) function.)
      */
     public static final String name(SimpleGroupPath group, MetricName metric) {
         return name(Stream.concat(group.getPath().stream(), metric.getPath().stream())
@@ -84,7 +85,8 @@ public class WavefrontStrings {
     /**
      * Does the escaping of tag values.
      *
-     * This function assumes you'll put double quotes ('"') around your tag value.
+     * This function assumes you'll put double quotes ('"') around your tag
+     * value.
      */
     private static String escapeTagValue(String tag_value) {
         return tag_value.replace("\"", "\\\"");
@@ -102,12 +104,13 @@ public class WavefrontStrings {
     }
 
     /**
-     * Truncate tag keys and values, to prevent them from exceeding the max length of a tag entry.
+     * Truncate tag keys and values, to prevent them from exceeding the max
+     * length of a tag entry.
      */
     private static Map.Entry<String, String> maybeTruncateTagEntry(Map.Entry<String, String> tag_entry) {
         String k = tag_entry.getKey();
         String v = tag_entry.getValue();
-        if (k.length() + v.length() <= MAX_TAG_KEY_VAL_CHARS - 2)  // 2 chars for the quotes around the value
+        if (k.length() + v.length() <= MAX_TAG_KEY_VAL_CHARS - 2) // 2 chars for the quotes around the value
             return tag_entry;
 
         if (k.length() > TRUNCATE_TAG_NAME)
@@ -134,7 +137,8 @@ public class WavefrontStrings {
     /**
      * Create a wavefront compatible string representation of the metric value.
      *
-     * If the metric value is empty or not representable in wavefront, an empty optional will be returned.
+     * If the metric value is empty or not representable in wavefront, an empty
+     * optional will be returned.
      */
     public static Optional<String> wavefrontValue(MetricValue mv) {
         // Omit NaN and Inf.
@@ -142,7 +146,10 @@ public class WavefrontStrings {
         return mv.value().map(Number::toString);
     }
 
-    /** Convert a timestamp to the string representation that wavefront will accept. */
+    /**
+     * Convert a timestamp to the string representation that wavefront will
+     * accept.
+     */
     public static String timestamp(DateTime ts) {
         return Long.toString(ts.getMillis() / 1000);
     }
@@ -150,8 +157,9 @@ public class WavefrontStrings {
     /**
      * Extract the 'source' tag from the tag_map.
      *
-     * Wavefront requires the 'source' tag to be the first tag on the line, hence
-     * the special handling.  It also *must* be present, so we can never return null.
+     * Wavefront requires the 'source' tag to be the first tag on the line,
+     * hence the special handling. It also *must* be present, so we can never
+     * return null.
      */
     private static String extractTagSource(Map<String, String> tag_map) {
         return Optional.ofNullable(tag_map.remove("source"))
@@ -162,7 +170,9 @@ public class WavefrontStrings {
                 });
     }
 
-    /** Build the wavefront line from its parts. */
+    /**
+     * Build the wavefront line from its parts.
+     */
     private static String wavefrontLine(DateTime ts, SimpleGroupPath group, MetricName metric, String value, String source, Map<String, String> tag_map) {
         return new StringBuilder()
                 .append(name(group, metric))
@@ -207,8 +217,7 @@ public class WavefrontStrings {
      *
      * Note: the line is not terminated with a newline.
      */
-    public static Stream<String> wavefrontLine(TimeSeriesValue tsv) {
-        final DateTime ts = tsv.getTimestamp();
+    public static Stream<String> wavefrontLine(DateTime ts, TimeSeriesValue tsv) {
         final GroupName group = tsv.getGroup();
 
         return tsv.getMetrics().entrySet().stream()

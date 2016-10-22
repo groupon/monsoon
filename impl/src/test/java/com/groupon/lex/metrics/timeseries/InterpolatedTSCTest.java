@@ -81,8 +81,6 @@ public class InterpolatedTSCTest {
         when(presentValue.getGroup()).thenReturn(TESTGROUP);
         when(pastValue.getTags()).thenReturn(TESTGROUP.getTags());
         when(futureValue.getTags()).thenReturn(TESTGROUP.getTags());
-        when(pastValue.getTimestamp()).thenReturn(pastDate);
-        when(futureValue.getTimestamp()).thenReturn(futureDate);
         when(pastValue.findMetric(Mockito.any())).thenCallRealMethod();
         when(futureValue.findMetric(Mockito.any())).thenCallRealMethod();
 
@@ -99,7 +97,6 @@ public class InterpolatedTSCTest {
 
         assertTrue(interpolatedTSC.get(TESTGROUP).isPresent());
         assertEquals(TESTGROUP, interpolatedTSC.get(TESTGROUP).get().getGroup());
-        assertEquals(midDate, interpolatedTSC.get(TESTGROUP).get().getTimestamp());
         assertEquals(Optional.of(MetricValue.fromDblValue(0.25)), interpolatedTSC.get(TESTGROUP).get().findMetric(TESTMETRIC));
     }
 
@@ -112,7 +109,6 @@ public class InterpolatedTSCTest {
 
         assertTrue(interpolatedTSC.get(TESTGROUP).isPresent());
         assertEquals(TESTGROUP, interpolatedTSC.get(TESTGROUP).get().getGroup());
-        assertEquals(midDate, interpolatedTSC.get(TESTGROUP).get().getTimestamp());
         assertEquals(Optional.of(MetricValue.fromDblValue(5)), interpolatedTSC.get(TESTGROUP).get().findMetric(TESTMETRIC));
     }
 
@@ -125,7 +121,6 @@ public class InterpolatedTSCTest {
 
         assertTrue(interpolatedTSC.get(TESTGROUP).isPresent());
         assertEquals(TESTGROUP, interpolatedTSC.get(TESTGROUP).get().getGroup());
-        assertEquals(midDate, interpolatedTSC.get(TESTGROUP).get().getTimestamp());
         assertEquals(Optional.of(MetricValue.fromDblValue(5.9)), interpolatedTSC.get(TESTGROUP).get().findMetric(TESTMETRIC));
     }
 
@@ -138,7 +133,6 @@ public class InterpolatedTSCTest {
 
         assertTrue(interpolatedTSC.get(TESTGROUP).isPresent());
         assertEquals(TESTGROUP, interpolatedTSC.get(TESTGROUP).get().getGroup());
-        assertEquals(midDate, interpolatedTSC.get(TESTGROUP).get().getTimestamp());
         assertEquals(Optional.of(MetricValue.fromStrValue("foo")), interpolatedTSC.get(TESTGROUP).get().findMetric(TESTMETRIC));
     }
 
@@ -151,13 +145,12 @@ public class InterpolatedTSCTest {
 
         assertTrue(interpolatedTSC.get(TESTGROUP).isPresent());
         assertEquals(TESTGROUP, interpolatedTSC.get(TESTGROUP).get().getGroup());
-        assertEquals(midDate, interpolatedTSC.get(TESTGROUP).get().getTimestamp());
         assertEquals(Optional.of(MetricValue.fromHistValue(new Histogram(new RangeWithCount(0, 10, 5)))), interpolatedTSC.get(TESTGROUP).get().findMetric(TESTMETRIC));
     }
 
     @Test
     public void namesFromBothArePresent() {
-        TimeSeriesCollection present = new SimpleTimeSeriesCollection(midDate, singletonList(new MutableTimeSeriesValue(midDate, GroupName.valueOf("mid", "point"))));
+        TimeSeriesCollection present = new SimpleTimeSeriesCollection(midDate, singletonList(new MutableTimeSeriesValue(GroupName.valueOf("mid", "point"))));
         InterpolatedTSC interpolatedTSC = new InterpolatedTSC(present, singletonList(past), singletonList(future));
 
         assertThat(interpolatedTSC.getGroups(),
@@ -203,7 +196,7 @@ public class InterpolatedTSCTest {
         when(pastValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromIntValue(4)));
         when(futureValue.getMetrics()).thenReturn(singletonMap(TESTMETRIC, MetricValue.fromIntValue(8)));
 
-        final TimeSeriesCollection expected = new SimpleTimeSeriesCollection(midDate, singletonList(new MutableTimeSeriesValue(midDate, TESTGROUP, singletonMap(TESTMETRIC, MetricValue.fromDblValue(5)))));
+        final TimeSeriesCollection expected = new SimpleTimeSeriesCollection(midDate, singletonList(new MutableTimeSeriesValue(TESTGROUP, singletonMap(TESTMETRIC, MetricValue.fromDblValue(5)))));
         InterpolatedTSC interpolatedTSC = new InterpolatedTSC(new EmptyTimeSeriesCollection(midDate), singletonList(past), singletonList(future));
 
         assertEquals(expected.hashCode(), interpolatedTSC.hashCode());

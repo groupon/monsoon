@@ -37,6 +37,7 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.lib.LazyMap;
+import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import gnu.trove.set.hash.THashSet;
 import static java.lang.Math.max;
 import java.util.ArrayList;
@@ -59,11 +60,17 @@ import org.joda.time.Duration;
 
 public class InterpolatedTSC extends AbstractTimeSeriesCollection implements TimeSeriesCollection {
     private static final Logger LOG = Logger.getLogger(InterpolatedTSC.class.getName());
-    /** TimeSeriesCollections used for interpolation. */
+    /**
+     * TimeSeriesCollections used for interpolation.
+     */
     private final List<TimeSeriesCollection> backward, forward;
-    /** Current TimeSeriesCollection. */
+    /**
+     * Current TimeSeriesCollection.
+     */
     private final TimeSeriesCollection current;
-    /** TimeSeriesValues. */
+    /**
+     * TimeSeriesValues.
+     */
     private final Map<GroupName, TimeSeriesValue> interpolatedTsvMap;
 
     public InterpolatedTSC(TimeSeriesCollection current, Collection<TimeSeriesCollection> backward, Collection<TimeSeriesCollection> forward) {
@@ -75,7 +82,9 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
         validate();
     }
 
-    /** Check the forward and backward invariants. */
+    /**
+     * Check the forward and backward invariants.
+     */
     private void validate() {
         try {
             DateTime ts;
@@ -152,8 +161,8 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
     }
 
     /**
-     * Calculate all names that can be interpolated.
-     * The returned set will not have any names present in the current collection.
+     * Calculate all names that can be interpolated. The returned set will not
+     * have any names present in the current collection.
      */
     private static Set<GroupName> calculateNames(TimeSeriesCollection current, Collection<TimeSeriesCollection> backward, Collection<TimeSeriesCollection> forward) {
         final Set<GroupName> names = backward.stream()
@@ -169,34 +178,39 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
     }
 
     /**
-     * Interpolates a group name, based on the most recent backward and oldest forward occurence.
+     * Interpolates a group name, based on the most recent backward and oldest
+     * forward occurence.
+     *
      * @param name The name of the group to interpolate.
      * @return The interpolated name of the group.
      */
     private TimeSeriesValue interpolateTSV(GroupName name) {
-        final TimeSeriesValue
-                backTSV = findName(backward, name),
+        final Map.Entry<DateTime, TimeSeriesValue> backTSV = findName(backward, name),
                 forwTSV = findName(forward, name);
 
-        final long backMillis = max(new Duration(backTSV.getTimestamp(), getTimestamp()).getMillis(), 0),
-                forwMillis = max(new Duration(getTimestamp(), forwTSV.getTimestamp()).getMillis(), 0);
+        final long backMillis = max(new Duration(backTSV.getKey(), getTimestamp()).getMillis(), 0),
+                forwMillis = max(new Duration(getTimestamp(), forwTSV.getKey()).getMillis(), 0);
         final double totalMillis = forwMillis + backMillis;
         final double backWeight = forwMillis / totalMillis;
         final double forwWeight = backMillis / totalMillis;
 
-        return new InterpolatedTSV(getTimestamp(), name, backTSV.getMetrics(), forwTSV.getMetrics(), backWeight, forwWeight);
+        return new InterpolatedTSV(name, backTSV.getValue().getMetrics(), forwTSV.getValue().getMetrics(), backWeight, forwWeight);
     }
 
     /**
      * Finds the first resolution of name in the given TimeSeriesCollections.
      * The cache is used and updated to skip the linear search phase.
+     *
      * @param c TimeSeriesCollection instances in which to search.
-     * @param name The searched for name.  Note that the name must be present in the collection.
-     * @param cache Cache used and updated during lookups, to skip the linear search.
-     * @return The first TimeSeriesValue in the list of TSCollections with the given name.
+     * @param name The searched for name. Note that the name must be present in
+     * the collection.
+     * @param cache Cache used and updated during lookups, to skip the linear
+     * search.
+     * @return The first TimeSeriesValue in the list of TSCollections with the
+     * given name.
      * @throws IllegalStateException if the name was not found.
      */
-    private static TimeSeriesValue findName(List<TimeSeriesCollection> c, GroupName name) {
+    private static Map.Entry<DateTime, TimeSeriesValue> findName(List<TimeSeriesCollection> c, GroupName name) {
         ListIterator<TimeSeriesCollection> iter = c.listIterator();
         while (iter.hasNext()) {
             final int idx = iter.nextIndex();
@@ -204,7 +218,7 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
 
             final Optional<TimeSeriesValue> found = tsdata.get(name);
             if (found.isPresent())
-                return found.get();
+                return SimpleMapEntry.create(tsdata.getTimestamp(), found.get());
         }
 
         throw new IllegalStateException("name not present in list of time series collections");
@@ -212,20 +226,17 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
 
     @Getter
     private static class InterpolatedTSV extends AbstractTimeSeriesValue implements TimeSeriesValue {
-        private final DateTime timestamp;
         private final GroupName group;
         private final Map<MetricName, MetricValue> backward, forward;
         private final double backWeight, forwWeight;
         private final Map<MetricName, MetricValue> metrics;
 
         public InterpolatedTSV(
-                DateTime timestamp,
                 GroupName group,
                 Map<MetricName, MetricValue> backward,
                 Map<MetricName, MetricValue> forward,
                 double backWeight,
                 double forwWeight) {
-            this.timestamp = timestamp;
             this.group = group;
             this.backward = backward;
             this.forward = forward;
@@ -245,8 +256,8 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
         }
 
         private MetricValue interpolate(MetricValue a, MetricValue b) {
-            if ((a.getBoolValue() != null || a.getIntValue() != null || a.getFltValue() != null) &&
-                    (b.getBoolValue() != null || b.getIntValue() != null || b.getFltValue() != null))
+            if ((a.getBoolValue() != null || a.getIntValue() != null || a.getFltValue() != null)
+                    && (b.getBoolValue() != null || b.getIntValue() != null || b.getFltValue() != null))
                 return MetricValue.fromDblValue(backWeight * a.value().get().doubleValue() + forwWeight * b.value().get().doubleValue());
 
             if (a.getStrValue() != null && b.getStrValue() != null)

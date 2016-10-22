@@ -52,10 +52,10 @@ public class UnmappedReadonlyTSDataFileTest {
     @Parameterized.Parameters
     public static Collection<Object[]> parameters() {
         return Arrays.asList(
-                new Object[]{ new FileSupport(new FileSupport0(), false) },
-                new Object[]{ new FileSupport(new FileSupport1(), false) },
-                new Object[]{ new FileSupport(new FileSupport0(), true) },
-                new Object[]{ new FileSupport(new FileSupport1(), true) }
+                new Object[]{new FileSupport(new FileSupport0(), false)},
+                new Object[]{new FileSupport(new FileSupport1(), false)},
+                new Object[]{new FileSupport(new FileSupport0(), true)},
+                new Object[]{new FileSupport(new FileSupport1(), true)}
         );
     }
 
@@ -70,9 +70,9 @@ public class UnmappedReadonlyTSDataFileTest {
         tsdata = new ArrayList<>();
         for (int i = 0; i < 100; ++i) {
             tsdata.add(new SimpleTimeSeriesCollection(now.plusMinutes(i), Stream.of(
-                new MutableTimeSeriesValue(now.plusMinutes(i),
-                        GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
-                        singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))))));
+                    new MutableTimeSeriesValue(
+                            GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
+                            singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))))));
         }
 
         expect_reversed = new ArrayList<>(tsdata);

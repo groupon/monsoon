@@ -56,18 +56,18 @@ import org.junit.Test;
  */
 public class TimeSeriesCollectionPairInstanceTest {
     private MutableTimeSeriesValue present_value(DateTime ts, int val) {
-        return new MutableTimeSeriesValue(ts, GroupName.valueOf("present"), singletonMap(MetricName.valueOf("value"), MetricValue.fromIntValue(val)));
+        return new MutableTimeSeriesValue(GroupName.valueOf("present"), singletonMap(MetricName.valueOf("value"), MetricValue.fromIntValue(val)));
     }
 
     private final DateTime date2 = new DateTime(2011, 1, 1, 0, 0, 0, DateTimeZone.UTC);
     private final DateTime date1 = new DateTime(2011, 1, 1, 0, 1, 0, DateTimeZone.UTC);
     private final DateTime date0 = new DateTime(2011, 1, 1, 0, 2, 0, DateTimeZone.UTC);
     private final MutableTimeSeriesValue pv2 = present_value(date2, 2);
-    private final MutableTimeSeriesValue date2_data = new MutableTimeSeriesValue(date2, GroupName.valueOf("date2"), EMPTY_MAP);
+    private final MutableTimeSeriesValue date2_data = new MutableTimeSeriesValue(GroupName.valueOf("date2"), EMPTY_MAP);
     private final MutableTimeSeriesValue pv1 = present_value(date1, 1);
-    private final MutableTimeSeriesValue date1_data = new MutableTimeSeriesValue(date1, GroupName.valueOf("date1"), EMPTY_MAP);
+    private final MutableTimeSeriesValue date1_data = new MutableTimeSeriesValue(GroupName.valueOf("date1"), EMPTY_MAP);
     private final MutableTimeSeriesValue pv0 = present_value(date0, 0);
-    private final MutableTimeSeriesValue date0_data = new MutableTimeSeriesValue(date0, GroupName.valueOf("date0"), EMPTY_MAP);
+    private final MutableTimeSeriesValue date0_data = new MutableTimeSeriesValue(GroupName.valueOf("date0"), EMPTY_MAP);
     private final MutableTimeSeriesCollection collection2 = new MutableTimeSeriesCollection(date2,
             Stream.concat(Stream.of(date2_data), Stream.of(pv2.clone())));
     private final MutableTimeSeriesCollection collection1 = new MutableTimeSeriesCollection(date1,

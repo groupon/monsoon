@@ -1,6 +1,5 @@
 package com.groupon.lex.metrics.history.v1.xdr;
 
-import com.groupon.lex.metrics.history.xdr.support.ImmutableTimeSeriesValue;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import static com.groupon.lex.metrics.ConfigSupport.quotedString;
@@ -10,6 +9,7 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.history.xdr.support.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -35,12 +35,24 @@ public class FromXdr {
     private final BiMap<Integer, MetricName> metric_dict = HashBiMap.create();
     private final BiMap<Integer, MetricValue> strval_dict = HashBiMap.create();
 
-    public FromXdr() {}
+    public FromXdr() {
+    }
 
-    public BiMap<Integer, SimpleGroupPath> getGroupDict() { return group_dict; }
-    public BiMap<Integer, Tags> getTagDict() { return tag_dict; }
-    public BiMap<Integer, MetricName> getMetricDict() { return metric_dict; }
-    public BiMap<Integer, MetricValue> getStrvalDict() { return strval_dict; }
+    public BiMap<Integer, SimpleGroupPath> getGroupDict() {
+        return group_dict;
+    }
+
+    public BiMap<Integer, Tags> getTagDict() {
+        return tag_dict;
+    }
+
+    public BiMap<Integer, MetricName> getMetricDict() {
+        return metric_dict;
+    }
+
+    public BiMap<Integer, MetricValue> getStrvalDict() {
+        return strval_dict;
+    }
 
     public static DateTime timestamp(timestamp_msec ts) {
         return new DateTime(ts.value, DateTimeZone.UTC);
@@ -62,7 +74,7 @@ public class FromXdr {
             case metrickind.HISTOGRAM:
                 return MetricValue.fromHistValue(new Histogram(
                         Arrays.stream(mv.hist_value)
-                                .map(he -> new Histogram.RangeWithCount(he.floor, he.ceil, he.events))));
+                        .map(he -> new Histogram.RangeWithCount(he.floor, he.ceil, he.events))));
         }
     }
 
@@ -92,7 +104,7 @@ public class FromXdr {
                     final MetricValue mvalue = metric_value_(metric.v);
                     return SimpleMapEntry.create(mname, mvalue);
                 });
-        return new ImmutableTimeSeriesValue(ts, GroupName.valueOf(group_name, tags), metrics, Map.Entry::getKey, Map.Entry::getValue);
+        return new ImmutableTimeSeriesValue(GroupName.valueOf(group_name, tags), metrics, Map.Entry::getKey, Map.Entry::getValue);
     }
 
     private void update_dict_(dictionary_delta dd) {

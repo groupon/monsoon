@@ -38,14 +38,12 @@ import com.groupon.lex.metrics.Tagged;
 import com.groupon.lex.metrics.Tags;
 import java.util.Map;
 import java.util.Optional;
-import org.joda.time.DateTime;
 
 /**
  *
  * @author ariane
  */
 public interface TimeSeriesValue extends Cloneable, Tagged, Comparable<TimeSeriesValue> {
-    public DateTime getTimestamp();
     public GroupName getGroup();
 
     @Override
@@ -54,6 +52,7 @@ public interface TimeSeriesValue extends Cloneable, Tagged, Comparable<TimeSerie
     }
 
     public Map<MetricName, MetricValue> getMetrics();
+
     public default Optional<MetricValue> findMetric(MetricName name) {
         return Optional.ofNullable(getMetrics().get(name));
     }

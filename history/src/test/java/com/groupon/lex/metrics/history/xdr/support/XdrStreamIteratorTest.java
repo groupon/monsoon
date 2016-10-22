@@ -46,8 +46,8 @@ public class XdrStreamIteratorTest {
     @Parameterized.Parameters
     public static Collection<Object[]> parameters() {
         return Arrays.asList(
-                new Object[]{ new FileSupport(new FileSupport0(), false) },
-                new Object[]{ new FileSupport(new FileSupport1(), false) }
+                new Object[]{new FileSupport(new FileSupport0(), false)},
+                new Object[]{new FileSupport(new FileSupport1(), false)}
         );
     }
 
@@ -62,9 +62,9 @@ public class XdrStreamIteratorTest {
         tsdata = new ArrayList<>();
         for (int i = 0; i < 100; ++i) {
             tsdata.add(new SimpleTimeSeriesCollection(now.plusMinutes(i), Stream.of(
-                new MutableTimeSeriesValue(now.plusMinutes(i),
-                        GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
-                        singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))))));
+                    new MutableTimeSeriesValue(
+                            GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
+                            singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))))));
         }
 
         tmpdir = Files.createTempDirectory("monsoon-XdrStreamIteratorTest");

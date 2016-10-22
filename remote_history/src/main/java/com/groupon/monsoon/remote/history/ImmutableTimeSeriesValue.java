@@ -47,20 +47,17 @@ import java.util.stream.Stream;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NonNull;
-import org.joda.time.DateTime;
 
 @Getter
 @AllArgsConstructor
 public final class ImmutableTimeSeriesValue extends AbstractTimeSeriesValue implements TimeSeriesValue {
     @NonNull
-    private final DateTime timestamp;
-    @NonNull
     private final GroupName group;
     @NonNull
     private final Map<MetricName, MetricValue> metrics;
 
-    public <T> ImmutableTimeSeriesValue(DateTime ts, GroupName group, Stream<T> metrics, Function<? super T, MetricName> name_fn, Function<? super T, MetricValue> value_fn) {
-        this(ts, group, unmodifiableMap(metrics.collect(Collectors.toMap(name_fn, value_fn, throwing_merger_(), hashmap_constructor_()))));
+    public <T> ImmutableTimeSeriesValue(GroupName group, Stream<T> metrics, Function<? super T, MetricName> name_fn, Function<? super T, MetricValue> value_fn) {
+        this(group, unmodifiableMap(metrics.collect(Collectors.toMap(name_fn, value_fn, throwing_merger_(), hashmap_constructor_()))));
     }
 
     @Override
@@ -69,10 +66,15 @@ public final class ImmutableTimeSeriesValue extends AbstractTimeSeriesValue impl
     }
 
     private static <T> BinaryOperator<T> throwing_merger_() {
-        return (x, y) -> { throw new IllegalStateException("duplicate key " + x); };
+        return (x, y) -> {
+            throw new IllegalStateException("duplicate key " + x);
+        };
     }
 
-    /** HashMap constructor, so we can create hashmaps with an altered load factor. */
+    /**
+     * HashMap constructor, so we can create hashmaps with an altered load
+     * factor.
+     */
     private static <K, V> Supplier<Map<K, V>> hashmap_constructor_() {
         return () -> new THashMap<K, V>();
     }

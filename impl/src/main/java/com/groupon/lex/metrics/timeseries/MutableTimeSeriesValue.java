@@ -40,44 +40,30 @@ import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.function.Function;
 import java.util.stream.Stream;
-import org.joda.time.DateTime;
 
 /**
  *
  * @author ariane
  */
 public final class MutableTimeSeriesValue extends AbstractTimeSeriesValue implements TimeSeriesValue {
-    private DateTime timestamp_;
     private GroupName group_;
     private final Map<MetricName, MetricValue> metrics_ = new THashMap<>(4, 1);  // Favour small, dense hashmaps, since there are a lot of instances.
 
-    public MutableTimeSeriesValue(DateTime timestamp, GroupName group) {
-        timestamp_ = requireNonNull(timestamp);
+    public MutableTimeSeriesValue(GroupName group) {
         group_ = requireNonNull(group);
     }
 
-    public MutableTimeSeriesValue(DateTime timestamp, GroupName group, Map<? extends MetricName, ? extends MetricValue> metrics) {
-        this(timestamp, group, metrics.entrySet().stream(), Map.Entry::getKey, Map.Entry::getValue);
+    public MutableTimeSeriesValue(GroupName group, Map<? extends MetricName, ? extends MetricValue> metrics) {
+        this(group, metrics.entrySet().stream(), Map.Entry::getKey, Map.Entry::getValue);
     }
 
-    public <T> MutableTimeSeriesValue(DateTime timestamp, GroupName group, Stream<T> metric_stream, Function<T, MetricName> name_fn, Function<T, MetricValue> value_fn) {
-        timestamp_ = requireNonNull(timestamp);
+    public <T> MutableTimeSeriesValue(GroupName group, Stream<T> metric_stream, Function<T, MetricName> name_fn, Function<T, MetricValue> value_fn) {
         group_ = requireNonNull(group);
         metric_stream.forEach((T t) -> metrics_.put(requireNonNull(name_fn.apply(t)), requireNonNull(value_fn.apply(t))));
     }
 
     public MutableTimeSeriesValue(TimeSeriesValue tsv) {
-        this(tsv.getTimestamp(), tsv.getGroup(), tsv.getMetrics());
-    }
-
-    @Override
-    public DateTime getTimestamp() {
-        return timestamp_;
-    }
-
-    public MutableTimeSeriesValue setTimestamp(DateTime timestamp) {
-        timestamp_ = requireNonNull(timestamp);
-        return this;
+        this(tsv.getGroup(), tsv.getMetrics());
     }
 
     @Override

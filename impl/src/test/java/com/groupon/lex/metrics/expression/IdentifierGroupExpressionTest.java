@@ -39,8 +39,6 @@ import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Optional;
 import java.util.stream.Stream;
 import static org.hamcrest.CoreMatchers.containsString;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
@@ -61,7 +59,7 @@ public class IdentifierGroupExpressionTest {
     @Mock
     private Context ctx;
 
-    private TimeSeriesValue tsv = new MutableTimeSeriesValue(DateTime.now(DateTimeZone.UTC), GroupName.valueOf("foobar"));
+    private TimeSeriesValue tsv = new MutableTimeSeriesValue(GroupName.valueOf("foobar"));
 
     @Test
     public void config_string() {

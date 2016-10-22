@@ -29,7 +29,8 @@ import org.joda.time.DateTimeZone;
  * @author ariane
  */
 public class FromXdr {
-    private FromXdr() {}
+    private FromXdr() {
+    }
 
     public static SimpleGroupPath groupname(path p) {
         return SimpleGroupPath.valueOf(Arrays.stream(p.elems).map((pe) -> pe.value).collect(Collectors.toList()));
@@ -55,7 +56,7 @@ public class FromXdr {
             case metrickind.HISTOGRAM:
                 return MetricValue.fromHistValue(new Histogram(
                         Arrays.stream(mv.hist_value)
-                                .map(he -> new Histogram.RangeWithCount(he.floor, he.ceil, he.events))));
+                        .map(he -> new Histogram.RangeWithCount(he.floor, he.ceil, he.events))));
         }
     }
 
@@ -69,29 +70,29 @@ public class FromXdr {
                 .collect(Collectors.toMap(tag -> tag.key, tag -> metricValue(tag.value))));
     }
 
-    private static TimeSeriesValue time_series_value_(DateTime timestamp, GroupName name, tsfile_metric m[]) {
-        return new ImmutableTimeSeriesValue(timestamp, name, Arrays.stream(m).map(FromXdr::metric), Map.Entry::getKey, Map.Entry::getValue);
+    private static TimeSeriesValue time_series_value_(GroupName name, tsfile_metric m[]) {
+        return new ImmutableTimeSeriesValue(name, Arrays.stream(m).map(FromXdr::metric), Map.Entry::getKey, Map.Entry::getValue);
     }
 
-    private static Stream<TimeSeriesValue> process_tags_(DateTime timestamp, SimpleGroupPath name, tsfile_tagged_datapoint dp[]) {
+    private static Stream<TimeSeriesValue> process_tags_(SimpleGroupPath name, tsfile_tagged_datapoint dp[]) {
         return Arrays.stream(dp)
                 .map(dp_elem -> {
                     final Tags tags = FromXdr.tags(dp_elem.tags);
                     final GroupName group = GroupName.valueOf(name, tags);
-                    return time_series_value_(timestamp, group, dp_elem.tsv);
+                    return time_series_value_(group, dp_elem.tsv);
                 });
     }
 
-    private static Stream<TimeSeriesValue> process_path_(DateTime timestamp, tsfile_pathgroup pg[]) {
+    private static Stream<TimeSeriesValue> process_path_(tsfile_pathgroup pg[]) {
         return Arrays.stream(pg)
                 .flatMap(pg_elem -> {
                     final SimpleGroupPath name = FromXdr.groupname(pg_elem.group);
-                    return process_tags_(timestamp, name, pg_elem.dps);
+                    return process_tags_(name, pg_elem.dps);
                 });
     }
 
     public static TimeSeriesCollection datapoints(tsfile_datapoint tsv) {
         final DateTime ts = FromXdr.timestamp(tsv.ts);
-        return new SimpleTimeSeriesCollection(ts, process_path_(ts, tsv.groups));
+        return new SimpleTimeSeriesCollection(ts, process_path_(tsv.groups));
     }
 }

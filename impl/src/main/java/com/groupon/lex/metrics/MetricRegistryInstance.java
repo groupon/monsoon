@@ -92,7 +92,9 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
     }
 
     @Override
-    public EndpointRegistration getApi() { return api_; }
+    public EndpointRegistration getApi() {
+        return api_;
+    }
 
     public synchronized GroupGenerator add(GroupGenerator g) {
         generators_.add(g);
@@ -104,30 +106,50 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
     }
 
     /**
-     * Retrieve the number of collectors that encountered a failure during the last call to streamGroups().
+     * Retrieve the number of collectors that encountered a failure during the
+     * last call to streamGroups().
+     *
      * @return The number of collectors that failed.
      */
-    public long getFailedCollections() { return failed_collections_; }
+    public long getFailedCollections() {
+        return failed_collections_;
+    }
+
     /**
      * Retrieve timing for scrape.
+     *
      * @return The duration it took to complete all scrapes.
      */
-    public Optional<Duration> getScrapeDuration() { return scrape_duration_; }
+    public Optional<Duration> getScrapeDuration() {
+        return scrape_duration_;
+    }
+
     /**
      * Retrieve timing for rule evaluation.
+     *
      * @return The duration it took to evaluate all rules.
      */
-    public Optional<Duration> getRuleEvalDuration() { return rule_eval_duration_; }
+    public Optional<Duration> getRuleEvalDuration() {
+        return rule_eval_duration_;
+    }
+
     /**
      * Retrieve timing for processor to handle the data.
+     *
      * @return The duration it took for the processor, to push all the data out.
      */
-    public Optional<Duration> getProcessorDuration() { return processor_duration_; }
+    public Optional<Duration> getProcessorDuration() {
+        return processor_duration_;
+    }
+
     /**
      * Update the processor duration.
+     *
      * @param duration The time spent in the processor.
      */
-    public void updateProcessorDuration(Duration duration) { processor_duration_ = Optional.of(duration); }
+    public void updateProcessorDuration(Duration duration) {
+        processor_duration_ = Optional.of(duration);
+    }
 
     private Stream<TimeSeriesValue> streamGroups() {
         return streamGroups(now());
@@ -151,10 +173,10 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
         Stream<TimeSeriesValue> groups = collections.stream()
                 .map(GroupGenerator.GroupCollection::getGroups)
                 .flatMap(Collection::stream)
-                .collect(Collectors.toMap(MetricGroup::getName, Function.identity(), (x, y) -> y))  // Resolve group-name conflict, such that latest metric wins.
+                .collect(Collectors.toMap(MetricGroup::getName, Function.identity(), (x, y) -> y)) // Resolve group-name conflict, such that latest metric wins.
                 .values()
                 .stream()
-                .map((mg) -> new MutableTimeSeriesValue(now, mg.getName(), Arrays.stream(mg.getMetrics()), Metric::getName, Metric::getValue));
+                .map((mg) -> new MutableTimeSeriesValue(mg.getName(), Arrays.stream(mg.getMetrics()), Metric::getName, Metric::getValue));
         return groups;
     }
 
@@ -173,15 +195,15 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
     @Override
     public void close() {
         generators_.forEach((g) -> {
-                    try {
-                        g.close();
-                    } catch (Exception e) {
-                        logger.log(Level.SEVERE, "failed to close group generator " + g, e);
-                    }
-                });
+            try {
+                g.close();
+            } catch (Exception e) {
+                logger.log(Level.SEVERE, "failed to close group generator " + g, e);
+            }
+        });
         if (api_ instanceof AutoCloseable) {
             try {
-                ((AutoCloseable)api_).close();
+                ((AutoCloseable) api_).close();
             } catch (Exception ex) {
                 logger.log(Level.SEVERE, "unable to close API " + api_.getClass(), ex);
             }
@@ -189,11 +211,17 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
     }
 
     @Override
-    public boolean hasConfig() { return has_config_; }
-    public DateTime now() { return requireNonNull(now_.get()); }
+    public boolean hasConfig() {
+        return has_config_;
+    }
+
+    public DateTime now() {
+        return requireNonNull(now_.get());
+    }
 
     /**
      * Apply all timeseries decorators.
+     *
      * @param ctx Input timeseries.
      */
     protected void apply_rules_and_decorators_(Context ctx) {
@@ -206,19 +234,19 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
 
     public static interface CollectionContext {
         public Consumer<Alert> alertManager();
+
         public MutableTimeSeriesCollectionPair tsdata();
+
         public void commit();
     }
 
     protected abstract CollectionContext beginCollection(DateTime now);
 
     /**
-     * Run an update cycle.
-     * An update cycle consists of:
-     * - gathering raw metrics
-     * - creating a new, minimal context
-     * - applying decorators against the current and previous values
-     * - storing the collection values as the most recent capture
+     * Run an update cycle. An update cycle consists of: - gathering raw metrics
+     * - creating a new, minimal context - applying decorators against the
+     * current and previous values - storing the collection values as the most
+     * recent capture
      */
     public TimeSeriesCollection updateCollection() {
         // Scrape metrics from all collectors.

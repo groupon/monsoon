@@ -42,30 +42,21 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.Getter;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
 /**
  *
  * @author ariane
  */
 public class RTFTimeSeriesValue extends AbstractTimeSeriesValue {
-    private final long ts;
     private final int index;
     @Getter
     private final GroupName group;
     private final RTFGroupTable tbl;
 
-    public RTFTimeSeriesValue(long ts, int index, GroupName group, RTFGroupTable tbl) {
-        this.ts = ts;
+    public RTFTimeSeriesValue(int index, GroupName group, RTFGroupTable tbl) {
         this.index = index;
         this.group = group;
         this.tbl = tbl;
-    }
-
-    @Override
-    public DateTime getTimestamp() {
-        return new DateTime(ts, DateTimeZone.UTC);
     }
 
     @Override

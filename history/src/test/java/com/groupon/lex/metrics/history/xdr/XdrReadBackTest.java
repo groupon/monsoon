@@ -1,13 +1,16 @@
 package com.groupon.lex.metrics.history.xdr;
 
-import com.groupon.lex.metrics.history.v0.xdr.ToXdr;
-import com.groupon.lex.metrics.history.v0.xdr.FromXdr;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
+import com.groupon.lex.metrics.history.v0.xdr.FromXdr;
+import com.groupon.lex.metrics.history.v0.xdr.ToXdr;
 import com.groupon.lex.metrics.history.v0.xdr.tsfile_datapoint;
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
+import com.groupon.lex.metrics.history.xdr.support.XdrBufferEncodingStream;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import static java.lang.Math.min;
@@ -17,13 +20,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
-import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
-import com.groupon.lex.metrics.history.xdr.support.XdrBufferEncodingStream;
-import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
-import static org.junit.Assert.assertEquals;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
@@ -56,7 +56,7 @@ public class XdrReadBackTest {
             b.get(result, off, rdlen);
             off += rdlen;
         }
-        assert(off == result.length);
+        assert (off == result.length);
         return result;
     }
 
@@ -64,7 +64,9 @@ public class XdrReadBackTest {
         private final byte[] data_;
         private int off_ = 0;
 
-        public ByteArraySupplier(byte data[]) { data_ = data; }
+        public ByteArraySupplier(byte data[]) {
+            data_ = data;
+        }
 
         @Override
         public void load(ByteBuffer buf) {
@@ -83,14 +85,16 @@ public class XdrReadBackTest {
 
     @Before
     public void setup() {
-        final Map<MetricName, MetricValue> metrics = new HashMap<MetricName, MetricValue>() {{
-            put(MetricName.valueOf("boolean"), MetricValue.fromBoolean(true));
-            put(MetricName.valueOf("integer"), MetricValue.fromIntValue(17));
-            put(MetricName.valueOf("float"), MetricValue.fromDblValue(Math.E));
-            put(MetricName.valueOf("string"), MetricValue.fromStrValue("chocoladevla"));
-        }};
+        final Map<MetricName, MetricValue> metrics = new HashMap<MetricName, MetricValue>() {
+            {
+                put(MetricName.valueOf("boolean"), MetricValue.fromBoolean(true));
+                put(MetricName.valueOf("integer"), MetricValue.fromIntValue(17));
+                put(MetricName.valueOf("float"), MetricValue.fromDblValue(Math.E));
+                put(MetricName.valueOf("string"), MetricValue.fromStrValue("chocoladevla"));
+            }
+        };
         final DateTime now = DateTime.now(DateTimeZone.UTC);
-        tsv_ = new SimpleTimeSeriesCollection(now, Stream.of(new MutableTimeSeriesValue(now, GroupName.valueOf(GROUP), metrics)));
+        tsv_ = new SimpleTimeSeriesCollection(now, Stream.of(new MutableTimeSeriesValue(GroupName.valueOf(GROUP), metrics)));
     }
 
     @Test
@@ -101,12 +105,12 @@ public class XdrReadBackTest {
         encoder.endEncoding();
         byte[] result = to_byte_array(encoder.getBuffers());
 
-        assertArrayEquals(new byte[]{ 0, 0, 0, 17 }, result);
+        assertArrayEquals(new byte[]{0, 0, 0, 17}, result);
     }
 
     @Test
     public void int_deserialized() throws Exception {
-        XdrBufferDecodingStream decoder = new XdrBufferDecodingStream(new ByteArraySupplier(new byte[]{ 0, 0, 0, 19 }));
+        XdrBufferDecodingStream decoder = new XdrBufferDecodingStream(new ByteArraySupplier(new byte[]{0, 0, 0, 19}));
         int result = decoder.xdrDecodeInt();
 
         assertEquals(19, result);

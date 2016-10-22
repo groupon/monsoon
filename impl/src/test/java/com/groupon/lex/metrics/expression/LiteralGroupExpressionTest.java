@@ -43,8 +43,6 @@ import com.groupon.lex.metrics.transformers.NameResolver;
 import java.util.Optional;
 import java.util.stream.Stream;
 import static org.hamcrest.CoreMatchers.containsString;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
@@ -69,7 +67,7 @@ public class LiteralGroupExpressionTest {
     @Mock
     private TimeSeriesCollectionPair ts_data;
 
-    private TimeSeriesValue tsv = new MutableTimeSeriesValue(DateTime.now(DateTimeZone.UTC), GroupName.valueOf("foobar"));
+    private TimeSeriesValue tsv = new MutableTimeSeriesValue(GroupName.valueOf("foobar"));
 
     @Test
     public void name() {
