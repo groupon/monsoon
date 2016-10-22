@@ -3,7 +3,7 @@
     <parent>
         <groupId>com.github.groupon.monsoon</groupId>
         <artifactId>monsoon-processors</artifactId>
-        <version>2.2</version>
+        <version>2.3-SNAPSHOT</version>
     </parent>
     <artifactId>monsoon-processor-wavefront</artifactId>
     <packaging>jar</packaging>
