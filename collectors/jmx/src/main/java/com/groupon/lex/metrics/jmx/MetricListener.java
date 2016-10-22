@@ -34,6 +34,7 @@ package com.groupon.lex.metrics.jmx;
 import com.groupon.lex.metrics.GroupGenerator;
 import com.groupon.lex.metrics.MetricGroup;
 import com.groupon.lex.metrics.jmx.JmxClient.ConnectionDecorator;
+import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -55,6 +56,7 @@ import javax.management.MBeanServerNotification;
 import javax.management.Notification;
 import javax.management.NotificationListener;
 import javax.management.ObjectName;
+import javax.management.remote.JMXConnector;
 import lombok.Getter;
 import lombok.NonNull;
 
@@ -227,20 +229,24 @@ public class MetricListener implements GroupGenerator {
          */
         CompletableFuture<List<MetricGroup>> future = connection.getConnection(threadpool)
                 .applyToEitherAsync(
-                        timeout.thenApply(timeoutObject -> (MBeanServerConnection) null),
+                        timeout.thenApply(timeoutObject -> new GCCloseable<JMXConnector>()),
                         conn -> {
-                            if (conn == null)
+                            if (conn.get() == null)
                                 throw new RuntimeException("connection unavailable");
 
                             synchronized (this) {
-                                List<MetricGroup> result = new ArrayList<>();
-                                for (MBeanGroup group
-                                     : detected_groups_.values()) {
-                                    if (timeout.isDone())
-                                        throw new RuntimeException("timed out");
-                                    group.getMetrics(conn).ifPresent(result::add);
+                                try {
+                                    List<MetricGroup> result = new ArrayList<>();
+                                    for (MBeanGroup group
+                                                 : detected_groups_.values()) {
+                                        if (timeout.isDone())
+                                            throw new RuntimeException("timed out");
+                                        group.getMetrics(conn.get().getMBeanServerConnection()).ifPresent(result::add);
+                                    }
+                                    return result;
+                                } catch (IOException ex) {
+                                    throw new RuntimeException("unable to get MBeanServerConnection", ex);
                                 }
-                                return result;
                             }
                         },
                         threadpool);

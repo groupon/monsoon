@@ -16,8 +16,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * A wrapper around a closable, that uses an unreachability event by the GC
- * to close the underlying closeable.
+ * A wrapper around a closable, that uses an unreachability event by the GC to
+ * close the underlying closeable.
  */
 public class GCCloseable<T extends AutoCloseable> {
     private static final Logger LOG = Logger.getLogger(GCCloseable.class.getName());
@@ -29,7 +29,7 @@ public class GCCloseable<T extends AutoCloseable> {
         Reference<? extends GCCloseable> ref = cleanup_queue_.remove();
         final AutoCloseable item = instances_.remove(ref);
 
-        assert(item != null);
+        assert (item != null);
         try {
             LOG.log(Level.FINE, "closing {0}", item);
             item.close();
@@ -41,7 +41,7 @@ public class GCCloseable<T extends AutoCloseable> {
     private static void ensure_started_() {
         if (started_.get()) return;
 
-        synchronized(GCCloseable.class) {
+        synchronized (GCCloseable.class) {
             final Thread t = new Thread(() -> {
                 for (;;) {
                     try {
@@ -63,6 +63,10 @@ public class GCCloseable<T extends AutoCloseable> {
     }
 
     private final T value_;
+
+    public GCCloseable() {
+        value_ = null;
+    }
 
     public GCCloseable(T value) {
         value_ = requireNonNull(value);

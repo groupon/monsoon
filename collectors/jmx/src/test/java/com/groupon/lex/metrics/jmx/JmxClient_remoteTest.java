@@ -171,7 +171,7 @@ public class JmxClient_remoteTest {
     public void connection() throws Exception {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
-            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get();
+            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get().get().getMBeanServerConnection();
 
             assertNotNull(connection);
         }
@@ -183,7 +183,7 @@ public class JmxClient_remoteTest {
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             MBeanServerConnection connection = null;
             try {
-                connection = jmx_client.getConnection(threadpool).get();  // Must throw IOException (wrapped inside ExecutionException, because future).
+                connection = jmx_client.getConnection(threadpool).get().get().getMBeanServerConnection();  // Must throw IOException (wrapped inside ExecutionException, because future).
             } catch (ExecutionException ex) {
                 throw ex.getCause();
             }
@@ -207,7 +207,7 @@ public class JmxClient_remoteTest {
                 fail("Test requires connection to fail initially.");
 
             jmx_server.start();
-            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get();
+            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get().get().getMBeanServerConnection();
 
             assertNotNull(connection);
         }
@@ -237,13 +237,13 @@ public class JmxClient_remoteTest {
     public void connect_and_server_restarts() throws Exception {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
-            jmx_client.getConnection(threadpool).get();
+            jmx_client.getConnection(threadpool).get();  // Force connection to come up.
 
             /* Restart JMX server. */
             jmx_server.stop();
             jmx_server.start();
 
-            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get();
+            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get().get().getMBeanServerConnection();
             assertNotNull(connection);
         }
     }
@@ -252,6 +252,7 @@ public class JmxClient_remoteTest {
     public void opt_connection() throws Exception {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
+            jmx_client.getConnection(threadpool).get();  // Force connection to come up.
             Optional<MBeanServerConnection> connection = jmx_client.getOptionalConnection();
 
             assertNotEquals("Since the server is up, the connection must be present.", Optional.empty(), connection);
@@ -314,7 +315,7 @@ public class JmxClient_remoteTest {
     public void opt_connect_and_server_restarts() throws Exception {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
-            MBeanServerConnection old_connection = jmx_client.getConnection(threadpool).get();
+            MBeanServerConnection old_connection = jmx_client.getConnection(threadpool).get().get().getMBeanServerConnection();
 
             /* Restart JMX server. */
             jmx_server.stop();
@@ -337,6 +338,7 @@ public class JmxClient_remoteTest {
 
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
+            jmx_client.getConnection(threadpool).get();  // Force connection to come up.
             jmx_client.addRecoveryCallback((conn) -> ++init_count.count);
         }
 
@@ -352,6 +354,11 @@ public class JmxClient_remoteTest {
 
         assert (!jmx_server.isStarted());
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
+            try {
+                jmx_client.getConnection(threadpool).get();  // Force connection to come up.
+            } catch (Exception ex) {
+                // Expect exception as we can't connect.
+            }
             jmx_client.addRecoveryCallback((conn) -> ++init_count.count);
         }
 
@@ -367,6 +374,11 @@ public class JmxClient_remoteTest {
 
         assert (!jmx_server.isStarted());
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
+            try {
+                jmx_client.getConnection(threadpool).get();  // Force connection to come up.
+            } catch (Exception ex) {
+                // Expected.
+            }
             jmx_client.addRecoveryCallback((conn) -> ++init_count.count);
             assertEquals("Initialization callback was not yet called", 0, init_count.count);
 
@@ -387,14 +399,14 @@ public class JmxClient_remoteTest {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
             jmx_client.addRecoveryCallback((conn) -> ++init_count.count);
-            MBeanServerConnection old_connection = jmx_client.getConnection(threadpool).get();
+            MBeanServerConnection old_connection = jmx_client.getConnection(threadpool).get().get().getMBeanServerConnection();
             assertEquals("1 connection, 1 callback", 1, init_count.count);
 
             /* Restart JMX server. */
             jmx_server.stop();
             jmx_server.start();
 
-            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get(); // Force reconnect.
+            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get().get().getMBeanServerConnection(); // Force reconnect.
             if (old_connection != connection)
                 assertEquals("Callback was invoked upon reconnect", 2, init_count.count);
         }
@@ -409,6 +421,7 @@ public class JmxClient_remoteTest {
 
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
+            jmx_client.getConnection(threadpool).get();  // Force connection to come up.
             jmx_client.addRecoveryCallback((conn) -> ++init_count.count);
         }
         assertEquals(1, init_count.count);
@@ -423,6 +436,11 @@ public class JmxClient_remoteTest {
 
         assert (!jmx_server.isStarted());
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
+            try {
+                jmx_client.getConnection(threadpool).get();  // Force connection to come up.
+            } catch (Exception ex) {
+                // Expected.
+            }
             jmx_client.addRecoveryCallback((conn) -> ++init_count.count);
         }
         assertEquals(0, init_count.count);
@@ -437,6 +455,7 @@ public class JmxClient_remoteTest {
 
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
+            jmx_client.getConnection(threadpool).get();  // Force connection to come up.
             jmx_server.stop();  // JmxClient hasn't detected server went away.
 
             jmx_client.addRecoveryCallback((conn) -> ++init_count.count);
@@ -448,6 +467,7 @@ public class JmxClient_remoteTest {
     public void connect_callback_throws() throws Exception {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
+            jmx_client.getConnection(threadpool).get();  // Force connection to come up.
             jmx_client.addRecoveryCallback((conn) -> {
                 throw new IOException("muhahaha");
             });

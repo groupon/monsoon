@@ -127,7 +127,7 @@ public class MBeanGroupTest {
         test_value.setStringval("foobar");
         test_value.getNested().setDblval(17);
 
-        Metric[] metrics = mbg.getMetrics(jmx.getConnection(threadpool).get()).get().getMetrics();
+        Metric[] metrics = mbg.getMetrics(jmx.getConnection(threadpool).get().get().getMBeanServerConnection()).get().getMetrics();
 
         /**
          * Create metrics map for easy test asserting.
