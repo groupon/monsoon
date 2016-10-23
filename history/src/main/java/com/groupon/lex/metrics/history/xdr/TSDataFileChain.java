@@ -193,7 +193,7 @@ public class TSDataFileChain extends SequenceTSData {
     }
 
     public static TSDataFileChain openDir(@NonNull TSDataScanDir scandir, long max_filesize) throws IOException {
-        TSDataFileChain result = openDirExisting(scandir).orElse(null);
+        TSDataFileChain result = openDirExisting(scandir, max_filesize).orElse(null);
         if (result == null)
             result = new TSDataFileChain(scandir.getDir(), Optional.empty(), emptyList(), max_filesize);
         return result;
