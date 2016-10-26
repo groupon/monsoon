@@ -89,20 +89,29 @@ public class PushProcessorPipeline extends AbstractProcessor<PushMetricRegistryI
      */
     @Override
     public final void run() {
-        registry_.updateCollection();
+        try {
+            registry_.updateCollection();
 
-        final long t0 = System.nanoTime();
+            final long t0 = System.nanoTime();
 
-        processors_.forEach(p -> {
-            try {
-                run_implementation_(p);
-            } catch (Exception ex) {
-                logger.log(Level.SEVERE, p.getClass().getName() + " failed to run properly, some or all metrics may be missed this cycle", ex);
-            }
-        });
+            processors_.forEach(p -> {
+                try {
+                    run_implementation_(p);
+                } catch (Exception ex) {
+                    logger.log(Level.SEVERE, p.getClass().getName() + " failed to run properly, some or all metrics may be missed this cycle", ex);
+                }
+            });
 
-        final long t_processor = System.nanoTime();
-        registry_.updateProcessorDuration(Duration.millis(TimeUnit.NANOSECONDS.toMillis(t_processor - t0)));
+            final long t_processor = System.nanoTime();
+            registry_.updateProcessorDuration(Duration.millis(TimeUnit.NANOSECONDS.toMillis(t_processor - t0)));
+        } catch (Throwable t) {
+            /*
+             * We catch any and all throwables.
+             * If we don't and let an exception or error escape,
+             * the scheduled executor service will _silently_ drop our task.
+             */
+            logger.log(Level.SEVERE, "failed to perform collection", t);
+        }
     }
 
     public final int getIntervalSeconds() { return interval_seconds_; }
