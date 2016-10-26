@@ -37,6 +37,7 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.builders.collector.AcceptAsPath;
 import com.groupon.lex.metrics.builders.collector.AcceptTagSet;
 import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
+import com.groupon.lex.metrics.builders.collector.MainNone;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
@@ -53,7 +54,7 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-public class TcpBuilder implements CollectorBuilder, AcceptAsPath, AcceptTagSet {
+public class TcpBuilder implements CollectorBuilder, MainNone, AcceptAsPath, AcceptTagSet {
     private SimpleGroupPath asPath;
     private NameBoundResolver tagSet;
 
