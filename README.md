@@ -19,6 +19,7 @@ Monsoon supports:
 5. A history module that will write time series to disk.
 6. It has metrics API endpoint for graphing ( work in progress).
 7. It also has a prometheus exporter.
+8. A simple TCP collector (can be used to see if a port is open).
 
 Usage
 ----
