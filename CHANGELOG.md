@@ -4,6 +4,13 @@ Change log
 monsoon-2.3-SNAPSHOT
 ----
 
+monsoon-2.2.1 (Nov 3, 2016)
+----
+
+Bug fixes:
+- Fix missing interface on tcp collector, causing it to be unparsable.
+- Put a giant catch-all around the push processor task, to prevent monsoon silently stopping if a scrape errors out.
+
 monsoon-2.2 (Oct 22, 2016)
 ----
 
