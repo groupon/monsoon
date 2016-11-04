@@ -50,7 +50,7 @@ To check multiple hosts, the parameters can be split:
 
     collect tcp as social.media
       host = [ "www.facebook.com", "www.google.com", "www.twitter.com", "www.groupon.com" ],
-      port = 80
+      port = [ 80 ]
     }
 
 Creates a TCP connection to the specified hosts, on port *80*.
