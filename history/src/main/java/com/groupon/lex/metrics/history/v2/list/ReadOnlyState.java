@@ -34,6 +34,7 @@ package com.groupon.lex.metrics.history.v2.list;
 import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.tables.DictionaryDelta;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
+import com.groupon.lex.metrics.history.v2.xdr.dictionary_delta;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
 import com.groupon.lex.metrics.history.v2.xdr.tsdata;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
@@ -51,6 +52,7 @@ import java.util.Collection;
 import java.util.Collections;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.Getter;
@@ -123,14 +125,24 @@ public class ReadOnlyState implements State {
                 .cache();
     }
 
-    public static SegmentReader<DictionaryDelta> calculateDictionary(GCCloseable<FileChannel> file, Compression compression, List<SegmentReader<ReadonlyTSDataHeader>> tsdataList) {
-        SegmentReader<DictionaryDelta> accumulated = SegmentReader.of(new DictionaryDelta());
-        for (SegmentReader<ReadonlyTSDataHeader> tsdata : tsdataList) {
-            accumulated = tsdata
-                    .flatMap(tsdHeader -> tsdHeader.dictionaryDecoder(file, compression))
-                    .combine(accumulated, (optTsd, dict) -> optTsd.map(tsd -> new DictionaryDelta(tsd, dict)).orElse(dict));
-        }
-        return accumulated;
+    public static SegmentReader<DictionaryDelta> calculateDictionary(GCCloseable<FileChannel> file, Compression compression, List<SegmentReader<ReadonlyTSDataHeader>> tsdataListArg) {
+        /* Create copy of the list, since the input list may be modified by caller later and is not thread-safe. */
+        final List<SegmentReader<ReadonlyTSDataHeader>> tsdataList = new ArrayList<>(tsdataListArg);
+
+        return new SegmentReader<DictionaryDelta>() {
+            @Override
+            public DictionaryDelta decode() throws IOException, OncRpcException {
+                DictionaryDelta accumulated = new DictionaryDelta();
+                for (SegmentReader<ReadonlyTSDataHeader> tsdata : tsdataList) {
+                    final Optional<dictionary_delta> delta = tsdata
+                            .flatMap(tsdHeader -> tsdHeader.dictionaryDecoder(file, compression))
+                            .decode();
+                    if (delta.isPresent())
+                        accumulated = new DictionaryDelta(delta.get(), accumulated);
+                }
+                return accumulated;
+            }
+        };
     }
 
     public static List<SegmentReader<TimeSeriesCollection>> calculateTimeSeries(GCCloseable<FileChannel> file, Compression compression, List<SegmentReader<ReadonlyTSDataHeader>> tsdataList, SegmentReader<DictionaryDelta> dictionary) {
