@@ -47,9 +47,9 @@ import org.joda.time.Duration;
 public class ExprEval extends HttpServlet {
     private static final Logger LOG = Logger.getLogger(ExprEval.class.getName());
     private static final Cache<String, IteratorAndCookie> ITERATORS = CacheBuilder.newBuilder()
-                .expireAfterAccess(5, TimeUnit.MINUTES)
-                .softValues()
-                .build();
+            .expireAfterAccess(5, TimeUnit.MINUTES)
+            .softValues()
+            .build();
     private static final int ITER_BUFCOUNT = 4;
     private static final AtomicLong ITERATORS_SEQUENCE = new AtomicLong();
     private final static String EXPR_PREFIX = "expr:";
@@ -75,11 +75,11 @@ public class ExprEval extends HttpServlet {
                 .collect(Collectors.toMap(entry -> entry.getKey().substring(EXPR_PREFIX.length()), entry -> entry.getValue()));
     }
 
-    private static Stream<TSV> encode_evaluation_result_(Stream<Collection<CollectHistory.NamedEvaluation>> evaluated) {
+    private static Stream<TSV> encode_evaluation_result_(Stream<Collection<CollectHistory.NamedEvaluation>> evaluated, boolean numericOnly) {
         return evaluated
                 .map(c -> {
                     final DateTime dt = c.stream().findAny().map(CollectHistory.NamedEvaluation::getDatetime).orElseThrow(() -> new IllegalStateException("no expression result"));
-                    return new TSV(dt, c);
+                    return new TSV(dt, c, numericOnly);
                 });
     }
 
@@ -149,7 +149,7 @@ public class ExprEval extends HttpServlet {
         @SerializedName("name_tags")
         public String name_tags;
 
-        public Metric(String name, Tags mv_tags, MetricValue mv) {
+        public Metric(String name, Tags mv_tags, MetricValue mv, boolean numericOnly) {
             name_tags = name + (mv_tags.isEmpty() ? "" : mv_tags.toString());
 
             tags = mv_tags.stream()
@@ -157,15 +157,21 @@ public class ExprEval extends HttpServlet {
                         final String key = tag_entry.getKey();
                         final MetricValue m = tag_entry.getValue();
 
-                        if (m.getBoolValue() != null) return SimpleMapEntry.create(key, m.getBoolValue());
-                        if (m.getIntValue() != null) return SimpleMapEntry.create(key, m.getIntValue());
-                        if (m.getFltValue() != null) return SimpleMapEntry.create(key, m.getFltValue());
-                        if (m.getStrValue() != null) return SimpleMapEntry.create(key, m.getStrValue());
+                        if (m.getBoolValue() != null)
+                            return SimpleMapEntry.create(key, m.getBoolValue());
+                        if (m.getIntValue() != null)
+                            return SimpleMapEntry.create(key, m.getIntValue());
+                        if (m.getFltValue() != null)
+                            return SimpleMapEntry.create(key, m.getFltValue());
+                        if (m.getStrValue() != null)
+                            return SimpleMapEntry.create(key, m.getStrValue());
                         return SimpleMapEntry.create(key, null);
                     })
                     .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue()));
 
-            if (mv.getBoolValue() != null)
+            if (numericOnly)
+                value = mv.value().orElse(null);
+            else if (mv.getBoolValue() != null)
                 value = mv.getBoolValue();
             else if (mv.getIntValue() != null)
                 value = mv.getIntValue();
@@ -187,7 +193,7 @@ public class ExprEval extends HttpServlet {
         @SerializedName("metrics")
         public Map<String, List<Metric>> metrics;
 
-        public TSV(DateTime timestamp, Collection<CollectHistory.NamedEvaluation> named_data) {
+        public TSV(DateTime timestamp, Collection<CollectHistory.NamedEvaluation> named_data, boolean numericOnly) {
             this.timestamp = timestamp;
             timestamp_msec = timestamp.getMillis();
             timestamp_iso8601 = timestamp.toString();
@@ -196,7 +202,7 @@ public class ExprEval extends HttpServlet {
                         final String name = nd.getName();
                         final TimeSeriesMetricDeltaSet data = nd.getTS();
                         final List<Metric> ts_metrics = data.streamAsMap()
-                                .map(entry -> new Metric(name, entry.getKey(), entry.getValue()))
+                                .map(entry -> new Metric(name, entry.getKey(), entry.getValue(), numericOnly))
                                 .collect(Collectors.toList());
                         return SimpleMapEntry.create(name, ts_metrics);
                     })
@@ -216,8 +222,9 @@ public class ExprEval extends HttpServlet {
 
         /**
          * Change the cookie.
-         * @return True indicating the expected value matched and the cookie was changed.
-         *   If the operation fails, false is returned.
+         *
+         * @return True indicating the expected value matched and the cookie was
+         * changed. If the operation fails, false is returned.
          */
         synchronized public boolean update(String expected) {
             if (!cookie.equals(expected)) return false;
@@ -251,6 +258,9 @@ public class ExprEval extends HttpServlet {
         final Optional<Duration> stepsize = Optional.ofNullable(req.getParameter("stepsize"))
                 .map(Long::valueOf)
                 .map(Duration::new);
+        final boolean numericOnly = Optional.ofNullable(req.getParameter("numeric"))
+                .flatMap(s -> "true".equalsIgnoreCase(s) ? Optional.of(true) : ("false".equalsIgnoreCase(s) ? Optional.of(false) : Optional.empty()))
+                .orElse(Boolean.FALSE);
         final Map<String, String> s_exprs = expressions_(req);
 
         if (end.isPresent() && !begin.isPresent())
@@ -264,13 +274,14 @@ public class ExprEval extends HttpServlet {
                     } catch (IOException ex) {
                         throw new RuntimeException(ex);
                     } catch (ConfigurationException ex) {
-                        if (ex.getParseErrors().isEmpty()) throw new RuntimeException(ex);
+                        if (ex.getParseErrors().isEmpty())
+                            throw new RuntimeException(ex);
                         throw new RuntimeException(String.join("\n", ex.getParseErrors()), ex);
                     }
                 }));
 
         final IteratorAndCookie iterator = new IteratorAndCookie(
-                new BufferedIterator<>(encode_evaluation_result_(eval_(exprs, begin, end, stepsize)).iterator(), ITER_BUFCOUNT),
+                new BufferedIterator<>(encode_evaluation_result_(eval_(exprs, begin, end, stepsize), numericOnly).iterator(), ITER_BUFCOUNT),
                 stepsize.filter(d -> d.getMillis() >= 1000).orElseGet(() -> Duration.standardSeconds(1)));
         final String iteratorName = Long.toHexString(ITERATORS_SEQUENCE.incrementAndGet());
         ITERATORS.put(iteratorName, iterator);
@@ -280,7 +291,9 @@ public class ExprEval extends HttpServlet {
         return SimpleMapEntry.create(iteratorName, iterator);
     }
 
-    /** Tiny toString adapter for the logging of expressions. */
+    /**
+     * Tiny toString adapter for the logging of expressions.
+     */
     @RequiredArgsConstructor
     private static class exprsMapToString {
         private final Map<String, TimeSeriesMetricExpression> exprs;
