@@ -259,7 +259,13 @@ public class ExprEval extends HttpServlet {
                 .map(Long::valueOf)
                 .map(Duration::new);
         final boolean numericOnly = Optional.ofNullable(req.getParameter("numeric"))
-                .flatMap(s -> "true".equalsIgnoreCase(s) ? Optional.of(true) : ("false".equalsIgnoreCase(s) ? Optional.of(false) : Optional.empty()))
+                .map(s -> {
+                    if ("true".equalsIgnoreCase(s))
+                        return true;
+                    if ("false".equalsIgnoreCase(s))
+                        return false;
+                    throw new IllegalArgumentException("numeric specified, but does not match true or false");
+                })
                 .orElse(Boolean.FALSE);
         final Map<String, String> s_exprs = expressions_(req);
 
