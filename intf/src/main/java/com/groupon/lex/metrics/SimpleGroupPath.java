@@ -31,89 +31,26 @@
  */
 package com.groupon.lex.metrics;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.util.concurrent.UncheckedExecutionException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import static java.util.Collections.unmodifiableList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Function;
 
 /**
  *
  * @author ariane
  */
-public final class SimpleGroupPath implements Comparable<SimpleGroupPath>, Path {
-    private static final Function<List<String>, SimpleGroupPath> CACHE = CacheBuilder.newBuilder()
-            .softValues()
-            .build(CacheLoader.from((List<String> pathelems) -> new SimpleGroupPath(pathelems)))::getUnchecked;
-    private final List<String> path_;
+public final class SimpleGroupPath extends BasicPath<SimpleGroupPath> implements Comparable<SimpleGroupPath>, Path {
+    private static final Function<PathArray, SimpleGroupPath> CACHE = makeCacheFunction(SimpleGroupPath::new);
 
     /** Use valueOf() instead. */
-    private SimpleGroupPath(List<String> path) {
-        path_ = unmodifiableList(new ArrayList<>(path));
+    private SimpleGroupPath(PathArray path) {
+        super(path);
     }
 
     public static SimpleGroupPath valueOf(String... path) {
-        return valueOf(Arrays.asList(path));
+        return CACHE.apply(new PathArray(path));
     }
 
     public static SimpleGroupPath valueOf(List<String> path) {
-        try {
-            return CACHE.apply(path);
-        } catch (UncheckedExecutionException e) {
-            if (e.getCause() instanceof RuntimeException)
-                throw (RuntimeException)e.getCause();
-            throw e;
-        }
-    }
-
-    @Override
-    public List<String> getPath() { return path_; }
-
-    @Override
-    public int hashCode() {
-        int hash = 3;
-        hash = 97 * hash + Objects.hashCode(this.path_);
-        return hash;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final SimpleGroupPath other = (SimpleGroupPath) obj;
-        if (!Objects.equals(this.path_, other.path_)) {
-            return false;
-        }
-        return true;
-    }
-
-    @Override
-    public String toString() {
-        return getPathString();
-    }
-
-    @Override
-    public int compareTo(SimpleGroupPath o) {
-        if (o == null) return 1;
-
-        int cmp = 0;
-
-        Iterator<String> self_iter = path_.iterator();
-        Iterator<String> othr_iter = o.path_.iterator();
-        while (cmp == 0 && self_iter.hasNext() && othr_iter.hasNext())
-            cmp = self_iter.next().compareTo(othr_iter.next());
-        if (cmp == 0)
-            cmp = (self_iter.hasNext() ? 1 : (othr_iter.hasNext() ? -1 : 0));
-
-        return cmp;
+        return CACHE.apply(new PathArray(path));
     }
 }
