@@ -31,89 +31,26 @@
  */
 package com.groupon.lex.metrics;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.util.concurrent.UncheckedExecutionException;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import static java.util.Collections.unmodifiableList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Function;
 
 /**
  *
  * @author ariane
  */
-public class MetricName implements Serializable, Comparable<MetricName>, Path {
-    private static final Function<List<String>, MetricName> CACHE = CacheBuilder.newBuilder()
-            .softValues()
-            .build(CacheLoader.from((List<String> list) -> new MetricName(list)))::getUnchecked;
-    private final List<String> path_;
+public class MetricName extends BasicPath<MetricName> implements Comparable<MetricName>, Path {
+    private static final Function<PathArray, MetricName> CACHE = makeCacheFunction(MetricName::new);
 
     /** Use valueOf() instead. */
-    private MetricName(List<String> path) {
-        path_ = unmodifiableList(new ArrayList<>(path));
+    private MetricName(PathArray path) {
+        super(path);
     }
 
     public static MetricName valueOf(String... path) {
-        return valueOf(Arrays.asList(path));
+        return CACHE.apply(new PathArray(path));
     }
 
     public static MetricName valueOf(List<String> path) {
-        try {
-            return CACHE.apply(path);
-        } catch (UncheckedExecutionException e) {
-            if (e.getCause() instanceof RuntimeException)
-                throw (RuntimeException)e.getCause();
-            throw e;
-        }
-    }
-
-    @Override
-    public List<String> getPath() { return path_; }
-
-    @Override
-    public String toString() {
-        return configString().toString();
-    }
-
-    @Override
-    public int hashCode() {
-        int hash = 7;
-        hash = 37 * hash + Objects.hashCode(this.path_);
-        return hash;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final MetricName other = (MetricName) obj;
-        if (!Objects.equals(this.path_, other.path_)) {
-            return false;
-        }
-        return true;
-    }
-
-    @Override
-    public int compareTo(MetricName o) {
-        if (o == null) return 1;
-        int cmp = 0;
-
-        Iterator<String> self_iter = path_.iterator();
-        Iterator<String> othr_iter = o.path_.iterator();
-        while (cmp == 0 && self_iter.hasNext() && othr_iter.hasNext())
-            cmp = self_iter.next().compareTo(othr_iter.next());
-        if (cmp == 0)
-            cmp = (self_iter.hasNext() ? 1 : othr_iter.hasNext() ? -1 : 0);
-
-        return cmp;
+        return CACHE.apply(new PathArray(path));
     }
 }
