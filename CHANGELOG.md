@@ -6,6 +6,7 @@ monsoon-2.3-SNAPSHOT
 
 Bug fixes:
 - Fix stack overflow during list file decoding.
+- Fix frontend chart bailing out on non-number responses.
 
 monsoon-2.2.1 (Nov 3, 2016)
 ----
