@@ -29,7 +29,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-grammar Config;
+parser grammar Config;
 options {
     tokenVocab=ConfigTokenizer;
 }
@@ -77,6 +77,6 @@ import ConfigBnf;
 
 
 expr             returns [ Configuration s ]
-                 : s1=import_statements s2=collect_statements s3=rules EOF
-                   { $s = new Configuration($s1.s, $s2.s, $s3.s); }
+                 : c=configuration EOF
+                   { $s = $c.s; }
                  ;

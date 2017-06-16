@@ -78,39 +78,15 @@ parser grammar ConfigBnf;
  */
 
 import ExprBnf;
+
 @members {
     private File dir_;
 
     public File getDir() { return dir_; }
     public void setDir(File dir) { dir_ = dir; }
-
-    private final Deque<Scope> scopes_ = new ArrayDeque<>(Collections.singleton(new MutableScope()));
-    private Scope currentScope() { return scopes_.peek(); }
-    private MutableScope currentMutableScope() {
-        Scope scope = currentScope();
-        return (MutableScope)scope;
-    }
-    private void pushScope(Scope scope) { scopes_.addFirst(scope); }
-    private void popScope(Scope scope) {
-        if (scopes_.peek() != scope) throw new IllegalStateException("Scope mismatch");
-        scopes_.removeFirst();
-    }
-    private MutableScope newMutableScope() {
-        MutableScope new_scope = new MutableScope(currentScope());
-        pushScope(new_scope);
-        return new_scope;
-    }
-
-    private Consumer<String> error_message_consumer_ = (String x) -> {};
-    public void setErrorMessageConsumer(Consumer<String> error_message_consumer) {
-        error_message_consumer_ = error_message_consumer;
-    }
-    public void emitErrorMessage(String msg) {
-        error_message_consumer_.accept(msg);
-    }
 }
 
-expr             returns [ Configuration s ]
+configuration    returns [ Configuration s ]
                  @after{ $s = new Configuration(Objects.requireNonNull($s1.s), Objects.requireNonNull($s2.s), Objects.requireNonNull($s3.s)); }
                  : s1=import_statements s2=collect_statements s3=rules EOF
                  ;
