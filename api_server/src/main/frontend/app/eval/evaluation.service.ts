@@ -87,6 +87,7 @@ export class EvaluationService {
       Object.keys(exprs).forEach((k) => {
         params.set('expr:' + k, exprs[k]);
       });
+      params.set('numeric', 'True');
       return params;
     });
 
