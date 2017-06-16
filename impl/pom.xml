@@ -20,6 +20,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.build.targetJdk>1.8</project.build.targetJdk>
+        <antlr.collectedSources>${project.build.directory}/antlr-collected-src</antlr.collectedSources>
     </properties>
 
     <dependencies>
@@ -127,6 +128,49 @@
                     </archive>
                 </configuration>
             </plugin>
+
+            <!-- Gather tokens and include grammars from dependencies. -->
+            <plugin>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>extract-grammer</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>unpack-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>sources</classifier>
+                            <includeScope>compile</includeScope>
+                            <includes>imports/*.g4</includes>
+                            <outputDirectory>${antlr.collectedSources}</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Gather local grammar files. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-local-grammar</id>
+                        <phase>initialize</phase>
+                        <configuration>
+                            <tasks>
+                                <copy todir="${antlr.collectedSources}">
+                                    <fileset dir="${project.basedir}/src/main/antlr4">
+                                    </fileset>
+                                </copy>
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Build sources, using collected dependencies. -->
             <plugin>
                 <groupId>org.antlr</groupId>
                 <artifactId>antlr4-maven-plugin</artifactId>
@@ -141,7 +185,8 @@
                 </executions>
                 <configuration>
                     <treatWarningsAsErrors>true</treatWarningsAsErrors>
-                    <sourceDirectory>src/main/antlr4</sourceDirectory>
+                    <sourceDirectory>${antlr.collectedSources}</sourceDirectory>
+                    <libDirectory>${antlr.collectedSources}/imports</libDirectory>
                 </configuration>
             </plugin>
         </plugins>
