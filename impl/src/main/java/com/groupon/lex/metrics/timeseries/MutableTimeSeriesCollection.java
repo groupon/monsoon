@@ -191,9 +191,4 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
         data_by_path_.clear();
         return this;
     }
-
-    @Override
-    public String toString() {
-        return "MutableTimeSeriesCollection{" + timestamp_ + ", " + data_.values() + '}';
-    }
 }
