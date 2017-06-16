@@ -6,8 +6,6 @@ import com.google.gson.annotations.SerializedName;
 import static com.groupon.lex.metrics.ConfigSupport.quotedString;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.Tags;
-import com.groupon.lex.metrics.config.ConfigurationException;
-import com.groupon.lex.metrics.config.ParserSupport;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
@@ -276,10 +274,8 @@ public class ExprEval extends HttpServlet {
         final Map<String, TimeSeriesMetricExpression> exprs = s_exprs.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
                     try {
-                        return new ParserSupport(entry.getValue()).expression();
-                    } catch (IOException ex) {
-                        throw new RuntimeException(ex);
-                    } catch (ConfigurationException ex) {
+                        return TimeSeriesMetricExpression.valueOf(entry.getValue());
+                    } catch (TimeSeriesMetricExpression.ParseException ex) {
                         if (ex.getParseErrors().isEmpty())
                             throw new RuntimeException(ex);
                         throw new RuntimeException(String.join("\n", ex.getParseErrors()), ex);
