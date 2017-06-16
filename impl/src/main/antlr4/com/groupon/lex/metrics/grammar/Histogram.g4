@@ -1,6 +1,6 @@
 grammar Histogram;
 options {
-    tokenVocab=ConfigBnf;
+    tokenVocab=ConfigTokenizer;
 }
 import ConfigBnf;
 

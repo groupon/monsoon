@@ -1,6 +1,6 @@
 grammar Expression;
 options {
-    tokenVocab=ConfigBnf;
+    tokenVocab=ConfigTokenizer;
 }
 import ConfigBnf;
 
