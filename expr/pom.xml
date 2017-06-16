@@ -20,6 +20,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.build.targetJdk>1.8</project.build.targetJdk>
+        <antlr.collectedSources>${project.build.directory}/antlr-collected-src</antlr.collectedSources>
     </properties>
 
     <dependencies>
@@ -32,36 +33,6 @@
             <groupId>com.github.groupon.monsoon</groupId>
             <artifactId>monsoon-lib</artifactId>
             <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.groupon.monsoon</groupId>
-            <artifactId>monsoon-collector-http</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.groupon.monsoon</groupId>
-            <artifactId>monsoon-collector-collectd</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.groupon.monsoon</groupId>
-            <artifactId>monsoon-collector-jmx</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.groupon.monsoon</groupId>
-            <artifactId>monsoon-collector-tcp</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.groupon.monsoon</groupId>
-            <artifactId>monsoon-api</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpcore-nio</artifactId>
-            <version>4.4.4</version>
         </dependency>
         <dependency>
             <groupId>org.antlr</groupId>
@@ -78,11 +49,6 @@
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>19.0</version>
-        </dependency>
-        <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-            <version>3.1.0</version>
         </dependency>
         <dependency>
             <groupId>net.sf.trove4j</groupId>
@@ -122,6 +88,49 @@
                     </archive>
                 </configuration>
             </plugin>
+
+            <!-- Gather tokens and include grammars from dependencies. -->
+            <plugin>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>extract-grammer</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>unpack-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>sources</classifier>
+                            <includeScope>compile</includeScope>
+                            <includes>imports/*.g4</includes>
+                            <outputDirectory>${antlr.collectedSources}</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Gather local grammar files. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-local-grammar</id>
+                        <phase>initialize</phase>
+                        <configuration>
+                            <tasks>
+                                <copy todir="${antlr.collectedSources}">
+                                    <fileset dir="${project.basedir}/src/main/antlr4">
+                                    </fileset>
+                                </copy>
+                            </tasks>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Build sources, using collected dependencies. -->
             <plugin>
                 <groupId>org.antlr</groupId>
                 <artifactId>antlr4-maven-plugin</artifactId>
@@ -136,7 +145,8 @@
                 </executions>
                 <configuration>
                     <treatWarningsAsErrors>true</treatWarningsAsErrors>
-                    <sourceDirectory>src/main/antlr4</sourceDirectory>
+                    <sourceDirectory>${antlr.collectedSources}</sourceDirectory>
+                    <libDirectory>${antlr.collectedSources}/imports</libDirectory>
                 </configuration>
             </plugin>
         </plugins>
