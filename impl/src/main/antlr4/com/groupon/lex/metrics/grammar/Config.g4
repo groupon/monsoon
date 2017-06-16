@@ -35,7 +35,7 @@ options {
 }
 import ConfigBnf;
 
-@parser::header {
+@header {
     import com.groupon.lex.metrics.lib.TriFunction;
     import com.groupon.lex.metrics.config.*;
     import com.groupon.lex.metrics.expression.*;
@@ -74,6 +74,8 @@ import ConfigBnf;
     import com.groupon.lex.metrics.lib.Any2;
     import com.groupon.lex.metrics.lib.Any3;
 }
+
+@members{}
 
 
 expr             returns [ Configuration s ]
