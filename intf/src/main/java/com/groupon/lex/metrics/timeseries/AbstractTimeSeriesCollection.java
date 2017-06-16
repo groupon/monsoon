@@ -40,12 +40,12 @@ import lombok.NonNull;
  */
 public abstract class AbstractTimeSeriesCollection implements TimeSeriesCollection {
     @Override
-    public final int hashCode() {
+    public int hashCode() {
         return hashCode(this);
     }
 
     @Override
-    public final boolean equals(Object obj) {
+    public boolean equals(Object obj) {
         if (obj == null) {
             return false;
         }
@@ -57,7 +57,7 @@ public abstract class AbstractTimeSeriesCollection implements TimeSeriesCollecti
     }
 
     @Override
-    public final String toString() {
+    public String toString() {
         String className = getClass().getSimpleName();
         if (className.isEmpty())
             className = "anonymous-AbstractTimeSeriesCollection";
