@@ -54,6 +54,7 @@
     <modules>
         <module>intf</module>
         <module>lib</module>
+        <module>expr</module>
         <module>impl</module>
         <module>api_server</module>
         <module>history</module>

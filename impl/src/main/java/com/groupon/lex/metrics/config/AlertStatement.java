@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -61,17 +61,17 @@ public class AlertStatement implements RuleStatement {
 
     @Deprecated  // XXX currently used by grammar.
     public AlertStatement(NameResolver name,
-            TimeSeriesMetricExpression predicate,
-            Optional<Duration> fire_duration,
-            Optional<String> message) {
+                          TimeSeriesMetricExpression predicate,
+                          Optional<Duration> fire_duration,
+                          Optional<String> message) {
         this(name, predicate, fire_duration, message, EMPTY_MAP);
     }
 
     public AlertStatement(NameResolver name,
-            TimeSeriesMetricExpression predicate,
-            Optional<Duration> fire_duration,
-            Optional<String> message,
-            Map<String, Any2<TimeSeriesMetricExpression, List<TimeSeriesMetricExpression>>> attributes) {
+                          TimeSeriesMetricExpression predicate,
+                          Optional<Duration> fire_duration,
+                          Optional<String> message,
+                          Map<String, Any2<TimeSeriesMetricExpression, List<TimeSeriesMetricExpression>>> attributes) {
         name_ = requireNonNull(name);
         predicate_ = requireNonNull(predicate);
         fire_duration_ = requireNonNull(fire_duration).orElse(Duration.ZERO);
@@ -79,11 +79,25 @@ public class AlertStatement implements RuleStatement {
         attributes_ = requireNonNull(attributes);
     }
 
-    public TimeSeriesMetricExpression getPredicate() { return predicate_; }
-    public NameResolver getName() { return name_; }
-    public Duration getFireDuration() { return fire_duration_; }
-    public String getMessage() { return message_; }
-    public Map<String, Any2<TimeSeriesMetricExpression, List<TimeSeriesMetricExpression>>> getAttributes() { return attributes_; }
+    public TimeSeriesMetricExpression getPredicate() {
+        return predicate_;
+    }
+
+    public NameResolver getName() {
+        return name_;
+    }
+
+    public Duration getFireDuration() {
+        return fire_duration_;
+    }
+
+    public String getMessage() {
+        return message_;
+    }
+
+    public Map<String, Any2<TimeSeriesMetricExpression, List<TimeSeriesMetricExpression>>> getAttributes() {
+        return attributes_;
+    }
 
     @Override
     public AlertTransformerImpl get() {
@@ -118,10 +132,9 @@ public class AlertStatement implements RuleStatement {
                                         return value.configString();
                                     },
                                     values -> {
-                                        return values
-                                                .stream()
-                                                .map(ConfigStatement::configString)
-                                                .collect(Collectors.joining(", ", "[ ", " ]"));
+                                        return values.stream()
+                                        .map(TimeSeriesMetricExpression::configString)
+                                        .collect(Collectors.joining(", ", "[ ", " ]"));
                                     }))
                             .append(",\n");
                 });

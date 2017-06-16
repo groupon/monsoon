@@ -5,9 +5,9 @@
         <artifactId>monsoon-basepom</artifactId>
         <version>2.3-SNAPSHOT</version>
     </parent>
-    <artifactId>monsoon-engine</artifactId>
+    <artifactId>monsoon-expr</artifactId>
     <packaging>jar</packaging>
-    <name>Mon-soon engine</name>
+    <name>Mon-soon expressions</name>
     <url>https://github.com/groupon/monsoon</url>
 
     <scm>
@@ -31,11 +31,6 @@
         <dependency>
             <groupId>com.github.groupon.monsoon</groupId>
             <artifactId>monsoon-lib</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.groupon.monsoon</groupId>
-            <artifactId>monsoon-expr</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>
