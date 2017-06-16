@@ -1,4 +1,4 @@
-parser grammar Expression;
+parser grammar HistogramParser;
 options {
     tokenVocab=ConfigTokenizer;
 }
@@ -47,7 +47,7 @@ import ConfigBnf;
 @members{}
 
 
-expr             returns [ TimeSeriesMetricExpression s ]
-                 : s1=expression EOF
+expr             returns [ Histogram s ]
+                 : s1=histogram EOF
                    { $s = $s1.s; }
                  ;

@@ -29,7 +29,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-parser grammar GroupName;
+parser grammar ConfigParser;
 options {
     tokenVocab=ConfigTokenizer;
 }
@@ -78,7 +78,7 @@ import ConfigBnf;
 @members{}
 
 
-expr             returns [ GroupName s ]
-                 : s1=raw_dotted_identifier EOF
-                   { $s = GroupName.valueOf(SimpleGroupPath.valueOf($s1.s)); }
+expr             returns [ Configuration s ]
+                 : c=configuration EOF
+                   { $s = $c.s; }
                  ;
