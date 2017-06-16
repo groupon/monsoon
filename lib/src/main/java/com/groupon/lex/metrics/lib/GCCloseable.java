@@ -9,11 +9,11 @@ import java.lang.ref.PhantomReference;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.util.Map;
-import static java.util.Objects.requireNonNull;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A wrapper around a closable, that uses an unreachability event by the GC to
@@ -21,13 +21,13 @@ import java.util.logging.Logger;
  */
 public class GCCloseable<T extends AutoCloseable> {
     private static final Logger LOG = Logger.getLogger(GCCloseable.class.getName());
-    private static final ReferenceQueue<GCCloseable> cleanup_queue_ = new ReferenceQueue();
-    private static final Map<Reference<? extends GCCloseable>, AutoCloseable> instances_ = new ConcurrentHashMap<>();
-    private static final AtomicBoolean started_ = new AtomicBoolean(false);
+    private static final ReferenceQueue<GCCloseable> CLEANUP_QUEUE = new ReferenceQueue();
+    private static final Map<Reference<? extends GCCloseable>, AutoCloseable> INSTANCES = new ConcurrentHashMap<>();
+    private static final AtomicBoolean STARTED = new AtomicBoolean(false);
 
     private static void cleanup_() throws InterruptedException {
-        Reference<? extends GCCloseable> ref = cleanup_queue_.remove();
-        final AutoCloseable item = instances_.remove(ref);
+        Reference<? extends GCCloseable> ref = CLEANUP_QUEUE.remove();
+        final AutoCloseable item = INSTANCES.remove(ref);
 
         assert (item != null);
         try {
@@ -39,7 +39,7 @@ public class GCCloseable<T extends AutoCloseable> {
     }
 
     private static void ensure_started_() {
-        if (started_.get()) return;
+        if (STARTED.get()) return;
 
         synchronized (GCCloseable.class) {
             final Thread t = new Thread(() -> {
@@ -53,9 +53,12 @@ public class GCCloseable<T extends AutoCloseable> {
             });
             t.setDaemon(true);
             t.setName(GCCloseable.class.getName() + "-cleaner");
-            t.setUncaughtExceptionHandler((Thread thr, Throwable ex) -> Logger.getLogger(GCCloseable.class.getName()).log(Level.WARNING, "uncaught exception", ex));
+            t.setUncaughtExceptionHandler((Thread thr, Throwable ex) -> {
+                LOG.log(Level.WARNING, "uncaught exception", ex);
+                STARTED.set(false);
+            });
 
-            if (started_.compareAndSet(false, true)) {
+            if (STARTED.compareAndSet(false, true)) {
                 LOG.info("starting cleaner thread");
                 t.start();
             }
@@ -70,7 +73,7 @@ public class GCCloseable<T extends AutoCloseable> {
 
     public GCCloseable(T value) {
         value_ = requireNonNull(value);
-        instances_.put(new PhantomReference<>(this, cleanup_queue_), value_);
+        INSTANCES.put(new PhantomReference<>(this, CLEANUP_QUEUE), value_);
         ensure_started_();
     }
 
