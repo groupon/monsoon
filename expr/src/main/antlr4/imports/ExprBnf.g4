@@ -59,6 +59,8 @@ parser grammar ExprBnf;
     import com.groupon.lex.metrics.transformers.IdentifierNameResolver;
     import com.groupon.lex.metrics.transformers.LiteralNameResolver;
     import com.groupon.lex.metrics.transformers.NameResolver;
+    import com.groupon.lex.metrics.timeseries.parser.Scope;
+    import com.groupon.lex.metrics.timeseries.parser.MutableScope;
 
     import java.util.ArrayDeque;
     import java.util.ArrayList;
