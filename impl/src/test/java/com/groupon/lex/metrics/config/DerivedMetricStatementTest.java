@@ -68,23 +68,27 @@ public class DerivedMetricStatementTest {
         when(metricResolver1.configString()).then((invocation) -> new StringBuilder("METRIC_1"));
         when(metricResolver2.configString()).then((invocation) -> new StringBuilder("METRIC_2"));
 
-        expr_one_plus_two = new ParserSupport("1 + 2").expression();
-        expr_one = new ParserSupport("1").expression();
-        expr_two = new ParserSupport("2").expression();
+        expr_one_plus_two = TimeSeriesMetricExpression.valueOf("1 + 2");
+        expr_one = TimeSeriesMetricExpression.valueOf("1");
+        expr_two = TimeSeriesMetricExpression.valueOf("2");
 
         no_tags = EMPTY_MAP;
         one_tag = singletonMap("name", expr_one_plus_two);
-        two_tags = new HashMap<String, TimeSeriesMetricExpression>() {{
-            put("x", expr_one);
-            put("y", expr_two);
-        }};
+        two_tags = new HashMap<String, TimeSeriesMetricExpression>() {
+            {
+                put("x", expr_one);
+                put("y", expr_two);
+            }
+        };
 
         no_metrics = EMPTY_MAP;
         one_metric = singletonMap(metricResolver1, expr_one_plus_two);
-        two_metrics = new HashMap<NameResolver, TimeSeriesMetricExpression>() {{
-            put(metricResolver1, expr_one);
-            put(metricResolver2, expr_two);
-        }};
+        two_metrics = new HashMap<NameResolver, TimeSeriesMetricExpression>() {
+            {
+                put(metricResolver1, expr_one);
+                put(metricResolver2, expr_two);
+            }
+        };
 
         stmt_noTags_noMetrics = new DerivedMetricStatement(groupResolver, no_tags, no_metrics);
         stmt_noTags_oneMetric = new DerivedMetricStatement(groupResolver, no_tags, one_metric);
