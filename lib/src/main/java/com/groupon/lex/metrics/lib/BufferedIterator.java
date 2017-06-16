@@ -31,7 +31,7 @@ public final class BufferedIterator<T> {
     private boolean at_end_;
     private final int queue_size_;
     private boolean running_ = false;
-    private Optional<Runnable> wakeup_ = Optional.empty();
+    private Runnable wakeup_ = null;
 
     public BufferedIterator(ForkJoinPool work_queue, Iterator<? extends T> iter, int queue_size) {
         if (queue_size <= 0) throw new IllegalArgumentException("queue size must be at least 1");
@@ -156,9 +156,9 @@ public final class BufferedIterator<T> {
         synchronized(this) {
             if (!queue_.isEmpty() || at_end_) {
                 run_immediately_ = true;
-                wakeup_ = Optional.empty();
+                wakeup_ = null;
             } else {
-                wakeup_ = Optional.of(wakeup);
+                wakeup_ = wakeup;
             }
         }
         if (run_immediately_) work_queue_.submit(wakeup);
@@ -192,8 +192,8 @@ public final class BufferedIterator<T> {
                     final Optional<Runnable> wakeup;
                     synchronized(this) {
                         queue_.add(next);
-                        wakeup = wakeup_;
-                        wakeup_ = Optional.empty();
+                        wakeup = Optional.ofNullable(wakeup_);
+                        wakeup_ = null;
                     }
                     wakeup.ifPresent(this.work_queue_::submit);
                 } else {
@@ -201,8 +201,8 @@ public final class BufferedIterator<T> {
                     synchronized(this) {
                         at_end_ = true;
                         stop_loop = true;
-                        wakeup = wakeup_;
-                        wakeup_ = Optional.empty();
+                        wakeup = Optional.ofNullable(wakeup_);
+                        wakeup_ = null;
                     }
                     wakeup.ifPresent(this.work_queue_::submit);
                 }
@@ -220,8 +220,8 @@ public final class BufferedIterator<T> {
             synchronized(this) {
                 running_ = false;
                 exception = e;
-                wakeup = wakeup_;
-                wakeup_ = Optional.empty();
+                wakeup = Optional.ofNullable(wakeup_);
+                wakeup_ = null;
             }
             wakeup.ifPresent(Runnable::run);
         }
