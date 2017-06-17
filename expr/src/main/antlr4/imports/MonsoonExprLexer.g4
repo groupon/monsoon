@@ -57,8 +57,6 @@ LT_KW           : '<'
                 ;
 GT_KW           : '>'
                 ;
-EQ_KW           : '='
-                ;
 NEQ_KW          : '!='
                 ;
 REGEX_MATCH_KW  : '=~'
@@ -89,8 +87,6 @@ DOT_LIT         : '.'
                 ;
 PLUS_LIT        : '+'
                 ;
-DASH_LIT        : '-'
-                ;
 DOLLAR_LIT      : '$'
                 ;
 BRACE_OPEN_LIT  : '('
@@ -103,14 +99,7 @@ PERCENT_LIT     : '%'
                 ;
 BANG_LIT        : '!'
                 ;
-SQBRACE_OPEN_LIT: '['
-                ;
-SQBRACE_CLOSE_LIT
-                : ']'
-                ;
 COLON_LIT       : ':'
-                ;
-DOT_DOT_LIT     : '..'
                 ;
 
 /*

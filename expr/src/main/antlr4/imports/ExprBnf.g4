@@ -30,9 +30,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 parser grammar ExprBnf;
+import MonsoonPrimitivesParser;
 
 @header{
-    import com.groupon.lex.metrics.Histogram;
     import com.groupon.lex.metrics.MetricMatcher;
     import com.groupon.lex.metrics.PathMatcher;
     import com.groupon.lex.metrics.expression.GroupExpression;
@@ -93,18 +93,6 @@ parser grammar ExprBnf;
     }
 }
 
-identifier       returns [ String s ]
-                 @init{
-                   String text;
-                 }
-                 @after{
-                   $s = text;
-                 }
-                 : s1_tok=ID
-                   { text = $s1_tok.getText(); }
-                 | s1_str=SQSTRING
-                   { text = $s1_str.getText(); }
-                 ;
 name             returns [ NameResolver s ]
                  @init{
                    NameResolver resolver;
@@ -178,79 +166,12 @@ group            returns [ GroupExpression s ]
                  ;
 
 /*
- * Number logic.
- *
- * uint_val: accepts any unsigned integer -> returning long
- * int_val: accepts any integer -> returning long
- * fp_val: accepts any floating point value, _except_ integers -> returning double
- * number: accepts any floating point value, including integers -> returning java.lang.Number
- */
-
-int_val          returns [ long s ]
-                 : DASH_LIT s2=uint_val
-                   { $s = -$s2.s; }
-                 | s1=uint_val
-                   { $s = $s1.s; }
-                 ;
-uint_val         returns [ long s ]
-                 : s1=DIGITS
-                   { $s = Long.parseLong($s1.getText()); }
-                 | s1=HEXDIGITS
-                   { $s = Long.parseLong($s1.getText()); }
-                 | s1=OCTDIGITS
-                   { $s = Long.parseLong($s1.getText()); }
-                 ;
-positive_fp_val  returns [ double s ]
-                 : s1=FP_DECIMAL
-                   { $s = Double.parseDouble($s1.getText()); }
-                 | s1=FP_HEX
-                   { $s = Double.parseDouble($s1.getText()); }
-                 ;
-fp_val           returns [ double s ]
-                 : s1=positive_fp_val
-                   { $s = $s1.s; }
-                 | DASH_LIT s2=positive_fp_val
-                   { $s = -$s2.s; }
-                 ;
-positive_number  returns [ Number s ]
-                 : s1_dbl=positive_fp_val
-                   { $s = $s1_dbl.s; }
-                 | s1_int=uint_val
-                   { $s = $s1_int.s; }
-                 ;
-number           returns [ Number s ]
-                 : s1_dbl=fp_val
-                   { $s = $s1_dbl.s; }
-                 | s1_int=int_val
-                   { $s = $s1_int.s; }
-                 ;
-histogram        returns [ Histogram s ]
-                 @init{ List<Histogram.RangeWithCount> elems = new ArrayList<>(); }
-                 : SQBRACE_OPEN_LIT
-                   ( s0=histogram_elem{ elems.add($s0.s); }
-                     (COMMA_LIT sN=histogram_elem{ elems.add($sN.s); })*
-                   )?
-                   SQBRACE_CLOSE_LIT
-                   { $s = new Histogram(elems.stream()); }
-                 ;
-histogram_elem   returns [ Histogram.RangeWithCount s ]
-                 : s_floor=number DOT_DOT_LIT s_ceil=number EQ_KW s_count=number
-                   {
-                     $s = new Histogram.RangeWithCount(new Histogram.Range($s_floor.s.doubleValue(), $s_ceil.s.doubleValue()), $s_count.s.doubleValue());
-                   }
-                 ;
-
-/*
  * String logic.
  *
  * Strings are enclosed in double quotes and may contain escape sequences.
  * Strings are sensitive to white space.
  */
 
-quoted_string    returns [ String s = "" ]
-                 : s1=QSTRING
-                   { $s = $s1.getText(); }
-                 ;
 quoted_identifier returns [ String s = "" ]
                  : s1=SQSTRING
                    { $s = $s1.getText(); }
@@ -278,8 +199,8 @@ primary_expression returns [ TimeSeriesMetricExpression s ]
                    { expr = TimeSeriesMetricExpression.FALSE; }
                  | BRACE_OPEN_LIT s2=expression BRACE_CLOSE_LIT
                    { expr = $s2.s; }
-                 | s1_string=quoted_string
-                   { expr = Util.constantExpression($s1_string.s); }
+                 | s1_string=QSTRING
+                   { expr = Util.constantExpression($s1_string.text); }
                  | s1_fn=function_invocation
                    { expr = $s1_fn.s; }
                  | s1_hist=histogram
@@ -389,8 +310,8 @@ equality_expression returns [ TimeSeriesMetricExpression s ]
                    | ( ( REGEX_MATCH_KW{ regex_transform = UtilX.regexMatch(); }
                        | REGEX_NEGATE_KW{ regex_transform = UtilX.regexMismatch(); }
                        )
-                       ( qs=quoted_string
-                         { expr = regex_transform.apply(expr, $qs.s); }
+                       ( qs=QSTRING
+                         { expr = regex_transform.apply(expr, $qs.text); }
                        | re=regex
                          { expr = regex_transform.apply(expr, $re.s); }
                        )
@@ -446,29 +367,6 @@ label_selector
                    ( (EQ_KW|NEQ_KW) constant
                    | (REGEX_MATCH_KW|REGEX_NEGATE_KW) (constant | regex)
                    )?
-                 ;
-
-duration_val     returns [ Duration s ]
-                 @after{ $s = $fn.fn.apply(Objects.requireNonNull($s1.s)); }
-                 : s1=uint_val fn=duration_unit { $fn.fn != null }?
-                 ;
-duration         returns [ Duration s = Duration.ZERO ]
-                 : (s1=duration_val{ $s = $s.withDurationAdded($s1.s, 1); })+
-                 ;
-duration_unit    returns [ Function<Long, Duration> fn ]
-                 : id=ID
-                   {
-                     if ($id.getText().equals("s"))
-                       $fn = Duration::standardSeconds;
-                     else if ($id.getText().equals("m"))
-                       $fn = Duration::standardMinutes;
-                     else if ($id.getText().equals("h"))
-                       $fn = Duration::standardHours;
-                     else if ($id.getText().equals("d"))
-                       $fn = Duration::standardDays;
-                     else
-                       $fn = null;
-                   }
                  ;
 
 
@@ -544,12 +442,12 @@ fn__str          returns [ TimeSeriesMetricExpression s ]
                  ;
 fn__regexp       returns [ TimeSeriesMetricExpression s ]
                  @init{ String regexp = null; }
-                 @after{ $s = new RegexpExpression($s_expr.s, regexp, $s_replacement.s); }
+                 @after{ $s = new RegexpExpression($s_expr.s, regexp, $s_replacement.text); }
                  : s_expr=expression COMMA_LIT
-                   ( s_regexp_str=quoted_string{ regexp = $s_regexp_str.s; }
+                   ( s_regexp_str=QSTRING{ regexp = $s_regexp_str.text; }
                    | s_regexp_re=regex{ regexp = $s_regexp_re.s; }
                    ) COMMA_LIT
-                   s_replacement=quoted_string
+                   s_replacement=QSTRING
                    BRACE_CLOSE_LIT
                  ;
 fn__name         returns [ TimeSeriesMetricExpression s ]

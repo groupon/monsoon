@@ -220,3 +220,16 @@ REGEX           : '//'
                   '//'
                   { setText(getText().substring(2, getText().length() - 2).replace("\\/", "/")); }
                 ;
+
+
+SQBRACE_OPEN_LIT: '['
+                ;
+SQBRACE_CLOSE_LIT
+                : ']'
+                ;
+DASH_LIT        : '-'
+                ;
+DOT_DOT_LIT     : '..'
+                ;
+EQ_KW           : '='
+                ;

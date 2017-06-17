@@ -140,15 +140,15 @@ collect_stmt_parse_main [ CollectorBuilder builder ]
                  : ( { $builder instanceof MainNone }?
                      /* SKIP */
                    | { $builder instanceof MainString }?
-                     main_name=quoted_string
-                     { ((MainString)$builder).setMain($main_name.s); }
+                     main_name=QSTRING
+                     { ((MainString)$builder).setMain($main_name.text); }
                    | { $builder instanceof MainStringList }?
-                     main_name0=quoted_string
+                     main_name0=QSTRING
                      { strings = new ArrayList<>();
-                       strings.add($main_name0.s);
+                       strings.add($main_name0.text);
                      }
-                     ( COMMA_LIT main_nameN=quoted_string
-                       { strings.add($main_nameN.s); }
+                     ( COMMA_LIT main_nameN=QSTRING
+                       { strings.add($main_nameN.text); }
                      )*
                      { ((MainStringList)$builder).setMain(strings); }
                    )
@@ -298,8 +298,8 @@ tag_rule         returns [ SetTagStatement s ]
                  ;
 
 filename         returns [ String s ]
-                 : s1=quoted_string
-                   { $s = $s1.s; }
+                 : s1=QSTRING
+                   { $s = $s1.text; }
                  ;
 dotted_identifier returns [ String s ]
                  : s1=raw_dotted_identifier
@@ -317,8 +317,8 @@ metric_name      returns [ NameResolver s ]
                    { $s = $s1.s; }
                  ;
 metric_constant  returns [ MetricValue s ]
-                 : s1_str=quoted_string
-                   { $s = MetricValue.fromStrValue($s1_str.s); }
+                 : s1_str=QSTRING
+                   { $s = MetricValue.fromStrValue($s1_str.text); }
                  | s1_int=int_val
                    { $s = MetricValue.fromIntValue($s1_int.s); }
                  | s1_dbl=fp_val
@@ -348,7 +348,9 @@ alert_statement_opt_duration returns [ Optional<Duration> s ]
 alert_statement_opt_message returns [ Optional<String> s ]
                  @init{ String s = null; }
                  @after{ $s = Optional.ofNullable(s); }
-                 : (MESSAGE_KW s2=quoted_string)?
+                 : ( MESSAGE_KW s2=QSTRING
+                     { s = $s2.text; }
+                   )?
                  ;
 alert_statement_attributes returns [ Map<String, Any2<TimeSeriesMetricExpression, List<TimeSeriesMetricExpression>>> s = new HashMap<>() ]
                  : ATTRIBUTES_KW CURLYBRACKET_OPEN
@@ -444,5 +446,5 @@ tuple_value      returns [ Any3<Boolean, Integer, String> s ]
                  : TRUE_KW           { $s = ResolverTuple.newTupleElement(true);   }
                  | FALSE_KW          { $s = ResolverTuple.newTupleElement(false);  }
                  | s_i=int_val       { $s = ResolverTuple.newTupleElement((int)$s_i.s); }
-                 | s_s=quoted_string { $s = ResolverTuple.newTupleElement($s_s.s); }
+                 | s_s=QSTRING       { $s = ResolverTuple.newTupleElement($s_s.text); }
                  ;
