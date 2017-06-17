@@ -37,10 +37,11 @@ lexer grammar MonsoonPrimitivesLexer;
 }
 
 @members {
-    private static final Pattern SPECIAL = Pattern.compile("\\([\\abtnvfr'\"/]"
-            + "|x[0..7][0..7][0..7]"
-            + "|x[0..7][0..7]"
-            + "|x[0..7]"
+    private static final Pattern SPECIAL = Pattern.compile("\\\\([\\\\abtnvfr'\"/]"
+            + "|[0..7][0..7][0..7]"
+            + "|[0..7][0..7]"
+            + "|[0..7]"
+            + "|x[0..9a..fA..F][0..9a..fA..F]"
             + "|u[0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F]"
             + "|U[0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F])");
 
@@ -83,13 +84,21 @@ lexer grammar MonsoonPrimitivesLexer;
                 case '/':
                     result.append('/');
                     break;
-                case 'x':
-                    final String octal_part = s.substring(matcher.start() + 2, matcher.end());
+                case '0':
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7':
+                    final String octal_part = s.substring(matcher.start() + 1, matcher.end());
                     final int ch_int = Integer.parseInt(octal_part, 8);
                     if (ch_int > 127)
                         throw new NumberFormatException("Invalid octal escape: " + octal_part);
                     result.append((char) ch_int);
                     break;
+                case 'x':
                 case 'u':
                 case 'U':
                     final String hex_part = s.substring(matcher.start() + 2, matcher.end());
