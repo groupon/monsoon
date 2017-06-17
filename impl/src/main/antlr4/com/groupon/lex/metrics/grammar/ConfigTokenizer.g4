@@ -44,12 +44,12 @@ options {
 
 @members {
     private static final Pattern SPECIAL = Pattern.compile("\\\\([\\\\abtnvfr'\"/]"
-            + "|[0..7][0..7][0..7]"
-            + "|[0..7][0..7]"
-            + "|[0..7]"
-            + "|x[0..9a..fA..F][0..9a..fA..F]"
-            + "|u[0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F]"
-            + "|U[0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F][0..9a..fA..F])");
+            + "|[0-7][0-7][0-7]"
+            + "|[0-7][0-7]"
+            + "|[0-7]"
+            + "|x[0-9a-fA-F][0-9a-fA-F]"
+            + "|u[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]"
+            + "|U[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F])");
 
     private static String handleEscapes(String s) {
         final StringBuilder result = new StringBuilder(s.length());
