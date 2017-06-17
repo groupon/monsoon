@@ -111,7 +111,7 @@
                 <artifactId>maven-dependency-plugin</artifactId>
                 <executions>
                     <execution>
-                        <id>extract-grammer</id>
+                        <id>extract-grammar</id>
                         <phase>generate-sources</phase>
                         <goals>
                             <goal>unpack-dependencies</goal>
@@ -121,6 +121,10 @@
                             <includeScope>compile</includeScope>
                             <includes>imports/*.g4</includes>
                             <outputDirectory>${antlr.collectedSources}</outputDirectory>
+                            <includeGroupIds>com.github.groupon.monsoon</includeGroupIds>
+                            <includeArtifactIds>monsoon-collector-base</includeArtifactIds>
+                            <excludeTransitive>true</excludeTransitive>
+                            <type>java-source</type>
                         </configuration>
                     </execution>
                 </executions>
