@@ -31,8 +31,8 @@
  */
 package com.groupon.lex.metrics.config;
 
-import com.groupon.lex.metrics.grammar.ConfigTokenizer;
 import com.groupon.lex.metrics.grammar.ConfigParser;
+import com.groupon.lex.metrics.grammar.ConfigTokenizer;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
@@ -43,9 +43,9 @@ import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.BufferedTokenStream;
+import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.Recognizer;
 
 /**
@@ -85,7 +85,7 @@ public class ParserSupport {
 
     public Configuration configuration() throws IOException, ConfigurationException {
         final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
-        final ConfigTokenizer lexer = new ConfigTokenizer(new ANTLRInputStream(reader_));
+        final ConfigTokenizer lexer = new ConfigTokenizer(CharStreams.fromReader(reader_));
         lexer.removeErrorListeners();
         lexer.addErrorListener(error_listener);
         final ConfigParser parser = new ConfigParser(new BufferedTokenStream(lexer));

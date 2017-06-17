@@ -42,9 +42,9 @@ import static java.util.Objects.requireNonNull;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.BaseErrorListener;
+import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.UnbufferedTokenStream;
@@ -56,6 +56,7 @@ import org.antlr.v4.runtime.UnbufferedTokenStream;
 public class StringTemplate implements Function<Map<Any2<Integer, String>, String>, String> {
     public static interface Element {
         public void apply(StringBuilder out, Map<Any2<Integer, String>, String> args);
+
         public void keys(Consumer<Any2<Integer, String>> c);
     }
 
@@ -72,9 +73,13 @@ public class StringTemplate implements Function<Map<Any2<Integer, String>, Strin
         }
 
         @Override
-        public String toString() { return lit_.replace("$", "$$"); }
+        public String toString() {
+            return lit_.replace("$", "$$");
+        }
+
         @Override
-        public void keys(Consumer<Any2<Integer, String>> c) {}
+        public void keys(Consumer<Any2<Integer, String>> c) {
+        }
     }
 
     public static class SubstituteElement implements Element {
@@ -90,12 +95,19 @@ public class StringTemplate implements Function<Map<Any2<Integer, String>, Strin
             out.append(args.get(Any2.<Integer, String>left(idx_)));
         }
 
-        public int getIndex() { return idx_; }
+        public int getIndex() {
+            return idx_;
+        }
 
         @Override
-        public String toString() { return "${" + idx_ + '}'; }
+        public String toString() {
+            return "${" + idx_ + '}';
+        }
+
         @Override
-        public void keys(Consumer<Any2<Integer, String>> c) { c.accept(Any2.left(getIndex())); }
+        public void keys(Consumer<Any2<Integer, String>> c) {
+            c.accept(Any2.left(getIndex()));
+        }
     }
 
     public static class SubstituteNameElement implements Element {
@@ -111,12 +123,19 @@ public class StringTemplate implements Function<Map<Any2<Integer, String>, Strin
             out.append(args.get(Any2.<Integer, String>right(name_)));
         }
 
-        public String getName() { return name_; }
+        public String getName() {
+            return name_;
+        }
 
         @Override
-        public String toString() { return "${" + name_ + '}'; }
+        public String toString() {
+            return "${" + name_ + '}';
+        }
+
         @Override
-        public void keys(Consumer<Any2<Integer, String>> c) { c.accept(Any2.right(getName())); }
+        public void keys(Consumer<Any2<Integer, String>> c) {
+            c.accept(Any2.right(getName()));
+        }
     }
 
     private final List<Element> elements_;
@@ -139,7 +158,7 @@ public class StringTemplate implements Function<Map<Any2<Integer, String>, Strin
 
         final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
 
-        final StringSubstitutionLexer lexer = new StringSubstitutionLexer(new ANTLRInputStream(pattern));
+        final StringSubstitutionLexer lexer = new StringSubstitutionLexer(CharStreams.fromString(pattern));
         lexer.removeErrorListeners();
         lexer.addErrorListener(error_listener);
         final StringSubstitutionParser parser = new StringSubstitutionParser(new UnbufferedTokenStream(lexer));
@@ -165,7 +184,7 @@ public class StringTemplate implements Function<Map<Any2<Integer, String>, Strin
     public int indexSize() {
         return elements_.stream()
                 .filter(e -> e instanceof SubstituteElement)
-                .map(e -> (SubstituteElement)e)
+                .map(e -> (SubstituteElement) e)
                 .map(SubstituteElement::getIndex)
                 .max(Comparator.naturalOrder())
                 .map(x -> x + 1)
@@ -185,6 +204,7 @@ public class StringTemplate implements Function<Map<Any2<Integer, String>, Strin
 
     /**
      * Retrieve the variables used to render this string.
+     *
      * @return The list of variables used to render this string.
      */
     public List<Any2<Integer, String>> getArguments() {
