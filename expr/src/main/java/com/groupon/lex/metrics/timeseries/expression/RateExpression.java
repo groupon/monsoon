@@ -31,10 +31,10 @@
  */
 package com.groupon.lex.metrics.timeseries.expression;
 
-import com.groupon.lex.metrics.Histogram;
-import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.ConfigSupport;
+import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.TagMatchingClause;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
@@ -68,7 +68,9 @@ public class RateExpression implements TimeSeriesMetricExpression {
     }
 
     @Override
-    public Collection<TimeSeriesMetricExpression> getChildren() { return Collections.singleton(arg_); }
+    public Collection<TimeSeriesMetricExpression> getChildren() {
+        return Collections.singleton(arg_);
+    }
 
     private Optional<Double> diff_(double cur, double prev, double interval) {
         return Optional.of((cur - prev) / interval);
@@ -85,7 +87,7 @@ public class RateExpression implements TimeSeriesMetricExpression {
     private Optional<Any2<Double, Histogram>> apply_(Any2<Double, Histogram> cur, Any2<Double, Histogram> prev, Duration interval) {
         return Optional.of(interval.getMillis())
                 .filter(x -> x > 0)
-                .map(x -> x / 1000d)  // Interval in seconds.
+                .map(x -> x / 1000d) // Interval in seconds.
                 .flatMap(x -> {
                     return cur.mapCombine(
                             cur_num -> prev.mapCombine(
@@ -106,12 +108,13 @@ public class RateExpression implements TimeSeriesMetricExpression {
         return mv.value().map(Number::doubleValue).map(Any2::left);
     }
 
-    private Optional<MetricValue> apply_(MetricValue cur, MetricValue prev, Duration interval) {
+    private MetricValue apply_(MetricValue cur, MetricValue prev, Duration interval) {
         return pairwiseFlatMap(
-                        extract_(cur),
-                        extract_(prev),
-                        (Any2<Double, Histogram> c, Any2<Double, Histogram> p) -> apply_(c, p, interval))
-                .map(result -> result.mapCombine(MetricValue::fromDblValue, MetricValue::fromHistValue));
+                extract_(cur),
+                extract_(prev),
+                (Any2<Double, Histogram> c, Any2<Double, Histogram> p) -> apply_(c, p, interval))
+                .map(result -> result.mapCombine(MetricValue::fromDblValue, MetricValue::fromHistValue))
+                .orElse(MetricValue.EMPTY);
     }
 
     @Override
@@ -123,7 +126,7 @@ public class RateExpression implements TimeSeriesMetricExpression {
                 previous.getTSData().getCurrentCollection().getTimestamp(),
                 ctx.getTSData().getCurrentCollection().getTimestamp());
 
-        return TagMatchingClause.DEFAULT.applyOptional(
+        return TagMatchingClause.DEFAULT.apply(
                 arg_.apply(ctx),
                 arg_.apply(previous),
                 (cur, prev) -> apply_(cur, prev, collection_interval));

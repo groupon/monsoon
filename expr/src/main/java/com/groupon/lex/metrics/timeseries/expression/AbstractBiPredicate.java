@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -70,25 +70,38 @@ public abstract class AbstractBiPredicate<X, Y> implements TimeSeriesMetricExpre
         matcher_ = Objects.requireNonNull(matcher);
     }
 
-    public TimeSeriesMetricExpression getXArg() { return x_arg_; }
-    public TimeSeriesMetricExpression getYArg() { return y_arg_; }
-    @Override
-    public Collection<TimeSeriesMetricExpression> getChildren() { return Arrays.asList(x_arg_, y_arg_); }
+    public TimeSeriesMetricExpression getXArg() {
+        return x_arg_;
+    }
 
-    private Optional<MetricValue> apply_(MetricValue x, MetricValue y) {
+    public TimeSeriesMetricExpression getYArg() {
+        return y_arg_;
+    }
+
+    @Override
+    public Collection<TimeSeriesMetricExpression> getChildren() {
+        return Arrays.asList(x_arg_, y_arg_);
+    }
+
+    private MetricValue apply_(MetricValue x, MetricValue y) {
         return pairwiseFlatMap(x_impl_.apply(x), y_impl_.apply(y), this::expr)
-                .map(MetricValue::fromBoolean);
+                .map(MetricValue::fromBoolean)
+                .orElse(MetricValue.EMPTY);
     }
 
     @Override
     public TimeSeriesMetricDeltaSet apply(Context ctx) {
         final TimeSeriesMetricDeltaSet x_val = x_arg_.apply(ctx);
         final TimeSeriesMetricDeltaSet y_val = y_arg_.apply(ctx);
-        return matcher_.applyOptional(x_val, y_val, this::apply_);
+        return matcher_.apply(x_val, y_val, this::apply_);
     }
 
-    protected final TagMatchingClause getMatcher() { return matcher_; }
+    protected final TagMatchingClause getMatcher() {
+        return matcher_;
+    }
 
     @Override
-    public int getPriority() { return priority_; }
+    public int getPriority() {
+        return priority_;
+    }
 }

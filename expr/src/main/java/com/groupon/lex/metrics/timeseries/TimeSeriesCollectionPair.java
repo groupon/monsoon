@@ -123,12 +123,12 @@ public interface TimeSeriesCollectionPair {
             final TimeSeriesCollection collection = list.get(i);
 
             if (collection.getTimestamp().equals(ts)) {
-                List<TimeSeriesCollection> forward = list.subList(0, i);
+                List<TimeSeriesCollection> forward = new ArrayList<>(list.subList(0, i));
                 reverse(forward);
                 List<TimeSeriesCollection> backward = list.subList(i + 1, list.size());
                 return new InterpolatedTSC(collection, backward, forward);
             } else if (collection.getTimestamp().isBefore(ts)) {
-                List<TimeSeriesCollection> forward = list.subList(0, i);
+                List<TimeSeriesCollection> forward = new ArrayList<>(list.subList(0, i));
                 reverse(forward);
                 List<TimeSeriesCollection> backward = list.subList(i, list.size());
                 return new InterpolatedTSC(new EmptyTimeSeriesCollection(ts), backward, forward);
