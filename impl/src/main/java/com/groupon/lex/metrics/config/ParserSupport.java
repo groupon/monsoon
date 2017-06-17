@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -49,13 +49,14 @@ import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.BufferedTokenStream;
+import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.Recognizer;
 
 /**
  * A class to make interactions with the parser easier.
+ *
  * @author ariane
  */
 public class ParserSupport {
@@ -90,7 +91,7 @@ public class ParserSupport {
 
     public Configuration configuration() throws IOException, ConfigurationException {
         final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
-        final ConfigTokenizer lexer = new ConfigTokenizer(new ANTLRInputStream(reader_));
+        final ConfigTokenizer lexer = new ConfigTokenizer(CharStreams.fromReader(reader_));
         lexer.removeErrorListeners();
         lexer.addErrorListener(error_listener);
         final ConfigParser parser = new ConfigParser(new BufferedTokenStream(lexer));
@@ -121,7 +122,7 @@ public class ParserSupport {
 
     public GroupName group_name() throws IOException, ConfigurationException {
         final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
-        final ConfigTokenizer lexer = new ConfigTokenizer(new ANTLRInputStream(reader_));
+        final ConfigTokenizer lexer = new ConfigTokenizer(CharStreams.fromReader(reader_));
         lexer.removeErrorListeners();
         lexer.addErrorListener(error_listener);
         final GroupNameParser parser = new GroupNameParser(new BufferedTokenStream(lexer));
@@ -152,7 +153,7 @@ public class ParserSupport {
 
     public TimeSeriesMetricExpression expression() throws IOException, ConfigurationException {
         final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
-        final ConfigTokenizer lexer = new ConfigTokenizer(new ANTLRInputStream(reader_));
+        final ConfigTokenizer lexer = new ConfigTokenizer(CharStreams.fromReader(reader_));
         lexer.removeErrorListeners();
         lexer.addErrorListener(error_listener);
         final ExpressionParser parser = new ExpressionParser(new BufferedTokenStream(lexer));
@@ -183,7 +184,7 @@ public class ParserSupport {
 
     public Histogram histogram() throws IOException, ConfigurationException {
         final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
-        final ConfigTokenizer lexer = new ConfigTokenizer(new ANTLRInputStream(reader_));
+        final ConfigTokenizer lexer = new ConfigTokenizer(CharStreams.fromReader(reader_));
         lexer.removeErrorListeners();
         lexer.addErrorListener(error_listener);
         final HistogramParser parser = new HistogramParser(new BufferedTokenStream(lexer));
