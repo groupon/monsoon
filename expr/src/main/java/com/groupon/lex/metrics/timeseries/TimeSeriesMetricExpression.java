@@ -49,9 +49,9 @@ import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.Getter;
-import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.BufferedTokenStream;
+import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.Recognizer;
 
 /**
@@ -166,7 +166,7 @@ public interface TimeSeriesMetricExpression extends Function<Context<?>, TimeSer
 
         final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
 
-        final ExpressionLexer lexer = new ExpressionLexer(new ANTLRInputStream(reader));
+        final ExpressionLexer lexer = new ExpressionLexer(CharStreams.fromReader(reader));
         lexer.removeErrorListeners();
         lexer.addErrorListener(error_listener);
 
