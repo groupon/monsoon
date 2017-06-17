@@ -133,13 +133,13 @@ path_match       returns [ PathMatcher s ]
                  : ( s_lit=identifier{ fragments.add(new PathMatcher.LiteralNameMatch($s_lit.s)); }
                    | STAR{ fragments.add(new PathMatcher.WildcardMatch()); }
                    | STAR_STAR{ fragments.add(new PathMatcher.DoubleWildcardMatch()); }
-                   | s_regex=regex{ fragments.add(new PathMatcher.RegexMatch($s_regex.s)); }
+                   | s_regex=REGEX{ fragments.add(new PathMatcher.RegexMatch($s_regex.text)); }
                    )
                    ( DOT_LIT
                      ( s_lit=identifier{ fragments.add(new PathMatcher.LiteralNameMatch($s_lit.s)); }
                      | STAR{ fragments.add(new PathMatcher.WildcardMatch()); }
                      | STAR_STAR{ fragments.add(new PathMatcher.DoubleWildcardMatch()); }
-                     | s_regex=regex{ fragments.add(new PathMatcher.RegexMatch($s_regex.s)); }
+                     | s_regex=REGEX{ fragments.add(new PathMatcher.RegexMatch($s_regex.text)); }
                      )
                    )*
                    { $s = new PathMatcher(fragments); }
@@ -164,23 +164,6 @@ group            returns [ GroupExpression s ]
                    s_rdi=name
                    { $s = new LiteralGroupExpression($s_rdi.s); }
                  ;
-
-/*
- * String logic.
- *
- * Strings are enclosed in double quotes and may contain escape sequences.
- * Strings are sensitive to white space.
- */
-
-quoted_identifier returns [ String s = "" ]
-                 : s1=SQSTRING
-                   { $s = $s1.getText(); }
-                 ;
-regex            returns [ String s = "" ]
-                 : s1=REGEX
-                   { $s = $s1.getText(); }
-                 ;
-
 
 /*
  * Arithmatic expressions.
@@ -312,8 +295,8 @@ equality_expression returns [ TimeSeriesMetricExpression s ]
                        )
                        ( qs=QSTRING
                          { expr = regex_transform.apply(expr, $qs.text); }
-                       | re=regex
-                         { expr = regex_transform.apply(expr, $re.s); }
+                       | re=REGEX
+                         { expr = regex_transform.apply(expr, $re.text); }
                        )
                      )
                    )?
@@ -365,7 +348,7 @@ label_selector
                  @after{ throw new UnsupportedOperationException(); }
                  : identifier
                    ( (EQ_KW|NEQ_KW) constant
-                   | (REGEX_MATCH_KW|REGEX_NEGATE_KW) (constant | regex)
+                   | (REGEX_MATCH_KW|REGEX_NEGATE_KW) (constant | REGEX)
                    )?
                  ;
 
@@ -445,7 +428,7 @@ fn__regexp       returns [ TimeSeriesMetricExpression s ]
                  @after{ $s = new RegexpExpression($s_expr.s, regexp, $s_replacement.text); }
                  : s_expr=expression COMMA_LIT
                    ( s_regexp_str=QSTRING{ regexp = $s_regexp_str.text; }
-                   | s_regexp_re=regex{ regexp = $s_regexp_re.s; }
+                   | s_regexp_re=REGEX{ regexp = $s_regexp_re.text; }
                    ) COMMA_LIT
                    s_replacement=QSTRING
                    BRACE_CLOSE_LIT
