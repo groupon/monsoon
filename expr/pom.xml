@@ -112,7 +112,7 @@
                 <executions>
                     <execution>
                         <id>extract-grammer</id>
-                        <phase>initialize</phase>
+                        <phase>generate-sources</phase>
                         <goals>
                             <goal>unpack-dependencies</goal>
                         </goals>
@@ -132,7 +132,7 @@
                 <executions>
                     <execution>
                         <id>copy-local-grammar</id>
-                        <phase>initialize</phase>
+                        <phase>generate-sources</phase>
                         <configuration>
                             <tasks>
                                 <copy todir="${antlr.collectedSources}">
