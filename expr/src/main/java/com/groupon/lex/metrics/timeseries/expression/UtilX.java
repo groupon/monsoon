@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -68,17 +68,25 @@ public class UtilX {
     public static TriFunction<TimeSeriesMetricExpression, TimeSeriesMetricExpression, TagMatchingClause, TimeSeriesMetricExpression> addition() {
         return (x_expr, y_expr, matcher) -> new AbstractArithmaticExpression(x_expr, y_expr, "+", ADDITION, matcher) {
             @Override
-            protected double expr(double x, double y) { return x + y; }
+            protected double expr(double x, double y) {
+                return x + y;
+            }
+
             @Override
-            protected long expr(long x, long y) { return x + y; }
+            protected long expr(long x, long y) {
+                return x + y;
+            }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(double x, Histogram y) {
-                return hist_expr(y, x);
+                return Optional.empty();
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, double y) {
-                return Optional.of(Any2.right(Histogram.add(x, y)));
+                return Optional.empty();
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, Histogram y) {
                 return Optional.of(Any2.right(Histogram.add(x, y)));
@@ -89,17 +97,25 @@ public class UtilX {
     public static TriFunction<TimeSeriesMetricExpression, TimeSeriesMetricExpression, TagMatchingClause, TimeSeriesMetricExpression> subtraction() {
         return (x_expr, y_expr, matcher) -> new AbstractArithmaticExpression(x_expr, y_expr, "-", ADDITION, matcher) {
             @Override
-            protected double expr(double x, double y) { return x - y; }
+            protected double expr(double x, double y) {
+                return x - y;
+            }
+
             @Override
-            protected long expr(long x, long y) { return x - y; }
+            protected long expr(long x, long y) {
+                return x - y;
+            }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(double x, Histogram y) {
-                return Optional.of(Any2.right(y.modifyEventCounters((r, c) -> r.getWidth() * x - c)));
+                return Optional.empty();
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, double y) {
-                return Optional.of(Any2.right(Histogram.subtract(x, y)));
+                return Optional.empty();
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, Histogram y) {
                 return Optional.of(Any2.right(Histogram.subtract(x, y)));
@@ -110,20 +126,31 @@ public class UtilX {
     public static TriFunction<TimeSeriesMetricExpression, TimeSeriesMetricExpression, TagMatchingClause, TimeSeriesMetricExpression> leftShift() {
         return (x_expr, y_expr, matcher) -> new AbstractArithmaticExpression(x_expr, y_expr, "<<", SHIFT, matcher) {
             @Override
-            protected double expr(double x, long y) { return Math.scalb(x, (int)y); }
+            protected double expr(double x, long y) {
+                return Math.scalb(x, (int) y);
+            }
+
             @Override
-            protected double expr(double x, double y) { return x * Math.pow(2d, y); }
+            protected double expr(double x, double y) {
+                return x * Math.pow(2d, y);
+            }
+
             @Override
-            protected long expr(long x, long y) { return x << y; }
+            protected long expr(long x, long y) {
+                return x << y;
+            }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(double x, Histogram y) {
                 return Optional.empty();
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, double y) {
                 final double mul = Math.pow(2d, y);
                 return Optional.of(Any2.right(Histogram.multiply(x, mul)));
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, Histogram y) {
                 return Optional.empty();
@@ -134,20 +161,31 @@ public class UtilX {
     public static TriFunction<TimeSeriesMetricExpression, TimeSeriesMetricExpression, TagMatchingClause, TimeSeriesMetricExpression> rightShift() {
         return (x_expr, y_expr, matcher) -> new AbstractArithmaticExpression(x_expr, y_expr, ">>", SHIFT, matcher) {
             @Override
-            protected double expr(double x, long y) { return Math.scalb(x, (int)-y); }
+            protected double expr(double x, long y) {
+                return Math.scalb(x, (int) -y);
+            }
+
             @Override
-            protected double expr(double x, double y) { return x * Math.pow(2d, -y); }
+            protected double expr(double x, double y) {
+                return x * Math.pow(2d, -y);
+            }
+
             @Override
-            protected long expr(long x, long y) { return x >> y; }
+            protected long expr(long x, long y) {
+                return x >> y;
+            }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(double x, Histogram y) {
                 return Optional.empty();
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, double y) {
                 final double mul = Math.pow(2d, -y);
                 return Optional.of(Any2.right(Histogram.multiply(x, mul)));
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, Histogram y) {
                 return Optional.empty();
@@ -158,17 +196,25 @@ public class UtilX {
     public static TriFunction<TimeSeriesMetricExpression, TimeSeriesMetricExpression, TagMatchingClause, TimeSeriesMetricExpression> multiply() {
         return (x_expr, y_expr, matcher) -> new AbstractArithmaticExpression(x_expr, y_expr, "*", MULTIPLICATION, matcher) {
             @Override
-            protected double expr(double x, double y) { return x * y; }
+            protected double expr(double x, double y) {
+                return x * y;
+            }
+
             @Override
-            protected long expr(long x, long y) { return x * y; }
+            protected long expr(long x, long y) {
+                return x * y;
+            }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(double x, Histogram y) {
                 return hist_expr(y, x);
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, double y) {
                 return Optional.of(Any2.right(Histogram.multiply(x, y)));
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, Histogram y) {
                 return Optional.empty();
@@ -179,17 +225,25 @@ public class UtilX {
     public static TriFunction<TimeSeriesMetricExpression, TimeSeriesMetricExpression, TagMatchingClause, TimeSeriesMetricExpression> divide() {
         return (x_expr, y_expr, matcher) -> new AbstractArithmaticExpression(x_expr, y_expr, "/", MULTIPLICATION, matcher) {
             @Override
-            protected double expr(double x, double y) { return x / y; }
+            protected double expr(double x, double y) {
+                return x / y;
+            }
+
             @Override
-            protected long expr(long x, long y) { return x / y; }
+            protected long expr(long x, long y) {
+                return x / y;
+            }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(double x, Histogram y) {
                 return Optional.empty();
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, double y) {
                 return Optional.of(Any2.right(Histogram.divide(x, y)));
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, Histogram y) {
                 return Optional.empty();
@@ -200,17 +254,25 @@ public class UtilX {
     public static TriFunction<TimeSeriesMetricExpression, TimeSeriesMetricExpression, TagMatchingClause, TimeSeriesMetricExpression> modulo() {
         return (x_expr, y_expr, matcher) -> new AbstractArithmaticExpression(x_expr, y_expr, "%", MULTIPLICATION, matcher) {
             @Override
-            protected double expr(double x, double y) { return Math.IEEEremainder(x, y); }
+            protected double expr(double x, double y) {
+                return Math.IEEEremainder(x, y);
+            }
+
             @Override
-            protected long expr(long x, long y) { return x % y; }
+            protected long expr(long x, long y) {
+                return x % y;
+            }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(double x, Histogram y) {
                 return Optional.empty();
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, double y) {
                 return Optional.empty();
             }
+
             @Override
             protected Optional<Any2<? extends Number, Histogram>> hist_expr(Histogram x, Histogram y) {
                 return Optional.empty();

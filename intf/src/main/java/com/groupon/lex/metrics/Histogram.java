@@ -23,16 +23,20 @@ import lombok.Value;
 /**
  * A histogram with buckets indexed by a value.
  *
- * A histogram contains zero or more buckets, each with a count of the number
- * of events in that bucket.
+ * A histogram contains zero or more buckets, each with a count of the number of
+ * events in that bucket.
+ *
  * @author ariane
  */
 public class Histogram implements Serializable, Comparable<Histogram> {
-    /** Buckets, sorted by range. */
+    /**
+     * Buckets, sorted by range.
+     */
     private final List<Bucket> buckets_;
 
     /**
      * Create a histogram from a set of ranges with associated event counters.
+     *
      * @throws IllegalArgumentException If the items contain mixed signs.
      */
     public Histogram(RangeWithCount... items) {
@@ -41,6 +45,7 @@ public class Histogram implements Serializable, Comparable<Histogram> {
 
     /**
      * Create a histogram from a set of ranges with associated event counters.
+     *
      * @throws IllegalArgumentException If the items contain mixed signs.
      */
     public Histogram(Stream<RangeWithCount> items) {
@@ -68,54 +73,72 @@ public class Histogram implements Serializable, Comparable<Histogram> {
     }
 
     /**
-     * Returns a map of range -&gt; event count.
-     * The elements of the stream are a mutable copy of the internal data.
+     * Returns a map of range -&gt; event count. The elements of the stream are
+     * a mutable copy of the internal data.
      */
     public Stream<RangeWithCount> stream() {
         return buckets_.stream()
                 .map(bucket -> new RangeWithCount(bucket.getRange(), bucket.getEvents()));
     }
 
-    /** Return the event count of this histogram. */
+    /**
+     * Return the event count of this histogram.
+     */
     public double getEventCount() {
         return (buckets_.isEmpty() ? 0 : buckets_.get(buckets_.size() - 1).getRunningEventsCount());
     }
 
-    /** Test if the histogram is empty. */
-    public boolean isEmpty() { return buckets_.isEmpty(); }
+    /**
+     * Test if the histogram is empty.
+     */
+    public boolean isEmpty() {
+        return buckets_.isEmpty();
+    }
 
-    /** Return the minimum value in the histogram. */
+    /**
+     * Return the minimum value in the histogram.
+     */
     public Optional<Double> min() {
         if (isEmpty()) return Optional.empty();
         return Optional.of(buckets_.get(0).getRange().getFloor());
     }
 
-    /** Return the minimum value in the histogram. */
+    /**
+     * Return the minimum value in the histogram.
+     */
     public Optional<Double> max() {
         if (isEmpty()) return Optional.empty();
         return Optional.of(buckets_.get(buckets_.size() - 1).getRange().getCeil());
     }
 
-    /** Return the median of the histogram. */
+    /**
+     * Return the median of the histogram.
+     */
     public Optional<Double> median() {
         if (isEmpty()) return Optional.empty();
         return Optional.of(percentile(50));
     }
 
-    /** Return the average of the histogram. */
+    /**
+     * Return the average of the histogram.
+     */
     public Optional<Double> avg() {
         if (isEmpty()) return Optional.empty();
         return Optional.of(sum() / getEventCount());
     }
 
-    /** Return the sum of the histogram. */
+    /**
+     * Return the sum of the histogram.
+     */
     public double sum() {
         return buckets_.stream()
                 .mapToDouble(b -> b.getRange().getMidPoint() * b.getEvents())
                 .sum();
     }
 
-    /** Get the value at a given position. */
+    /**
+     * Get the value at a given position.
+     */
     public double get(double index) {
         ListIterator<Bucket> b = buckets_.listIterator(0);
         ListIterator<Bucket> e = buckets_.listIterator(buckets_.size());
@@ -147,12 +170,17 @@ public class Histogram implements Serializable, Comparable<Histogram> {
         return bucket.getRange().getCeil() * left_fraction + bucket.getRange().getFloor() * right_fraction;
     }
 
-    /** Get the value at the given percentile. */
+    /**
+     * Get the value at the given percentile.
+     */
     public double percentile(double percentile) {
         return get(percentile * getEventCount() / 100);
     }
 
-    /** Create a new histogram, after applying the function on each of the event counters. */
+    /**
+     * Create a new histogram, after applying the function on each of the event
+     * counters.
+     */
     public Histogram modifyEventCounters(BiFunction<Range, Double, Double> fn) {
         return new Histogram(stream()
                 .map(entry -> {
@@ -161,18 +189,23 @@ public class Histogram implements Serializable, Comparable<Histogram> {
                 }));
     }
 
-    /** Add two histograms together. */
+    /**
+     * Add two histograms together.
+     */
     public static Histogram add(Histogram x, Histogram y) {
         return new Histogram(Stream.concat(x.stream(), y.stream()));
     }
 
-    /** Negates the counters on the histogram. */
+    /**
+     * Negates the counters on the histogram.
+     */
     public static Histogram negate(Histogram x) {
         return x.modifyEventCounters((r, d) -> -d);
     }
 
     /**
      * Subtracts two histograms.
+     *
      * @throws IllegalArgumentException If the result contains mixed signs.
      */
     public static Histogram subtract(Histogram x, Histogram y) {
@@ -184,22 +217,16 @@ public class Histogram implements Serializable, Comparable<Histogram> {
                 })));
     }
 
-    /** Add scalar to histogram. */
-    public static Histogram add(Histogram x, double y) {
-        return x.modifyEventCounters((r, d) -> d + r.getWidth() * y);
-    }
-
-    /** Subtract scalar to histogram. */
-    public static Histogram subtract(Histogram x, double y) {
-        return x.modifyEventCounters((r, d) -> d - r.getWidth() * y);
-    }
-
-    /** Multiply histogram by scalar. */
+    /**
+     * Multiply histogram by scalar.
+     */
     public static Histogram multiply(Histogram x, double y) {
         return x.modifyEventCounters((r, d) -> d * y);
     }
 
-    /** Divide histogram by scalar. */
+    /**
+     * Divide histogram by scalar.
+     */
     public static Histogram divide(Histogram x, double y) {
         return x.modifyEventCounters((r, d) -> d / y);
     }
@@ -226,7 +253,9 @@ public class Histogram implements Serializable, Comparable<Histogram> {
         return true;
     }
 
-    /** Compare two histograms. */
+    /**
+     * Compare two histograms.
+     */
     @Override
     public int compareTo(Histogram o) {
         int cmp = 0;
@@ -258,19 +287,29 @@ public class Histogram implements Serializable, Comparable<Histogram> {
 
         /**
          * Constructor.
+         *
          * @throws IllegalArgumentException If the ceil is less than the floor.
          */
         public Range(double floor, double ceil) {
-            if (floor > ceil) throw new IllegalArgumentException("negative range");
+            if (floor > ceil)
+                throw new IllegalArgumentException("negative range");
             this.floor = floor;
             this.ceil = ceil;
         }
 
-        /** Returns the width of this range. */
-        public double getWidth() { return getCeil() - getFloor(); }
+        /**
+         * Returns the width of this range.
+         */
+        public double getWidth() {
+            return getCeil() - getFloor();
+        }
 
-        /** Returns the mid-point of this range. */
-        public double getMidPoint() { return getFloor() / 2 + getCeil() / 2; }
+        /**
+         * Returns the mid-point of this range.
+         */
+        public double getMidPoint() {
+            return getFloor() / 2 + getCeil() / 2;
+        }
     }
 
     @Value
@@ -300,9 +339,11 @@ public class Histogram implements Serializable, Comparable<Histogram> {
     /**
      * Clean up an arbitrary collection of ranges.
      *
-     * Ranges are split at their intersection point.
-     * Ranges with a count of zero are omitted.
-     * @param imed An arbitrary collection of ranges.  The operations on this list will be destructive.
+     * Ranges are split at their intersection point. Ranges with a count of zero
+     * are omitted.
+     *
+     * @param imed An arbitrary collection of ranges. The operations on this
+     * list will be destructive.
      * @return An ordered list of ranges, none of which intersect eachother.
      */
     private static List<RangeWithCount> cleanup_(List<RangeWithCount> imed) {
@@ -348,8 +389,8 @@ public class Histogram implements Serializable, Comparable<Histogram> {
             }
 
             // head.floor < succ.floor < head.ceil
-            assert(head.getRange().getFloor() < succ.getRange().getFloor());
-            assert(succ.getRange().getFloor() < head.getRange().getCeil());
+            assert (head.getRange().getFloor() < succ.getRange().getFloor());
+            assert (succ.getRange().getFloor() < head.getRange().getCeil());
             // Head is intersected by succ, split it in two, at the succ.floor boundary.
             final double floor = head.getRange().getFloor();
             final double ceil = succ.getRange().getFloor();
@@ -364,18 +405,18 @@ public class Histogram implements Serializable, Comparable<Histogram> {
         }
 
         imed.stream()
-                .filter(rwc -> Math.signum(rwc.getCount()) !=  0)
+                .filter(rwc -> Math.signum(rwc.getCount()) != 0)
                 .forEach(result::add);
 
         // Merge adjecent entries, if they have the same distribution.
-        for (int i = 0; i < result.size() - 1; ) {
+        for (int i = 0; i < result.size() - 1;) {
             final RangeWithCount pred = result.get(i);
             final RangeWithCount succ = result.get(i + 1);
             final double pred_range = pred.getRange().getWidth();
             final double succ_range = succ.getRange().getWidth();
 
-            if (pred.getRange().getCeil() == succ.getRange().getFloor() &&
-                    pred.getCount() * succ_range == succ.getCount() * pred_range) {
+            if (pred.getRange().getCeil() == succ.getRange().getFloor()
+                    && pred.getCount() * succ_range == succ.getCount() * pred_range) {
                 result.remove(i);
                 succ.setRange(new Range(pred.getRange().getFloor(), succ.getRange().getCeil()));
                 succ.setCount(succ.getCount() + pred.getCount());
