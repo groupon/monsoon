@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -31,14 +31,8 @@
  */
 package com.groupon.lex.metrics.config;
 
-import com.groupon.lex.metrics.GroupName;
-import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.grammar.ConfigTokenizer;
 import com.groupon.lex.metrics.grammar.ConfigParser;
-import com.groupon.lex.metrics.grammar.ExpressionParser;
-import com.groupon.lex.metrics.grammar.GroupNameParser;
-import com.groupon.lex.metrics.grammar.HistogramParser;
-import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
@@ -56,6 +50,7 @@ import org.antlr.v4.runtime.Recognizer;
 
 /**
  * A class to make interactions with the parser easier.
+ *
  * @author ariane
  */
 public class ParserSupport {
@@ -99,99 +94,6 @@ public class ParserSupport {
         dir_.ifPresent(parser::setDir);
 
         final ConfigParser.ExprContext expr;
-        try {
-            expr = parser.expr();
-        } catch (Exception ex) {
-            LOG.log(Level.SEVERE, "parser yielded exceptional return", ex);
-            if (!error_listener.errors.isEmpty())
-                throw new ConfigurationException(error_listener.errors, ex);
-            else
-                throw ex;
-        }
-
-        if (!error_listener.errors.isEmpty()) {
-            if (expr.exception != null)
-                throw new ConfigurationException(error_listener.errors, expr.exception);
-            throw new ConfigurationException(error_listener.errors);
-        } else if (expr.exception != null) {
-            throw new ConfigurationException(expr.exception);
-        }
-        return expr.s;
-    }
-
-    public GroupName group_name() throws IOException, ConfigurationException {
-        final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
-        final ConfigTokenizer lexer = new ConfigTokenizer(new ANTLRInputStream(reader_));
-        lexer.removeErrorListeners();
-        lexer.addErrorListener(error_listener);
-        final GroupNameParser parser = new GroupNameParser(new BufferedTokenStream(lexer));
-        parser.removeErrorListeners();
-        parser.addErrorListener(error_listener);
-        dir_.ifPresent(parser::setDir);
-
-        final GroupNameParser.ExprContext expr;
-        try {
-            expr = parser.expr();
-        } catch (Exception ex) {
-            LOG.log(Level.SEVERE, "parser yielded exceptional return", ex);
-            if (!error_listener.errors.isEmpty())
-                throw new ConfigurationException(error_listener.errors, ex);
-            else
-                throw ex;
-        }
-
-        if (!error_listener.errors.isEmpty()) {
-            if (expr.exception != null)
-                throw new ConfigurationException(error_listener.errors, expr.exception);
-            throw new ConfigurationException(error_listener.errors);
-        } else if (expr.exception != null) {
-            throw new ConfigurationException(expr.exception);
-        }
-        return expr.s;
-    }
-
-    public TimeSeriesMetricExpression expression() throws IOException, ConfigurationException {
-        final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
-        final ConfigTokenizer lexer = new ConfigTokenizer(new ANTLRInputStream(reader_));
-        lexer.removeErrorListeners();
-        lexer.addErrorListener(error_listener);
-        final ExpressionParser parser = new ExpressionParser(new BufferedTokenStream(lexer));
-        parser.removeErrorListeners();
-        parser.addErrorListener(error_listener);
-        dir_.ifPresent(parser::setDir);
-
-        final ExpressionParser.ExprContext expr;
-        try {
-            expr = parser.expr();
-        } catch (Exception ex) {
-            LOG.log(Level.SEVERE, "parser yielded exceptional return", ex);
-            if (!error_listener.errors.isEmpty())
-                throw new ConfigurationException(error_listener.errors, ex);
-            else
-                throw ex;
-        }
-
-        if (!error_listener.errors.isEmpty()) {
-            if (expr.exception != null)
-                throw new ConfigurationException(error_listener.errors, expr.exception);
-            throw new ConfigurationException(error_listener.errors);
-        } else if (expr.exception != null) {
-            throw new ConfigurationException(expr.exception);
-        }
-        return expr.s;
-    }
-
-    public Histogram histogram() throws IOException, ConfigurationException {
-        final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
-        final ConfigTokenizer lexer = new ConfigTokenizer(new ANTLRInputStream(reader_));
-        lexer.removeErrorListeners();
-        lexer.addErrorListener(error_listener);
-        final HistogramParser parser = new HistogramParser(new BufferedTokenStream(lexer));
-        parser.removeErrorListeners();
-        parser.addErrorListener(error_listener);
-        dir_.ifPresent(parser::setDir);
-
-        final HistogramParser.ExprContext expr;
         try {
             expr = parser.expr();
         } catch (Exception ex) {

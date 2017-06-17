@@ -39,8 +39,6 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
-import com.groupon.lex.metrics.config.ConfigurationException;
-import com.groupon.lex.metrics.config.ParserSupport;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
@@ -80,7 +78,6 @@ import com.groupon.monsoon.remote.history.xdr.timeseries_metric_delta_set;
 import com.groupon.monsoon.remote.history.xdr.timestamp_msec;
 import com.groupon.monsoon.remote.history.xdr.tsfile_record;
 import com.groupon.monsoon.remote.history.xdr.tsfile_record_entry;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -341,9 +338,8 @@ public class EncDec {
                         eme -> eme.name,
                         eme -> {
                             try {
-                                ParserSupport ps = new ParserSupport(eme.expr);
-                                return ps.expression();
-                            } catch (IOException | ConfigurationException ex) {
+                                return TimeSeriesMetricExpression.valueOf(eme.expr);
+                            } catch (TimeSeriesMetricExpression.ParseException ex) {
                                 LOG.log(Level.WARNING, "parse failed for " + eme.expr, ex);
                                 throw new RuntimeException("unable to parse expression", ex);
                             }
