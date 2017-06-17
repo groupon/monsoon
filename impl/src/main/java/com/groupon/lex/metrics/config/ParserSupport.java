@@ -31,14 +31,8 @@
  */
 package com.groupon.lex.metrics.config;
 
-import com.groupon.lex.metrics.GroupName;
-import com.groupon.lex.metrics.Histogram;
-import com.groupon.lex.metrics.grammar.ConfigTokenizer;
 import com.groupon.lex.metrics.grammar.ConfigParser;
-import com.groupon.lex.metrics.grammar.ExpressionParser;
-import com.groupon.lex.metrics.grammar.GroupNameParser;
-import com.groupon.lex.metrics.grammar.HistogramParser;
-import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
+import com.groupon.lex.metrics.grammar.ConfigTokenizer;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
@@ -100,99 +94,6 @@ public class ParserSupport {
         dir_.ifPresent(parser::setDir);
 
         final ConfigParser.ExprContext expr;
-        try {
-            expr = parser.expr();
-        } catch (Exception ex) {
-            LOG.log(Level.SEVERE, "parser yielded exceptional return", ex);
-            if (!error_listener.errors.isEmpty())
-                throw new ConfigurationException(error_listener.errors, ex);
-            else
-                throw ex;
-        }
-
-        if (!error_listener.errors.isEmpty()) {
-            if (expr.exception != null)
-                throw new ConfigurationException(error_listener.errors, expr.exception);
-            throw new ConfigurationException(error_listener.errors);
-        } else if (expr.exception != null) {
-            throw new ConfigurationException(expr.exception);
-        }
-        return expr.s;
-    }
-
-    public GroupName group_name() throws IOException, ConfigurationException {
-        final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
-        final ConfigTokenizer lexer = new ConfigTokenizer(CharStreams.fromReader(reader_));
-        lexer.removeErrorListeners();
-        lexer.addErrorListener(error_listener);
-        final GroupNameParser parser = new GroupNameParser(new BufferedTokenStream(lexer));
-        parser.removeErrorListeners();
-        parser.addErrorListener(error_listener);
-        dir_.ifPresent(parser::setDir);
-
-        final GroupNameParser.ExprContext expr;
-        try {
-            expr = parser.expr();
-        } catch (Exception ex) {
-            LOG.log(Level.SEVERE, "parser yielded exceptional return", ex);
-            if (!error_listener.errors.isEmpty())
-                throw new ConfigurationException(error_listener.errors, ex);
-            else
-                throw ex;
-        }
-
-        if (!error_listener.errors.isEmpty()) {
-            if (expr.exception != null)
-                throw new ConfigurationException(error_listener.errors, expr.exception);
-            throw new ConfigurationException(error_listener.errors);
-        } else if (expr.exception != null) {
-            throw new ConfigurationException(expr.exception);
-        }
-        return expr.s;
-    }
-
-    public TimeSeriesMetricExpression expression() throws IOException, ConfigurationException {
-        final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
-        final ConfigTokenizer lexer = new ConfigTokenizer(CharStreams.fromReader(reader_));
-        lexer.removeErrorListeners();
-        lexer.addErrorListener(error_listener);
-        final ExpressionParser parser = new ExpressionParser(new BufferedTokenStream(lexer));
-        parser.removeErrorListeners();
-        parser.addErrorListener(error_listener);
-        dir_.ifPresent(parser::setDir);
-
-        final ExpressionParser.ExprContext expr;
-        try {
-            expr = parser.expr();
-        } catch (Exception ex) {
-            LOG.log(Level.SEVERE, "parser yielded exceptional return", ex);
-            if (!error_listener.errors.isEmpty())
-                throw new ConfigurationException(error_listener.errors, ex);
-            else
-                throw ex;
-        }
-
-        if (!error_listener.errors.isEmpty()) {
-            if (expr.exception != null)
-                throw new ConfigurationException(error_listener.errors, expr.exception);
-            throw new ConfigurationException(error_listener.errors);
-        } else if (expr.exception != null) {
-            throw new ConfigurationException(expr.exception);
-        }
-        return expr.s;
-    }
-
-    public Histogram histogram() throws IOException, ConfigurationException {
-        final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
-        final ConfigTokenizer lexer = new ConfigTokenizer(CharStreams.fromReader(reader_));
-        lexer.removeErrorListeners();
-        lexer.addErrorListener(error_listener);
-        final HistogramParser parser = new HistogramParser(new BufferedTokenStream(lexer));
-        parser.removeErrorListeners();
-        parser.addErrorListener(error_listener);
-        dir_.ifPresent(parser::setDir);
-
-        final HistogramParser.ExprContext expr;
         try {
             expr = parser.expr();
         } catch (Exception ex) {

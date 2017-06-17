@@ -36,7 +36,6 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
-import com.groupon.lex.metrics.config.ParserSupport;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
@@ -98,7 +97,7 @@ public class ClientServerTest {
 
     @Before
     public void setup() throws Exception {
-        expr = new ParserSupport("1 + 2").expression();
+        expr = TimeSeriesMetricExpression.valueOf("1 + 2");
         CompletableFuture<Integer> portFuture = new CompletableFuture<>();
 
         server = new CollectHistoryServer(history);

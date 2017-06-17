@@ -34,16 +34,22 @@ package com.groupon.lex.metrics.config;
 import static com.groupon.lex.metrics.ConfigSupport.collectorConfigString;
 import com.groupon.lex.metrics.MetricRegistryInstance;
 import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
-import lombok.Value;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
 /**
  * CollectorBuilderWrapper wraps a builder.
  */
-@Value
+@RequiredArgsConstructor
+@Getter
 public class CollectorBuilderWrapper implements MonitorStatement {
-    /** Collector name. */
+    /**
+     * Collector name.
+     */
     private final String name;
-    /** Builder implementation. */
+    /**
+     * Builder implementation.
+     */
     private final CollectorBuilder builder;
 
     @Override
