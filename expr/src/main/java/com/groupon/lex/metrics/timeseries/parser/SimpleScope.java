@@ -29,56 +29,43 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-lexer grammar ConfigTokenizer;
-options {
-    //backtrack = false;
-    //memoize = true;
-    //vocab = ConfigBnf;
-    //tokenVocab=ConfigBnf;
+package com.groupon.lex.metrics.timeseries.parser;
+
+import static java.util.Collections.EMPTY_MAP;
+import static java.util.Collections.unmodifiableMap;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ *
+ * @author ariane
+ */
+public class SimpleScope implements Scope {
+    private final Map<String, Type> identifiers_;
+
+    public SimpleScope() {
+        this(EMPTY_MAP);
+    }
+
+    public SimpleScope(Scope parent) {
+        this(parent.getIdentifiers());
+    }
+
+    public SimpleScope(Scope parent, Map<String, Type> identifiers) {
+        this(new HashMap<String, Type>() {
+            {
+                putAll(parent.getIdentifiers());
+                putAll(identifiers);
+            }
+        });
+    }
+
+    public SimpleScope(Map<String, Type> identifiers) {
+        identifiers_ = unmodifiableMap(new HashMap<>(identifiers));
+    }
+
+    @Override
+    public Map<String, Type> getIdentifiers() {
+        return identifiers_;
+    }
 }
-
-import MonsoonExprLexer;
-
-@header {
-    import java.util.regex.Matcher;
-    import java.util.regex.Pattern;
-}
-
-
-ENDSTATEMENT_KW  : ';'
-                 ;
-COMMENT          : '#' ~('\n')*
-                   { skip(); }
-                 ;
-IMPORT_KW        : 'import'
-                 ;
-COLLECTORS_KW    : 'collectors'
-                 ;
-ALL_KW           : 'all'
-                 ;
-FROM_KW          : 'from'
-                 ;
-COLLECT_KW       : 'collect'
-                 ;
-CONSTANT_KW      : 'constant'
-                 ;
-ALERT_KW         : 'alert'
-                 ;
-IF_KW            : 'if'
-                 ;
-MESSAGE_KW       : 'message'
-                 ;
-FOR_KW           : 'for'
-                 ;
-MATCH_KW         : 'match'
-                 ;
-AS_KW            : 'as'
-                 ;
-ATTRIBUTES_KW    : 'attributes'
-                 ;
-WHERE_KW         : 'where'
-                 ;
-ALIAS_KW         : 'alias'
-                 ;
-DEFINE_KW        : 'define'
-                 ;

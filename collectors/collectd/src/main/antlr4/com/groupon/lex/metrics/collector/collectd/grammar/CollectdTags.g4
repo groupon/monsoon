@@ -126,10 +126,10 @@ FP_HEX          : { state_ == State.INITIAL }? '0x' ('0'..'9'|'a'..'f'|'A'..'F')
  * Strings are sensitive to white space.
  */
 
-BEGIN_QUOTE      : { state_ == State.INITIAL }? '\"'
+BEGIN_QUOTE      : { state_ == State.INITIAL }? '"'
                    { state_ = State.QSTRING; }
                  ;
-END_QUOTE        : { state_ == State.QSTRING }? '\"'
+END_QUOTE        : { state_ == State.QSTRING }? '"'
                    { state_ = State.INITIAL; }
                  ;
 ESC_CHAR         : { is_string_state_() }? '\\\\'
@@ -150,7 +150,7 @@ ESC_CHAR         : { is_string_state_() }? '\\\\'
                    { setText("\r"); }
                  | { is_string_state_() }? '\\\''
                    { setText("\'"); }
-                 | { is_string_state_() }? '\\\"'
+                 | { is_string_state_() }? '\\"'
                    { setText("\""); }
                  | { is_string_state_() }? '\\/'
                    { setText("/"); }
@@ -226,8 +226,8 @@ ESC_CHAR         : { is_string_state_() }? '\\\\'
                      }
                    }
                  ;
-RAW              : { is_string_state_() }? ~('\\'|'\"'|'\''|'/'|'\u0000'..'\u001f')+  /* backslash escape sequence handled by ESC_CHAR. */
-                 | { is_string_state_() && state_ != State.QSTRING }? '\"'
+RAW              : { is_string_state_() }? ~('\\'|'"'|'\''|'/'|'\u0000'..'\u001f')+  /* backslash escape sequence handled by ESC_CHAR. */
+                 | { is_string_state_() && state_ != State.QSTRING }? '"'
                  ;
 
 

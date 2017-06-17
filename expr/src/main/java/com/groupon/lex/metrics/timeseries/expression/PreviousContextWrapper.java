@@ -29,56 +29,40 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-lexer grammar ConfigTokenizer;
-options {
-    //backtrack = false;
-    //memoize = true;
-    //vocab = ConfigBnf;
-    //tokenVocab=ConfigBnf;
+package com.groupon.lex.metrics.timeseries.expression;
+
+import com.groupon.lex.metrics.timeseries.Alert;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
+import java.util.Map;
+import static java.util.Objects.requireNonNull;
+import java.util.function.Consumer;
+
+/**
+ * A wrapper, that returns the context from the previous collection.
+ *
+ * @author ariane
+ */
+public class PreviousContextWrapper implements Context<TimeSeriesCollectionPair> {
+    private final Context ctx_;
+    private final TimeSeriesCollectionPair tsdata_;
+
+    public PreviousContextWrapper(Context ctx, TimeSeriesCollectionPair tsdata) {
+        ctx_ = requireNonNull(ctx);
+        tsdata_ = requireNonNull(tsdata);
+    }
+
+    @Override
+    public Map<String, ContextIdentifier> getAllIdentifiers() {
+        return ctx_.getAllIdentifiers();
+    }
+
+    @Override
+    public Consumer<Alert> getAlertManager() {
+        return ctx_.getAlertManager();
+    }
+
+    @Override
+    public TimeSeriesCollectionPair getTSData() {
+        return tsdata_;
+    }
 }
-
-import MonsoonExprLexer;
-
-@header {
-    import java.util.regex.Matcher;
-    import java.util.regex.Pattern;
-}
-
-
-ENDSTATEMENT_KW  : ';'
-                 ;
-COMMENT          : '#' ~('\n')*
-                   { skip(); }
-                 ;
-IMPORT_KW        : 'import'
-                 ;
-COLLECTORS_KW    : 'collectors'
-                 ;
-ALL_KW           : 'all'
-                 ;
-FROM_KW          : 'from'
-                 ;
-COLLECT_KW       : 'collect'
-                 ;
-CONSTANT_KW      : 'constant'
-                 ;
-ALERT_KW         : 'alert'
-                 ;
-IF_KW            : 'if'
-                 ;
-MESSAGE_KW       : 'message'
-                 ;
-FOR_KW           : 'for'
-                 ;
-MATCH_KW         : 'match'
-                 ;
-AS_KW            : 'as'
-                 ;
-ATTRIBUTES_KW    : 'attributes'
-                 ;
-WHERE_KW         : 'where'
-                 ;
-ALIAS_KW         : 'alias'
-                 ;
-DEFINE_KW        : 'define'
-                 ;

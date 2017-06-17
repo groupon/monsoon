@@ -5,9 +5,9 @@
         <artifactId>monsoon-basepom</artifactId>
         <version>2.3-SNAPSHOT</version>
     </parent>
-    <artifactId>monsoon-api</artifactId>
+    <artifactId>monsoon-expr</artifactId>
     <packaging>jar</packaging>
-    <name>Mon-soon api server</name>
+    <name>Mon-soon expressions</name>
     <url>https://github.com/groupon/monsoon</url>
 
     <scm>
@@ -20,6 +20,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.build.targetJdk>1.8</project.build.targetJdk>
+        <antlr.collectedSources>${project.build.directory}/antlr-collected-src</antlr.collectedSources>
     </properties>
 
     <dependencies>
@@ -34,9 +35,10 @@
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.github.groupon.monsoon</groupId>
-            <artifactId>monsoon-expr</artifactId>
-            <version>${project.parent.version}</version>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+            <version>${antlr.version}</version>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>joda-time</groupId>
@@ -44,29 +46,19 @@
             <version>2.8</version>
         </dependency>
         <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-server</artifactId>
-            <version>${jetty.version}</version>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>19.0</version>
         </dependency>
         <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-servlet</artifactId>
-            <version>${jetty.version}</version>
+            <groupId>net.sf.trove4j</groupId>
+            <artifactId>trove4j</artifactId>
+            <version>3.0.3</version>
         </dependency>
     </dependencies>
 
     <build>
         <finalName>${project.artifactId}</finalName>
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-                <filtering>false</filtering>
-            </resource>
-            <resource>
-                <directory>target/npm</directory>
-                <filtering>false</filtering>
-            </resource>
-        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -77,6 +69,23 @@
                     <target>1.8</target>
                     <compilerReuseStrategy>alwaysNew</compilerReuseStrategy>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>src/main/antlr4</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -96,70 +105,72 @@
                     </archive>
                 </configuration>
             </plugin>
-            <!-- Copy NPM sources pre-compilation. -->
+
+            <!-- Gather tokens and include grammars from dependencies. -->
             <plugin>
-                <artifactId>maven-resources-plugin</artifactId>
-                <version>2.7</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.0.1</version>
                 <executions>
                     <execution>
-                        <id>copy-resources</id>
-                        <!-- here the phase you need -->
+                        <id>extract-grammar</id>
                         <phase>generate-sources</phase>
                         <goals>
-                            <goal>copy-resources</goal>
+                            <goal>unpack-dependencies</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>target/npm/www</outputDirectory>
-                            <resources>
-                                <resource>
-                                    <directory>src/main/frontend</directory>
-                                    <filtering>false</filtering>
-                                    <excludes>
-                                        <exclude>node_modules/**</exclude>
-                                        <exclude>typings/**</exclude>
-                                        <exclude>app/*.js</exclude>
-                                        <exclude>app/*.js.map</exclude>
-                                    </excludes>
-                                </resource>
-                            </resources>
+                            <classifier>sources</classifier>
+                            <includeScope>compile</includeScope>
+                            <includes>imports/*.g4</includes>
+                            <outputDirectory>${antlr.collectedSources}</outputDirectory>
+                            <includeGroupIds>com.github.groupon.monsoon</includeGroupIds>
+                            <includeArtifactIds>monsoon-collector-base</includeArtifactIds>
+                            <excludeTransitive>true</excludeTransitive>
+                            <type>java-source</type>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
+            <!-- Gather local grammar files. -->
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
                     <execution>
-                        <id>exec-npm-install</id>
+                        <id>copy-local-grammar</id>
                         <phase>generate-sources</phase>
                         <configuration>
-                            <executable>npm</executable>
-                            <workingDirectory>target/npm/www</workingDirectory>
-                            <arguments>
-                                <argument>install</argument>
-                            </arguments>
+                            <tasks>
+                                <copy todir="${antlr.collectedSources}">
+                                    <fileset dir="${project.basedir}/src/main/antlr4">
+                                    </fileset>
+                                </copy>
+                            </tasks>
                         </configuration>
                         <goals>
-                            <goal>exec</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>exec-npm-tsc</id>
-                        <phase>generate-sources</phase>
-                        <configuration>
-                            <executable>npm</executable>
-                            <workingDirectory>target/npm/www</workingDirectory>
-                            <arguments>
-                                <argument>run-script</argument>
-                                <argument>tsc</argument>
-                            </arguments>
-                        </configuration>
-                        <goals>
-                            <goal>exec</goal>
+                            <goal>run</goal>
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- Build sources, using collected dependencies. -->
+            <plugin>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4-maven-plugin</artifactId>
+                <version>${antlr.version}</version>
+                <executions>
+                    <execution>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>antlr4</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <treatWarningsAsErrors>true</treatWarningsAsErrors>
+                    <sourceDirectory>${antlr.collectedSources}</sourceDirectory>
+                    <libDirectory>${antlr.collectedSources}/imports</libDirectory>
+                </configuration>
             </plugin>
         </plugins>
     </build>

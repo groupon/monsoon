@@ -29,56 +29,31 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-lexer grammar ConfigTokenizer;
-options {
-    //backtrack = false;
-    //memoize = true;
-    //vocab = ConfigBnf;
-    //tokenVocab=ConfigBnf;
+package com.groupon.lex.metrics.timeseries.parser;
+
+import java.util.Optional;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import org.junit.Test;
+
+/**
+ *
+ * @author ariane
+ */
+public class ScopeTest {
+    @Test
+    public void empty() {
+        Scope scope = Scope.empty();
+
+        assertTrue(scope.getIdentifiers().isEmpty());
+        assertEquals(Optional.empty(), scope.getIdentifier("foo"));
+        assertFalse(scope.isIdentifier("foo"));
+        assertFalse(scope.isIdentifier("foo", Scope.Type.GROUP));
+        assertFalse(scope.isIdentifier("foo", Scope.Type.METRIC));
+        assertFalse(scope.isIdentifier("foo", Scope.Type.VALUE));
+        assertEquals(Scope.Valid.NOT_AN_IDENTIFIER, scope.isValidIdentifier("foo", Scope.Type.GROUP));
+        assertEquals(Scope.Valid.NOT_AN_IDENTIFIER, scope.isValidIdentifier("foo", Scope.Type.METRIC));
+        assertEquals(Scope.Valid.NOT_AN_IDENTIFIER, scope.isValidIdentifier("foo", Scope.Type.VALUE));
+    }
 }
-
-import MonsoonExprLexer;
-
-@header {
-    import java.util.regex.Matcher;
-    import java.util.regex.Pattern;
-}
-
-
-ENDSTATEMENT_KW  : ';'
-                 ;
-COMMENT          : '#' ~('\n')*
-                   { skip(); }
-                 ;
-IMPORT_KW        : 'import'
-                 ;
-COLLECTORS_KW    : 'collectors'
-                 ;
-ALL_KW           : 'all'
-                 ;
-FROM_KW          : 'from'
-                 ;
-COLLECT_KW       : 'collect'
-                 ;
-CONSTANT_KW      : 'constant'
-                 ;
-ALERT_KW         : 'alert'
-                 ;
-IF_KW            : 'if'
-                 ;
-MESSAGE_KW       : 'message'
-                 ;
-FOR_KW           : 'for'
-                 ;
-MATCH_KW         : 'match'
-                 ;
-AS_KW            : 'as'
-                 ;
-ATTRIBUTES_KW    : 'attributes'
-                 ;
-WHERE_KW         : 'where'
-                 ;
-ALIAS_KW         : 'alias'
-                 ;
-DEFINE_KW        : 'define'
-                 ;

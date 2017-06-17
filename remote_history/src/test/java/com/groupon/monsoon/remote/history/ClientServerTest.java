@@ -38,6 +38,7 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.config.ParserSupport;
 import com.groupon.lex.metrics.history.CollectHistory;
+import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;

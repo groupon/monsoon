@@ -29,56 +29,53 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-lexer grammar ConfigTokenizer;
-options {
-    //backtrack = false;
-    //memoize = true;
-    //vocab = ConfigBnf;
-    //tokenVocab=ConfigBnf;
+package com.groupon.lex.metrics.timeseries.parser;
+
+import static com.groupon.lex.metrics.timeseries.parser.Scope.Valid.DIFFERENT_IDENTIFIER;
+import static com.groupon.lex.metrics.timeseries.parser.Scope.Valid.NOT_AN_IDENTIFIER;
+import static com.groupon.lex.metrics.timeseries.parser.Scope.Valid.VALID_IDENTIFIER;
+import static java.lang.Boolean.FALSE;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ *
+ * @author ariane
+ */
+public interface Scope {
+    public static Scope empty() {
+        return new SimpleScope();
+    }
+
+    public static enum Type {
+        GROUP,
+        METRIC,
+        VALUE
+    }
+
+    public static enum Valid {
+        VALID_IDENTIFIER,
+        DIFFERENT_IDENTIFIER,
+        NOT_AN_IDENTIFIER
+    }
+
+    public Map<String, Type> getIdentifiers();
+
+    public default Optional<Type> getIdentifier(String identifier) {
+        return Optional.ofNullable(getIdentifiers().get(identifier));
+    }
+
+    public default boolean isIdentifier(String identifier) {
+        return getIdentifiers().containsKey(identifier);
+    }
+
+    public default boolean isIdentifier(String identifier, Type type) {
+        return getIdentifier(identifier).map((Type id_type) -> id_type == type).orElse(FALSE);
+    }
+
+    public default Valid isValidIdentifier(String identifier, Type type) {
+        return getIdentifier(identifier)
+                .map((Type id_type) -> id_type == type ? VALID_IDENTIFIER : DIFFERENT_IDENTIFIER)
+                .orElse(NOT_AN_IDENTIFIER);
+    }
 }
-
-import MonsoonExprLexer;
-
-@header {
-    import java.util.regex.Matcher;
-    import java.util.regex.Pattern;
-}
-
-
-ENDSTATEMENT_KW  : ';'
-                 ;
-COMMENT          : '#' ~('\n')*
-                   { skip(); }
-                 ;
-IMPORT_KW        : 'import'
-                 ;
-COLLECTORS_KW    : 'collectors'
-                 ;
-ALL_KW           : 'all'
-                 ;
-FROM_KW          : 'from'
-                 ;
-COLLECT_KW       : 'collect'
-                 ;
-CONSTANT_KW      : 'constant'
-                 ;
-ALERT_KW         : 'alert'
-                 ;
-IF_KW            : 'if'
-                 ;
-MESSAGE_KW       : 'message'
-                 ;
-FOR_KW           : 'for'
-                 ;
-MATCH_KW         : 'match'
-                 ;
-AS_KW            : 'as'
-                 ;
-ATTRIBUTES_KW    : 'attributes'
-                 ;
-WHERE_KW         : 'where'
-                 ;
-ALIAS_KW         : 'alias'
-                 ;
-DEFINE_KW        : 'define'
-                 ;

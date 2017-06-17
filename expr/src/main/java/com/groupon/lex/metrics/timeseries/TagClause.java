@@ -29,56 +29,50 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-lexer grammar ConfigTokenizer;
-options {
-    //backtrack = false;
-    //memoize = true;
-    //vocab = ConfigBnf;
-    //tokenVocab=ConfigBnf;
+package com.groupon.lex.metrics.timeseries;
+
+import com.groupon.lex.metrics.Tags;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ *
+ * @author ariane
+ */
+public interface TagClause {
+    /**
+     * Create a Tags entry with only the specified keys.
+     */
+    public static Tags matchingKeys(Tags in, Set<String> keys) {
+        return Tags.valueOf(in.asMap().entrySet().stream()
+                .filter(entry -> keys.contains(entry.getKey())));
+    }
+
+    /**
+     * Create a Tags entry with only mismatching keys.
+     */
+    public static Tags mismatchingKeys(Tags in, Set<String> keys) {
+        return Tags.valueOf(in.asMap().entrySet().stream()
+                .filter(entry -> !keys.contains(entry.getKey())));
+    }
+
+    public static Tags keepCommonTags(Tags x, Tags y) {
+        return Tags.valueOf(x.stream()
+                .filter(x_entry -> {
+                    return Optional.ofNullable(y.asMap().get(x_entry.getKey()))
+                            .map(x_entry.getValue()::equals)
+                            .orElse(false);
+                }));
+    }
+
+    /**
+     * Returns a configuration statement that, when parsed, yields this
+     * statement.
+     *
+     * The returned statement will be terminated with a newline, unless it is
+     * empty.
+     *
+     * @return A string describing this statement.
+     */
+    public StringBuilder configString();
 }
-
-import MonsoonExprLexer;
-
-@header {
-    import java.util.regex.Matcher;
-    import java.util.regex.Pattern;
-}
-
-
-ENDSTATEMENT_KW  : ';'
-                 ;
-COMMENT          : '#' ~('\n')*
-                   { skip(); }
-                 ;
-IMPORT_KW        : 'import'
-                 ;
-COLLECTORS_KW    : 'collectors'
-                 ;
-ALL_KW           : 'all'
-                 ;
-FROM_KW          : 'from'
-                 ;
-COLLECT_KW       : 'collect'
-                 ;
-CONSTANT_KW      : 'constant'
-                 ;
-ALERT_KW         : 'alert'
-                 ;
-IF_KW            : 'if'
-                 ;
-MESSAGE_KW       : 'message'
-                 ;
-FOR_KW           : 'for'
-                 ;
-MATCH_KW         : 'match'
-                 ;
-AS_KW            : 'as'
-                 ;
-ATTRIBUTES_KW    : 'attributes'
-                 ;
-WHERE_KW         : 'where'
-                 ;
-ALIAS_KW         : 'alias'
-                 ;
-DEFINE_KW        : 'define'
-                 ;

@@ -9,8 +9,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.SerializedName;
 import com.google.gson.stream.JsonWriter;
-import com.groupon.lex.metrics.config.ConfigurationException;
-import com.groupon.lex.metrics.config.ParserSupport;
+import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -37,8 +36,8 @@ public class ExprValidate extends HttpServlet {
         final ResponseObj ro = new ResponseObj();
         ro.ok = true;
         try {
-            ro.normalizedQuery = new ParserSupport(expr.get()).expression().configString().toString();
-        } catch (ConfigurationException ce) {
+            ro.normalizedQuery = TimeSeriesMetricExpression.valueOf(expr.get()).configString().toString();
+        } catch (TimeSeriesMetricExpression.ParseException ce) {
             ro.ok = false;
             ro.parseErrors = ce.getParseErrors();
         }
