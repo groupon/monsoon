@@ -78,18 +78,13 @@ public interface TagMatchingClause extends TagClause {
                                         Function<? super Y, Tags> y_tag_fn,
                                         BiFunction<? super X, ? super Y, ? extends R> map_fn);
 
-    public default TimeSeriesMetricDeltaSet applyOptional(TimeSeriesMetricDeltaSet x_values, TimeSeriesMetricDeltaSet y_values, BiFunction<? super MetricValue, ? super MetricValue, Optional<? extends MetricValue>> fn) {
+    public default TimeSeriesMetricDeltaSet apply(TimeSeriesMetricDeltaSet x_values, TimeSeriesMetricDeltaSet y_values, BiFunction<? super MetricValue, ? super MetricValue, ? extends MetricValue> fn) {
         if (x_values.isScalar() && y_values.isScalar()) {
-            return fn.apply(x_values.asScalar().get(), y_values.asScalar().get())
-                    .map(TimeSeriesMetricDeltaSet::new)
-                    .orElseGet(TimeSeriesMetricDeltaSet::new);
+            return new TimeSeriesMetricDeltaSet(fn.apply(x_values.asScalar().get(), y_values.asScalar().get()));
         }
 
         final Stream<Map.Entry<Tags, MetricValue>> x_stream = x_values.streamAsMap(y_values.getTags());
         final Stream<Map.Entry<Tags, MetricValue>> y_stream = y_values.streamAsMap(x_values.getTags());
-        return new TimeSeriesMetricDeltaSet(apply(x_stream, y_stream, Map.Entry::getKey, Map.Entry::getKey, (x, y) -> fn.apply(x.getValue(), y.getValue()))
-                .entrySet().stream()
-                .map(tag_val -> tag_val.getValue().map(val -> SimpleMapEntry.create(tag_val.getKey(), val)))
-                .flatMap(opt -> opt.map(Stream::of).orElseGet(Stream::empty)));
+        return new TimeSeriesMetricDeltaSet(apply(x_stream, y_stream, Map.Entry::getKey, Map.Entry::getKey, (x, y) -> fn.apply(x.getValue(), y.getValue())));
     }
 }

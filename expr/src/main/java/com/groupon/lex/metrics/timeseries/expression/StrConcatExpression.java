@@ -1,21 +1,21 @@
 /*
  * Copyright (c) 2016, Groupon, Inc.
- * All rights reserved. 
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
- * are met: 
+ * are met:
  *
  * Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer. 
+ * this list of conditions and the following disclaimer.
  *
  * Redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution. 
+ * documentation and/or other materials provided with the distribution.
  *
  * Neither the name of GROUPON nor the names of its contributors may be
  * used to endorse or promote products derived from this software without
- * specific prior written permission. 
+ * specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -41,10 +41,11 @@ import java.util.Collection;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
 import static java.util.Objects.requireNonNull;
-import java.util.Optional;
 
 /**
- * Concatenate one or more MetricValue instances, using their string representation.
+ * Concatenate one or more MetricValue instances, using their string
+ * representation.
+ *
  * @author ariane
  */
 public class StrConcatExpression implements TimeSeriesMetricExpression {
@@ -58,18 +59,21 @@ public class StrConcatExpression implements TimeSeriesMetricExpression {
     }
 
     @Override
-    public Collection<TimeSeriesMetricExpression> getChildren() { return exprs_; }
+    public Collection<TimeSeriesMetricExpression> getChildren() {
+        return exprs_;
+    }
 
-    private static Optional<MetricValue> concat_(MetricValue x, MetricValue y) {
+    private static MetricValue concat_(MetricValue x, MetricValue y) {
         return Util.pairwiseMap(x.asString(), y.asString(), (r, s) -> r + s)
-                .map(MetricValue::fromStrValue);
+                .map(MetricValue::fromStrValue)
+                .orElse(MetricValue.EMPTY);
     }
 
     @Override
     public TimeSeriesMetricDeltaSet apply(Context ctx) {
         return exprs_.stream()
                 .map(expr -> expr.apply(ctx))
-                .reduce(INITIAL_, (r, s) -> matcher_.applyOptional(r, s, StrConcatExpression::concat_));
+                .reduce(INITIAL_, (r, s) -> matcher_.apply(r, s, StrConcatExpression::concat_));
     }
 
     @Override
@@ -92,7 +96,10 @@ public class StrConcatExpression implements TimeSeriesMetricExpression {
         }
         result.append(')');
 
-        result.append(Optional.of(matcher_.configString()).filter(sb -> sb.length() > 0).map(sb -> sb.insert(0, " ")).orElseGet(StringBuilder::new));
+        final StringBuilder matcherCfg = matcher_.configString();
+        if (matcherCfg.length() > 0) {
+            result.append(' ').append(matcherCfg);
+        }
 
         return result;
     }
