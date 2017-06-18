@@ -32,8 +32,6 @@
 package com.github.groupon.monsoon.api.bin;
 
 import com.groupon.lex.metrics.api.ApiServer;
-import com.groupon.lex.metrics.api.endpoints.ExprEval;
-import com.groupon.lex.metrics.api.endpoints.ExprValidate;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.monsoon.remote.history.Client;
 import java.io.IOException;
@@ -56,16 +54,18 @@ public class ApiBin {
     public static final int EX_USAGE = 64;  // From sysexits.h
     public static final int EX_TEMPFAIL = 75;  // From sysexits.h
 
-    @Option(name="-h", usage="print usage instructions")
+    @Option(name = "-h", usage = "print usage instructions")
     private boolean help = false;
 
-    @Option(name="-R", metaVar="history-server", usage="use remote history server", handler=RHistClientSocketOptionHandler.class)
+    @Option(name = "-R", metaVar = "history-server", usage = "use remote history server", handler = RHistClientSocketOptionHandler.class)
     private InetSocketAddress addr = new InetSocketAddress("localhost", Client.DEFAULT_PORT);
 
-    @Option(name="-L", metaVar="listen", usage="IP/port on which the webserver listens", handler=ApiServerSocketOptionHandler.class)
-    private List<InetSocketAddress> listen = new ArrayList<InetSocketAddress>() {{
-        add(new InetSocketAddress(anyAddr(), 9998));
-    }};
+    @Option(name = "-L", metaVar = "listen", usage = "IP/port on which the webserver listens", handler = ApiServerSocketOptionHandler.class)
+    private List<InetSocketAddress> listen = new ArrayList<InetSocketAddress>() {
+        {
+            add(new InetSocketAddress(anyAddr(), 9998));
+        }
+    };
 
     private static void print_usage_and_exit_(CmdLineParser parser) {
         System.err.println("java -jar monsoon-api-bin.jar [options]");
@@ -76,7 +76,7 @@ public class ApiBin {
 
     @SneakyThrows(UnknownHostException.class)
     private static InetAddress anyAddr() {
-        return InetAddress.getByAddress(new byte[]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+        return InetAddress.getByAddress(new byte[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
     }
 
     public ApiBin(String[] args) {
@@ -100,8 +100,7 @@ public class ApiBin {
         final CollectHistory history = createHistory();
         final ApiServer api = new ApiServer(listen);
 
-        api.addEndpoint("/monsoon/eval", new ExprEval(history));
-        api.addEndpoint("/monsoon/eval/validate", new ExprValidate());
+        api.setHistory(history);
 
         api.start();
         Runtime.getRuntime().addShutdownHook(new Thread(api::close));
