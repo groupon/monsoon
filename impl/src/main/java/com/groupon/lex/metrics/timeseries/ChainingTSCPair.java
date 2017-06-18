@@ -9,13 +9,17 @@ import gnu.trove.TLongCollection;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TLongObjectMap;
+import gnu.trove.map.TObjectLongMap;
 import gnu.trove.map.hash.THashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.map.hash.TObjectLongHashMap;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TLongHashSet;
 import static java.lang.Long.min;
 import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -36,6 +40,7 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
     private final CollectHistory history;
     private final TimestampChain timestamps;
     private final Map<GroupName, TsvChain> data = new THashMap<>();
+    private final TObjectLongMap<GroupName> activeGroups;
 
     public ChainingTSCPair(@NonNull CollectHistory history, @NonNull ExpressionLookBack lookback) {
         this.history = history;
@@ -50,11 +55,17 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
             filtered = history.stream(begin, end);
         }
 
-        this.timestamps = new TimestampChain(filtered
-                .map(TimeSeriesCollection::getTimestamp)
-                .mapToLong(DateTime::getMillis)
-                .collect(TLongHashSet::new, TLongHashSet::add, TLongHashSet::addAll));
+        final TscStreamReductor reduction = filtered
+                .collect(TscStreamReductor::new, TscStreamReductor::add, TscStreamReductor::addAll);
+        this.timestamps = new TimestampChain(reduction.timestamps);
+        this.activeGroups = reduction.groups;
         LOG.log(Level.INFO, "recovered {0} scrapes from history", timestamps.size());
+
+        // Fill data with empty, faultable group data.
+        activeGroups.forEachKey(group -> {
+            data.put(group, new TsvChain());
+            return true;
+        });
 
         validatePrevious();  // Should never trigger.
     }
@@ -93,6 +104,7 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
                             tsvChain.add(tsc.getTimestamp(), tsv);
                         return tsvChain;
                     });
+                    activeGroups.put(tsv.getGroup(), tsc.getTimestamp().getMillis());
                 });
     }
 
@@ -104,6 +116,11 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
 
         timestamps.retainAll(retainTs);
         data.values().forEach(tsvChain -> tsvChain.retainAll(retainTs));
+
+        // Drop inactive groups.
+        final long oldestTs = timestamps.backLong();
+        activeGroups.retainEntries((group, ts) -> ts >= oldestTs);
+        data.keySet().retainAll(activeGroups.keySet());
     }
 
     private void validatePrevious() {
@@ -196,27 +213,49 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
     }
 
     private class TsvChain {
-        private SoftReference<TLongObjectMap<TimeSeriesValue>> tailRef;
+        /**
+         * tailRefForAccess is used to access the value from requests for data
+         * access only. The internal clock in the soft reference is thus only
+         * advanced if the data is used, as opposed to when it is updated. This
+         * allows the GC to make intelligent decision on when to expire the
+         * referenced object.
+         */
+        private SoftReference<TLongObjectMap<TimeSeriesValue>> tailRefForAccess;
+        /**
+         * tailRefForUpdate is used to access the value for updates only. By
+         * using the weak reference, we don't impose a restriction on the GC to
+         * maintain the referenced object, allowing it to be collected if it
+         * hasn't been used in a while.
+         *
+         * It is important that the updates don't keep the object alive, hence
+         * we cannot access it through the tailRefForAccess pointer.
+         *
+         * This pointer is always kept in sync with tailRefForAccess (setting
+         * both by the code, while cleaning both by the GC).
+         */
+        private WeakReference<TLongObjectMap<TimeSeriesValue>> tailRefForUpdate;
 
         public TsvChain() {
-            tailRef = new SoftReference<>(null);
+            tailRefForAccess = new SoftReference<>(null);
+            tailRefForUpdate = new WeakReference<>(null);
         }
 
         public TsvChain(@NonNull DateTime initTs, @NonNull TimeSeriesValue initTsv) {
             final TLongObjectHashMap<TimeSeriesValue> tail = new TLongObjectHashMap<>();
             tail.put(initTs.getMillis(), initTsv);
-            tailRef = new SoftReference<>(tail);
+            tailRefForAccess = new SoftReference<>(tail);
+            tailRefForUpdate = new WeakReference<>(tail);
         }
 
         public synchronized void add(@NonNull DateTime ts, @NonNull TimeSeriesValue tv) {
-            final TLongObjectMap<TimeSeriesValue> tail = tailRef.get();
+            final TLongObjectMap<TimeSeriesValue> tail = tailRefForUpdate.get();
             if (tail != null)
                 tail.put(ts.getMillis(), tv);
         }
 
         public synchronized Optional<TimeSeriesValue> get(GroupName name, long ts) {
             {
-                final TLongObjectMap<TimeSeriesValue> tail = tailRef.get();
+                final TLongObjectMap<TimeSeriesValue> tail = tailRefForAccess.get();
                 /*
                  * Use the tail values immediately, if any of the following is true:
                  * - The timestamp ought to be included due to timestamps retention.
@@ -233,16 +272,20 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
             else
                 streamStart = new DateTime(min(timestamps.backLong(), ts), DateTimeZone.UTC);
 
-            final TLongObjectHashMap<TimeSeriesValue> tail = new TLongObjectHashMap<>();
-            history.streamGroup(streamStart, name)
-                    .forEach((tsvEntry) -> tail.put(tsvEntry.getKey().getMillis(), tsvEntry.getValue()));
-            tailRef = new SoftReference<>(tail);
+            final TLongObjectHashMap<TimeSeriesValue> tail = history.streamGroup(streamStart, name)
+                    .unordered()
+                    .parallel()
+                    .collect(TLongObjectHashMap<TimeSeriesValue>::new,
+                            (map, tsvEntry) -> map.put(tsvEntry.getKey().getMillis(), tsvEntry.getValue()),
+                            TLongObjectHashMap::putAll);
+            tailRefForAccess = new SoftReference<>(tail);
+            tailRefForUpdate = new WeakReference<>(tail);
 
             return Optional.ofNullable(tail.get(ts));
         }
 
         public synchronized void retainAll(TLongCollection timestamps) {
-            final TLongObjectMap<TimeSeriesValue> tail = tailRef.get();
+            final TLongObjectMap<TimeSeriesValue> tail = tailRefForUpdate.get();
             if (tail != null)
                 tail.retainEntries((ts, value) -> timestamps.contains(ts));
         }
@@ -307,6 +350,35 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
             if (tsvChain == null)
                 return Optional.empty();
             return tsvChain.get(name, ts);
+        }
+    }
+
+    @RequiredArgsConstructor
+    private static class TscStreamReductor {
+        private final TLongSet timestamps;
+        private final TObjectLongHashMap<GroupName> groups;
+
+        public TscStreamReductor() {
+            this(new TLongHashSet(), new TObjectLongHashMap<>());
+        }
+
+        public void add(TimeSeriesCollection tsc) {
+            final long tsMillis = tsc.getTimestamp().getMillis();
+            timestamps.add(tsMillis);
+
+            final List<GroupName> updateGroups = tsc.getGroups().stream()
+                    .filter(group -> !groups.containsKey(group) || tsMillis > groups.get(group))
+                    .collect(Collectors.toList());
+            updateGroups.forEach(group -> groups.put(group, tsMillis));
+        }
+
+        public void addAll(TscStreamReductor other) {
+            timestamps.addAll(other.timestamps);
+            other.groups.forEachEntry((group, ts) -> {
+                if (groups.get(group) < ts)
+                    groups.put(group, ts);
+                return true;
+            });
         }
     }
 }
