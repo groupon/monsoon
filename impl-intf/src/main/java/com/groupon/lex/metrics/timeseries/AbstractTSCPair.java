@@ -1,6 +1,5 @@
 package com.groupon.lex.metrics.timeseries;
 
-import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.lib.ForwardIterator;
 import java.util.ArrayList;
 import static java.util.Collections.unmodifiableList;
@@ -10,7 +9,6 @@ import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.joda.time.DateTime;
 
 /**
@@ -46,36 +44,10 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
     @Override
     public abstract TimeSeriesCollection getCurrentCollection();
 
-    public void initWithHistoricalData(CollectHistory history, ExpressionLookBack lookback) {
-        if (!previous_.isEmpty()) {
-            LOG.log(Level.WARNING, "skipping historical data initialization, as data is already present");
-            return;
-        }
-
-        Stream<TimeSeriesCollection> filtered;
-        try {
-            filtered = lookback.filter(new ForwardIterator<>(history.streamReversed().iterator()));
-        } catch (UnsupportedOperationException ex) {
-            LOG.log(Level.WARNING, "history reverse streaming not supported, fallback to duration hint");
-            final DateTime end = history.getEnd();
-            final DateTime begin = end.minus(lookback.hintDuration());
-            filtered = history.stream(begin, end);
-        }
-
-        for (TimeSeriesCollection tsc : filtered
-                .sorted()
-                .distinct()
-                .collect(Collectors.toList())) {
-            previous_.add(0, tsc);
-        }
-        LOG.log(Level.INFO, "recovered {0} scrapes from history", previous_.size());
-
-        validatePrevious();  // Should never trigger.
-    }
-
     @Override
     public Optional<TimeSeriesCollection> getPreviousCollection(int n) {
-        if (n < 0) throw new IllegalArgumentException("cannot look into the future");
+        if (n < 0)
+            throw new IllegalArgumentException("cannot look into the future");
         if (n == 0) return Optional.of(getCurrentCollection());
         if (n - 1 >= previous_.size()) return Optional.empty();
         return Optional.of(previous_.get(n - 1));
@@ -95,7 +67,7 @@ public abstract class AbstractTSCPair implements TimeSeriesCollectionPair {
                 .sorted(Comparator.comparing(TimeSeriesCollection::getTimestamp).reversed())
                 .collect(Collectors.toList());
 
-        if (suggested_previous.isEmpty())  // Always keep at least 1 element.
+        if (suggested_previous.isEmpty()) // Always keep at least 1 element.
             previous_.subList(1, previous_.size()).clear();
         else
             previous_ = suggested_previous;
