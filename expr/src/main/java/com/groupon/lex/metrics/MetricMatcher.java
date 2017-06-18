@@ -35,6 +35,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
+import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Collection;
 import java.util.HashSet;
@@ -59,8 +60,12 @@ public class MetricMatcher {
 
     @Value
     public static final class MatchedName {
-        private final GroupName group;
+        private final TimeSeriesValue matchedGroup;
         private final MetricName metric;
+
+        public GroupName getGroup() {
+            return matchedGroup.getGroup();
+        }
 
         public Tags getTags() {
             return getGroup().getTags();
@@ -92,7 +97,7 @@ public class MetricMatcher {
                     return metric_match_cache_.getUnchecked(new HashSet<>(tsv.getMetrics().keySet())).stream()
                             .map(metric_name -> {
                                 return SimpleMapEntry.create(
-                                        new MatchedName(tsv.getGroup(), metric_name),
+                                        new MatchedName(tsv, metric_name),
                                         tsv.findMetric(metric_name).orElseThrow(() -> new IllegalStateException("resolved metric name was not present")));
                             });
                 });
