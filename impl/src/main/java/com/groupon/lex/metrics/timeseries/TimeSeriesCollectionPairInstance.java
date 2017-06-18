@@ -47,7 +47,7 @@ import org.joda.time.Duration;
  * @author ariane
  */
 @ToString
-public class TimeSeriesCollectionPairInstance implements MutableTimeSeriesCollectionPair {
+public final class TimeSeriesCollectionPairInstance implements MutableTimeSeriesCollectionPair {
     @Getter
     private final MutableTimeSeriesCollection currentCollection;
     private Impl impl = new InMemoryImplementation();
