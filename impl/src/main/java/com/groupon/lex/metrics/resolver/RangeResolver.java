@@ -1,10 +1,8 @@
 package com.groupon.lex.metrics.resolver;
 
-import static com.groupon.lex.metrics.resolver.ResolverTuple.newTupleElement;
-import static java.lang.Integer.max;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -27,10 +25,10 @@ public class RangeResolver implements Resolver {
 
     @Override
     public Collection<ResolverTuple> getTuples() {
-        List<ResolverTuple> tuples = new ArrayList<>(max(end - begin, 0));
-        for (int i = begin; i < end; ++i)
-            tuples.add(new ResolverTuple(newTupleElement(i)));
-        return tuples;
+        return IntStream.range(begin, end)
+                .mapToObj(ResolverTuple::newTupleElement)
+                .map(ResolverTuple::new)
+                .collect(Collectors.toList());
     }
 
     @Override
