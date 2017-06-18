@@ -32,7 +32,8 @@
 package com.groupon.lex.metrics.collector.collectd;
 
 import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
+import java.util.function.BiConsumer;
+import javax.servlet.http.HttpServlet;
 import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -46,7 +47,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class CollectdPushBuilderTest {
     @Mock
-    private EndpointRegistration er;
+    private BiConsumer<String, HttpServlet> er;
 
     @Test
     public void constructor() throws Exception {
@@ -56,7 +57,7 @@ public class CollectdPushBuilderTest {
         final CollectdPushCollector collectd = builder.build(er);
 
         assertEquals(SimpleGroupPath.valueOf("foo", "bar"), collectd.getBasePath());
-        verify(er, times(1)).addEndpoint(Mockito.eq(CollectdPushCollector.API_ENDPOINT_BASE + "bla"), Mockito.anyObject());
+        verify(er, times(1)).accept(Mockito.eq(CollectdPushCollector.API_ENDPOINT_BASE + "bla"), Mockito.anyObject());
         verifyNoMoreInteractions(er);
     }
 }

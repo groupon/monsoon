@@ -36,15 +36,16 @@ import com.groupon.lex.metrics.ResolverGroupGenerator;
 import com.groupon.lex.metrics.builders.collector.AcceptTagSet;
 import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
 import com.groupon.lex.metrics.builders.collector.MainStringList;
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
 import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import static java.util.Collections.unmodifiableSortedSet;
 import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.BiConsumer;
 import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
+import javax.servlet.http.HttpServlet;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -58,7 +59,7 @@ public class JmxBuilder implements CollectorBuilder, MainStringList, AcceptTagSe
     private NameBoundResolver tagSet;
 
     @Override
-    public GroupGenerator build(EndpointRegistration er) throws Exception {
+    public GroupGenerator build(BiConsumer<String, HttpServlet> er) throws Exception {
         return new ResolverGroupGenerator(tagSet, new Constructor(getIncludes()));
     }
 

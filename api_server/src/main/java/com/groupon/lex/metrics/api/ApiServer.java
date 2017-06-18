@@ -1,5 +1,8 @@
 package com.groupon.lex.metrics.api;
 
+import com.groupon.lex.metrics.api.endpoints.ExprEval;
+import com.groupon.lex.metrics.api.endpoints.ExprValidate;
+import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -100,6 +103,12 @@ public class ApiServer implements AutoCloseable, EndpointRegistration {
             LOG.log(Level.SEVERE, "unable to stop API server", ex);
             return;
         }
+    }
+
+    @Override
+    public void setHistory(CollectHistory history) {
+        addEndpoint("/monsoon/eval", new ExprEval(history));
+        addEndpoint("/monsoon/eval/validate", new ExprValidate());
     }
 
     @Override

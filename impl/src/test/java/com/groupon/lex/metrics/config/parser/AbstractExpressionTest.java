@@ -40,6 +40,7 @@ import com.groupon.lex.metrics.config.Configuration;
 import com.groupon.lex.metrics.config.ConfigurationException;
 import com.groupon.lex.metrics.config.parser.ReplayCollector.DataPointIdentifier;
 import com.groupon.lex.metrics.config.parser.ReplayCollector.DataPointStream;
+import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.timeseries.Alert;
 import com.groupon.lex.metrics.timeseries.AlertState;
 import java.io.IOException;
@@ -64,7 +65,8 @@ public abstract class AbstractExpressionTest {
     protected static final GroupName GROUP = GroupName.valueOf("TEST");
     private static final GroupName ALERT_NAME = GroupName.valueOf("TEST_ALERT");
 
-    protected AbstractExpressionTest() {}
+    protected AbstractExpressionTest() {
+    }
 
     private static Configuration configurationForExpr(String expr, Stream<DataPointIdentifier> vars) throws IOException, ConfigurationException {
         StringBuilder config = new StringBuilder()
@@ -99,34 +101,34 @@ public abstract class AbstractExpressionTest {
     protected DataPointStream newDatapoint(MetricName var, Histogram... values) {
         return new ReplayCollector.DataPointStream(new ReplayCollector.DataPointIdentifier(GROUP, var),
                 Arrays.stream(values)
-                        .map(Optional::ofNullable)
-                        .map((opt) -> opt.map(MetricValue::fromHistValue)));
+                .map(Optional::ofNullable)
+                .map((opt) -> opt.map(MetricValue::fromHistValue)));
     }
 
     protected DataPointStream newDatapoint(MetricName var, Number... values) {
         return new ReplayCollector.DataPointStream(new ReplayCollector.DataPointIdentifier(GROUP, var),
                 Arrays.stream(values)
-                        .map(Optional::ofNullable)
-                        .map((opt) -> opt.map(MetricValue::fromNumberValue)));
+                .map(Optional::ofNullable)
+                .map((opt) -> opt.map(MetricValue::fromNumberValue)));
     }
 
     protected DataPointStream newDatapoint(MetricName var, Boolean... values) {
         return new ReplayCollector.DataPointStream(new ReplayCollector.DataPointIdentifier(GROUP, var),
                 Arrays.stream(values)
-                        .map(Optional::ofNullable)
-                        .map((opt) -> opt.map(MetricValue::fromBoolean)));
+                .map(Optional::ofNullable)
+                .map((opt) -> opt.map(MetricValue::fromBoolean)));
     }
 
     protected DataPointStream newDatapoint(MetricName var, String... values) {
         return new ReplayCollector.DataPointStream(new ReplayCollector.DataPointIdentifier(GROUP, var),
                 Arrays.stream(values)
-                        .map(Optional::ofNullable)
-                        .map((opt) -> opt.map(MetricValue::fromStrValue)));
+                .map(Optional::ofNullable)
+                .map((opt) -> opt.map(MetricValue::fromStrValue)));
     }
 
     protected void validateExpression(String expr, DataPointStream... input) throws Exception {
         try (final PushMetricRegistryInstance registry = configurationForExpr(expr, Arrays.stream(input).map(DataPointStream::getIdentifier))
-                .create(PushMetricRegistryInstance::new, new NowSupplier(), (pattern, handler) -> {})) {
+                .create(PushMetricRegistryInstance::new, new NowSupplier(), EndpointRegistration.DUMMY)) {
             ReplayCollector replay_collector = new ReplayCollector(input);
             registry.add(replay_collector);
 

@@ -31,7 +31,7 @@
  */
 package com.groupon.lex.metrics;
 
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
+import javax.servlet.http.HttpServlet;
 
 /**
  *
@@ -39,11 +39,9 @@ import com.groupon.lex.metrics.httpd.EndpointRegistration;
  */
 public interface MetricRegistry {
     /**
-     * Returns the exposed API.
-     *
-     * @return The exposed API.
+     * Register an endpoint.
      */
-    public EndpointRegistration getApi();
+    public void addEndpoint(String pattern, HttpServlet handler);
 
     /**
      * Tests if the metric registry has a configuration.

@@ -36,6 +36,7 @@ import static com.groupon.lex.metrics.ConfigSupport.quotedString;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.PushMetricRegistryInstance;
 import com.groupon.lex.metrics.expression.LiteralGroupExpression;
+import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.jmx.JmxBuilder;
 import com.groupon.lex.metrics.transformers.LiteralNameResolver;
 import java.io.File;
@@ -165,9 +166,9 @@ public class ConfigurationTest {
 
     @Test
     public void urlCollectorParsing() throws Exception {
-        Configuration cfg = Configuration.readFromFile(null, new StringReader("collect url \"http://$0\" as root {\n" +
-                "0 = [ \"www.google.com\", \"www.groupon.com\" ]," +
-                "1 = [ \"index.html\", \"error.html\" ]}"));
+        Configuration cfg = Configuration.readFromFile(null, new StringReader("collect url \"http://$0\" as root {\n"
+                + "0 = [ \"www.google.com\", \"www.groupon.com\" ],"
+                + "1 = [ \"index.html\", \"error.html\" ]}"));
         Configuration reparsed = Configuration.readFromFile(null, new StringReader(cfg.configString().toString()));
 
         assertEquals(cfg.configString().toString(), reparsed.configString().toString());
@@ -178,14 +179,14 @@ public class ConfigurationTest {
         Configuration cfg = Configuration.readFromFile(File.listRoots()[0], new StringReader("import all\n  from \"file.name\";"));
 
         assertTrue(cfg.needsResolve());
-        cfg.create(PushMetricRegistryInstance::new, (pattern, handler) -> {});
+        cfg.create(PushMetricRegistryInstance::new, EndpointRegistration.DUMMY);
     }
 
     @Test
     public void resolveConfiguration() throws Exception {
         // Contents to store in loaded file.
-        final String contents =
-                new ResolvedConstantStatement(
+        final String contents
+                = new ResolvedConstantStatement(
                         new LiteralGroupExpression(new LiteralNameResolver("foo")),
                         new LiteralNameResolver("metric"),
                         MetricValue.TRUE)
@@ -205,17 +206,16 @@ public class ConfigurationTest {
                         + "collect url \"http://localhost/\" as 'test';"));
         assertTrue(cfg.needsResolve());
         // Create must not fail.
-        try (PushMetricRegistryInstance instance = cfg.resolve().create(PushMetricRegistryInstance::new, (pattern, handler) -> {})) {
+        try (PushMetricRegistryInstance instance = cfg.resolve().create(PushMetricRegistryInstance::new, EndpointRegistration.DUMMY)) {
             /* SKIP */
         }
     }
 
-
     @Test
     public void resolveConfigurationUsingReducer() throws Exception {
         // Contents to store in loaded file.
-        final String contents =
-                new ResolvedConstantStatement(
+        final String contents
+                = new ResolvedConstantStatement(
                         new LiteralGroupExpression(new LiteralNameResolver("foo")),
                         new LiteralNameResolver("metric"),
                         MetricValue.TRUE)
@@ -240,7 +240,7 @@ public class ConfigurationTest {
                         + "collect url \"http://localhost/\" as 'test';"));
         assertTrue(cfg.needsResolve());
         // Create must not fail.
-        try (PushMetricRegistryInstance instance = cfg.resolve().create(PushMetricRegistryInstance::new, (pattern, handler) -> {})) {
+        try (PushMetricRegistryInstance instance = cfg.resolve().create(PushMetricRegistryInstance::new, EndpointRegistration.DUMMY)) {
             /* SKIP */
         }
     }
@@ -250,9 +250,9 @@ public class ConfigurationTest {
         File file = File.createTempFile("ConfigurationTest-", ".monsoon");
         file.deleteOnExit();
         try (FileWriter out = new FileWriter(file)) {
-            out.append("collect url \"http://$0\" as root {\n" +
-                    "0 = [ \"www.google.com\", \"www.groupon.com\" ]," +
-                    "1 = [ \"index.html\", \"error.html\" ]}");
+            out.append("collect url \"http://$0\" as root {\n"
+                    + "0 = [ \"www.google.com\", \"www.groupon.com\" ],"
+                    + "1 = [ \"index.html\", \"error.html\" ]}");
         }
         Configuration cfg = Configuration.readFromFile(file);
         Configuration reparsed = Configuration.readFromFile(null, new StringReader(cfg.configString().toString()));

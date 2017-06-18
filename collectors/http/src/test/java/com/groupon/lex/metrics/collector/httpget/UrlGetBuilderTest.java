@@ -32,8 +32,9 @@
 package com.groupon.lex.metrics.collector.httpget;
 
 import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import java.util.function.BiConsumer;
+import javax.servlet.http.HttpServlet;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import org.junit.Test;
@@ -44,7 +45,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class UrlGetBuilderTest {
     @Mock
-    EndpointRegistration er;
+    private BiConsumer<String, HttpServlet> er;
 
     @Test
     public void constructor() throws Exception {

@@ -66,6 +66,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.servlet.http.HttpServlet;
 import lombok.NonNull;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -105,7 +106,7 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
         decorators_.add(new MonitorMonitor(this));
         now_ = requireNonNull(now);
         list_metrics_ = new ListMetrics();
-        api_.addEndpoint("/monsoon/metrics", list_metrics_);
+        addEndpoint("/monsoon/metrics", list_metrics_);
     }
 
     protected MetricRegistryInstance(boolean has_config, EndpointRegistration api) {
@@ -113,7 +114,11 @@ public abstract class MetricRegistryInstance implements MetricRegistry, AutoClos
     }
 
     @Override
-    public EndpointRegistration getApi() {
+    public final void addEndpoint(String pattern, HttpServlet handler) {
+        getApi().addEndpoint(pattern, handler);
+    }
+
+    public final EndpointRegistration getApi() {
         return api_;
     }
 

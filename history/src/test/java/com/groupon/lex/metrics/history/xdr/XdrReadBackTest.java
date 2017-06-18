@@ -9,7 +9,7 @@ import com.groupon.lex.metrics.history.v0.xdr.ToXdr;
 import com.groupon.lex.metrics.history.v0.xdr.tsfile_datapoint;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferDecodingStream;
 import com.groupon.lex.metrics.history.xdr.support.XdrBufferEncodingStream;
-import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
@@ -94,7 +94,7 @@ public class XdrReadBackTest {
             }
         };
         final DateTime now = DateTime.now(DateTimeZone.UTC);
-        tsv_ = new SimpleTimeSeriesCollection(now, Stream.of(new MutableTimeSeriesValue(GroupName.valueOf(GROUP), metrics)));
+        tsv_ = new SimpleTimeSeriesCollection(now, Stream.of(new ImmutableTimeSeriesValue(GroupName.valueOf(GROUP), metrics)));
     }
 
     @Test

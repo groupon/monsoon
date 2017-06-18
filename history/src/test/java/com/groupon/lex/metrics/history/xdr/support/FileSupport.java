@@ -7,7 +7,7 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.TSDataVersionDispatch.Releaseable;
 import com.groupon.lex.metrics.history.xdr.Const;
-import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
@@ -125,7 +125,7 @@ public class FileSupport {
 
                     final Stream<TimeSeriesValue> tsv_stream = group_names.stream()
                             .map(name -> {
-                                return new MutableTimeSeriesValue(
+                                return new ImmutableTimeSeriesValue(
                                         name,
                                         metric_names.stream(),
                                         Function.identity(),

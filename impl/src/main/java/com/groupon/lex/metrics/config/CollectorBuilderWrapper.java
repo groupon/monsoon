@@ -54,7 +54,7 @@ public class CollectorBuilderWrapper implements MonitorStatement {
 
     @Override
     public void apply(MetricRegistryInstance registry) throws Exception {
-        registry.add(builder.build(registry.getApi()));
+        registry.add(builder.build(registry::addEndpoint));
     }
 
     @Override

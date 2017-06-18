@@ -31,8 +31,6 @@
  */
 package com.groupon.lex.metrics;
 
-import com.groupon.lex.metrics.api.endpoints.ExprEval;
-import com.groupon.lex.metrics.api.endpoints.ExprValidate;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.timeseries.Alert;
@@ -68,25 +66,43 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
         data_ = new TimeSeriesCollectionPairInstance(super.now());
     }
 
-    /** Set the history module that the push processor is to use. */
+    /**
+     * Set the history module that the push processor is to use.
+     */
     public synchronized void setHistory(CollectHistory history) {
         history_ = Optional.of(history);
-        getApi().addEndpoint("/monsoon/eval", new ExprEval(history_.get()));
-        getApi().addEndpoint("/monsoon/eval/validate", new ExprValidate());
+        history_.ifPresent(getApi()::setHistory);
         data_.initWithHistoricalData(history, getDecoratorLookBack());
     }
-    /** Clear the history module. */
-    public synchronized void clearHistory() { history_ = Optional.empty(); }
-    /** Retrieve the history module that the collector uses. */
-    public synchronized Optional<CollectHistory> getHistory() { return history_; }
 
-    public TimeSeriesCollection getCollectionData() { return data_.getCurrentCollection(); }
-    public Map<GroupName, Alert> getCollectionAlerts() { return alerts_; }
+    /**
+     * Clear the history module.
+     */
+    public synchronized void clearHistory() {
+        history_ = Optional.empty();
+    }
+
+    /**
+     * Retrieve the history module that the collector uses.
+     */
+    public synchronized Optional<CollectHistory> getHistory() {
+        return history_;
+    }
+
+    public TimeSeriesCollection getCollectionData() {
+        return data_.getCurrentCollection();
+    }
+
+    public Map<GroupName, Alert> getCollectionAlerts() {
+        return alerts_;
+    }
 
     /**
      * Begin a new collection cycle.
      *
-     * Note that the cycle isn't stored (a call to commitCollection is required).
+     * Note that the cycle isn't stored (a call to commitCollection is
+     * required).
+     *
      * @return A new collection cycle.
      */
     @Override
@@ -126,6 +142,7 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
 
     /**
      * Combine a new alert with its previous state.
+     *
      * @param alert An emitted alert.
      * @param previous A map with alerts during the previous cycle.
      * @return An alert that its predecessor extended.
@@ -139,12 +156,10 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
     }
 
     /**
-     * Run an update cycle.
-     * An update cycle consists of:
-     * - gathering raw metrics
-     * - creating a new, minimal context
-     * - applying decorators against the current and previous values
-     * - storing the collection values as the most recent capture
+     * Run an update cycle. An update cycle consists of: - gathering raw metrics
+     * - creating a new, minimal context - applying decorators against the
+     * current and previous values - storing the collection values as the most
+     * recent capture
      */
     @Override
     public synchronized TimeSeriesCollection updateCollection() {
@@ -155,9 +170,13 @@ public class PushMetricRegistryInstance extends MetricRegistryInstance {
     /**
      * Create a plain, uninitialized metric registry.
      *
-     * The metric registry is registered under its mbeanObjectName(package_name).
-     * @param now A function returning DateTime.now(DateTimeZone.UTC).  Allowing specifying it, for the benefit of unit tests.
-     * @param has_config True if the metric registry instance should mark monsoon as being supplied with a configuration file.
+     * The metric registry is registered under its
+     * mbeanObjectName(package_name).
+     *
+     * @param now A function returning DateTime.now(DateTimeZone.UTC). Allowing
+     * specifying it, for the benefit of unit tests.
+     * @param has_config True if the metric registry instance should mark
+     * monsoon as being supplied with a configuration file.
      * @param api The endpoint registration interface.
      * @return An empty metric registry.
      */

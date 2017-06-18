@@ -5,7 +5,7 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.history.xdr.BufferSupplier;
-import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
@@ -62,7 +62,7 @@ public class XdrStreamIteratorTest {
         tsdata = new ArrayList<>();
         for (int i = 0; i < 100; ++i) {
             tsdata.add(new SimpleTimeSeriesCollection(now.plusMinutes(i), Stream.of(
-                    new MutableTimeSeriesValue(
+                    new ImmutableTimeSeriesValue(
                             GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
                             singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))))));
         }
