@@ -31,9 +31,11 @@
  */
 package com.groupon.monsoon.remote.history;
 
+import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
+import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Collection;
@@ -147,6 +149,14 @@ public class CollectHistoryServer extends AbstractServer {
         LOG.log(Level.FINE, "request received({0}, {1}, {2})", new Object[]{begin, end, stepSize});
         Stream<Collection<CollectHistory.NamedEvaluation>> result = history.evaluate(query, begin, end, stepSize);
         LOG.log(Level.FINE, "returning({0}, {1}, {2}) => {3}", new Object[]{begin, end, stepSize, result});
+        return result;
+    }
+
+    @Override
+    public Stream<Map.Entry<DateTime, TimeSeriesValue>> streamGroup(DateTime begin, GroupName group) {
+        LOG.log(Level.FINE, "request received({0}, {1})", new Object[]{begin, group});
+        Stream<Map.Entry<DateTime, TimeSeriesValue>> result = history.streamGroup(begin, group);
+        LOG.log(Level.FINE, "returning({0}, {1}) => {2}", new Object[]{begin, group, result});
         return result;
     }
 }

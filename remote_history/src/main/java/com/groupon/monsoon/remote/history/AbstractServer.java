@@ -33,14 +33,19 @@ package com.groupon.monsoon.remote.history;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
+import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.monsoon.remote.history.xdr.duration_msec;
 import com.groupon.monsoon.remote.history.xdr.evaluate_iter_response;
 import com.groupon.monsoon.remote.history.xdr.evaluate_response;
+import com.groupon.monsoon.remote.history.xdr.group_stream_iter_response;
+import com.groupon.monsoon.remote.history.xdr.group_stream_response;
 import com.groupon.monsoon.remote.history.xdr.list_of_timeseries_collection;
+import com.groupon.monsoon.remote.history.xdr.literals_group_name;
 import com.groupon.monsoon.remote.history.xdr.named_evaluation_map;
 import com.groupon.monsoon.remote.history.xdr.rh_protoServerStub;
 import com.groupon.monsoon.remote.history.xdr.stream_iter_tsc_response;
@@ -67,43 +72,82 @@ import org.joda.time.Duration;
 
 public abstract class AbstractServer extends rh_protoServerStub {
     /**
-     * We try to spend at least MIN_REQUEST_DURATION in an iterator fetch request.
-     * We only bail out after that time, if we have at least some results to return.
+     * We try to spend at least MIN_REQUEST_DURATION in an iterator fetch
+     * request. We only bail out after that time, if we have at least some
+     * results to return.
      */
     public static final Duration MIN_REQUEST_DURATION = Duration.millis(800);
     /**
-     * We try to maintain at most MAX_REQUEST_DURATION in an iterator fetch request.
-     * If we exceed that time, bail out early and return a short result.
-     * We may emit at no results.
+     * We try to maintain at most MAX_REQUEST_DURATION in an iterator fetch
+     * request. If we exceed that time, bail out early and return a short
+     * result. We may emit at no results.
      */
     public static final Duration MAX_REQUEST_DURATION = Duration.millis(8000);
 
     private static final Logger LOG = Logger.getLogger(AbstractServer.class.getName());
-    /** Default port for the RPC server. */
+    /**
+     * Default port for the RPC server.
+     */
     public static final int DEFAULT_PORT = Client.DEFAULT_PORT;
-    /** Limit TimeSeriesCollection fetch size. */
+    /**
+     * Limit TimeSeriesCollection fetch size.
+     */
     private static final int MAX_TSC_FETCH = 50;
-    /** Limit evaluation fetch size. */
+    /**
+     * Limit evaluation fetch size.
+     */
     private static final int MAX_EVAL_FETCH = 500;
-    /** Background prefetch queue size for TimeSeriesCollection iterators. */
+    /**
+     * Limit group stream fetch size.
+     */
+    private static final int MAX_GROUP_STREAM_FETCH = 65536;
+    /**
+     * Background prefetch queue size for TimeSeriesCollection iterators.
+     */
     private static final int TSC_QUEUE_SIZE = 8;
-    /** Background prefetch queue size for evaluation iterators. */
+    /**
+     * Background prefetch queue size for evaluation iterators.
+     */
     private static final int EVAL_QUEUE_SIZE = 64;
-    /** Cache iterators, so subsequent requests can refer to existing iterator. */
+    /**
+     * Background prefetch queue size for group stream iterators.
+     */
+    private static final int GROUP_STREAM_QUEUE_SIZE = 512;
+    /**
+     * Cache iterators, so subsequent requests can refer to existing iterator.
+     */
     private static final Cache<Long, IteratorAndCookie<TimeSeriesCollection>> TSC_ITERS = CacheBuilder.newBuilder()
-                .expireAfterAccess(5, TimeUnit.MINUTES)
-                .softValues()
-                .build();
-    /** Allocator for generating unique iterator IDs. */
+            .expireAfterAccess(5, TimeUnit.MINUTES)
+            .softValues()
+            .build();
+    /**
+     * Allocator for generating unique iterator IDs.
+     */
     private static final AtomicLong TSC_ITERS_ALLOC = new AtomicLong();
 
-    /** Cache iterators, so subsequent requests can refer to existing iterator. */
+    /**
+     * Cache iterators, so subsequent requests can refer to existing iterator.
+     */
     private static final Cache<Long, IteratorAndCookie<Collection<CollectHistory.NamedEvaluation>>> EVAL_ITERS = CacheBuilder.newBuilder()
-                .expireAfterAccess(10, TimeUnit.MINUTES)
-                .softValues()
-                .build();
-    /** Allocator for generating unique iterator IDs. */
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .softValues()
+            .build();
+    /**
+     * Allocator for generating unique iterator IDs.
+     */
     private static final AtomicLong EVAL_ITERS_ALLOC = new AtomicLong();
+
+    /**
+     * Cache iterators, so subsequent requests can refer to existing iterator.
+     */
+    private static final Cache<Long, IteratorAndCookie<Map.Entry<DateTime, TimeSeriesValue>>> GROUP_STREAM_ITERS = CacheBuilder.newBuilder()
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .softValues()
+            .build();
+    /**
+     * Allocator for generating unique iterator IDs.
+     */
+    private static final AtomicLong GROUP_STREAM_ITERS_ALLOC = new AtomicLong();
 
     public AbstractServer() throws OncRpcException, IOException {
         super();
@@ -117,7 +161,9 @@ public abstract class AbstractServer extends rh_protoServerStub {
         super(bindAddr, port);
     }
 
-    /** Create a new TimeSeriesCollection iterator from the given stream. */
+    /**
+     * Create a new TimeSeriesCollection iterator from the given stream.
+     */
     private static stream_response newTscStream(Stream<TimeSeriesCollection> tsc, int fetch) {
         final BufferedIterator<TimeSeriesCollection> iter = new BufferedIterator(tsc.iterator(), TSC_QUEUE_SIZE);
         final long idx = TSC_ITERS_ALLOC.getAndIncrement();
@@ -125,13 +171,15 @@ public abstract class AbstractServer extends rh_protoServerStub {
         TSC_ITERS.put(idx, iterAndCookie);
 
         final List<TimeSeriesCollection> result = fetchFromIter(iter, fetch, MAX_TSC_FETCH);
-        EncDec.NewIterResponse<TimeSeriesCollection> responseObj =
-                new EncDec.NewIterResponse<>(idx, result, iter.atEnd(), iterAndCookie.getCookie());
+        EncDec.NewIterResponse<TimeSeriesCollection> responseObj
+                = new EncDec.NewIterResponse<>(idx, result, iter.atEnd(), iterAndCookie.getCookie());
         LOG.log(Level.FINE, "responseObj = {0}", responseObj);
         return EncDec.encodeStreamResponse(responseObj);
     }
 
-    /** Create a new evaluation iterator from the given stream. */
+    /**
+     * Create a new evaluation iterator from the given stream.
+     */
     private static evaluate_response newEvalStream(Stream<Collection<CollectHistory.NamedEvaluation>> tsc, int fetch) {
         final BufferedIterator<Collection<CollectHistory.NamedEvaluation>> iter = new BufferedIterator(tsc.iterator(), EVAL_QUEUE_SIZE);
         final long idx = EVAL_ITERS_ALLOC.getAndIncrement();
@@ -139,23 +187,41 @@ public abstract class AbstractServer extends rh_protoServerStub {
         EVAL_ITERS.put(idx, iterAndCookie);
 
         final List<Collection<CollectHistory.NamedEvaluation>> result = fetchFromIter(iter, fetch, MAX_EVAL_FETCH);
-        EncDec.NewIterResponse<Collection<CollectHistory.NamedEvaluation>> responseObj =
-                new EncDec.NewIterResponse<>(idx, result, iter.atEnd(), iterAndCookie.getCookie());
+        EncDec.NewIterResponse<Collection<CollectHistory.NamedEvaluation>> responseObj
+                = new EncDec.NewIterResponse<>(idx, result, iter.atEnd(), iterAndCookie.getCookie());
         LOG.log(Level.FINE, "responseObj = {0}", responseObj);
         return EncDec.encodeEvaluateResponse(responseObj);
     }
 
     /**
+     * Create a new group iterator from the given stream.
+     */
+    private static group_stream_response newGroupStream(Stream<Map.Entry<DateTime, TimeSeriesValue>> tsc, int fetch) {
+        final BufferedIterator<Map.Entry<DateTime, TimeSeriesValue>> iter = new BufferedIterator<>(tsc.iterator(), GROUP_STREAM_QUEUE_SIZE);
+        final long idx = GROUP_STREAM_ITERS_ALLOC.getAndIncrement();
+        final IteratorAndCookie<Map.Entry<DateTime, TimeSeriesValue>> iterAndCookie = new IteratorAndCookie<>(iter);
+        GROUP_STREAM_ITERS.put(idx, iterAndCookie);
+
+        final List<Map.Entry<DateTime, TimeSeriesValue>> result = fetchFromIter(iter, fetch, MAX_GROUP_STREAM_FETCH);
+        EncDec.NewIterResponse<Map.Entry<DateTime, TimeSeriesValue>> responseObj
+                = new EncDec.NewIterResponse<>(idx, result, iter.atEnd(), iterAndCookie.getCookie());
+        LOG.log(Level.FINE, "responseObj = {0}", responseObj);
+        return EncDec.encodeStreamGroupResponse(responseObj);
+    }
+
+    /**
      * Fetch up to a given amount of items from the iterator.
+     *
      * @param <T> The type of elements in the iterator.
      * @param iter The iterator supplying items.
-     * @param fetch The requested number of items to fetch (user supplied parameter).
+     * @param fetch The requested number of items to fetch (user supplied
+     * parameter).
      * @param max_fetch The hard limit on how many items to fetch.
      * @return A list with items fetched from the iterator.
      */
     private static <T> List<T> fetchFromIter(BufferedIterator<T> iter, int fetch, int max_fetch) {
         final long t0 = System.currentTimeMillis();
-        assert(max_fetch >= 1);
+        assert (max_fetch >= 1);
         if (fetch < 0 || fetch > max_fetch) fetch = max_fetch;
 
         final List<T> result = new ArrayList<>(fetch);
@@ -182,22 +248,37 @@ public abstract class AbstractServer extends rh_protoServerStub {
     }
 
     public abstract boolean addTSData(List<TimeSeriesCollection> c);
+
     public abstract long getFileSize();
+
     public abstract DateTime getEnd();
+
     public abstract Stream<TimeSeriesCollection> streamReverse();
+
     public Stream<TimeSeriesCollection> streamReverse(DateTime from) {
         return streamReverse()
                 .filter((TimeSeriesCollection tsc) -> !tsc.getTimestamp().isAfter(from));
     }
+
     public abstract Stream<TimeSeriesCollection> stream();
+
     public abstract Stream<TimeSeriesCollection> stream(DateTime begin);
+
     public abstract Stream<TimeSeriesCollection> stream(DateTime begin, DateTime end);
+
     public abstract Stream<TimeSeriesCollection> stream(Duration stepSize);
+
     public abstract Stream<TimeSeriesCollection> stream(DateTime begin, Duration stepSize);
+
     public abstract Stream<TimeSeriesCollection> stream(DateTime begin, DateTime end, Duration stepSize);
+
     public abstract Stream<Collection<CollectHistory.NamedEvaluation>> evaluate(Map<String, ? extends TimeSeriesMetricExpression> query, Duration stepSize);
+
     public abstract Stream<Collection<CollectHistory.NamedEvaluation>> evaluate(Map<String, ? extends TimeSeriesMetricExpression> query, DateTime begin, Duration stepSize);
+
     public abstract Stream<Collection<CollectHistory.NamedEvaluation>> evaluate(Map<String, ? extends TimeSeriesMetricExpression> query, DateTime begin, DateTime end, Duration stepSize);
+
+    public abstract Stream<Map.Entry<DateTime, TimeSeriesValue>> streamGroup(DateTime begin, GroupName group);
 
     @Override
     public final boolean addTSData_1(list_of_timeseries_collection c) {
@@ -320,6 +401,34 @@ public abstract class AbstractServer extends rh_protoServerStub {
         }
     }
 
+    @Override
+    public final group_stream_iter_response streamGroupIterNext_1(long id, long cookie, int fetch) {
+        LOG.log(Level.FINE, "group stream iter next({0}, {1})", new Object[]{id, fetch});
+        IteratorAndCookie<Map.Entry<DateTime, TimeSeriesValue>> iter = GROUP_STREAM_ITERS.getIfPresent(id);
+        if (iter == null || !iter.update(cookie))
+            return EncDec.encodeStreamGroupIterResponse(new EncDec.IterErrorResponse(IteratorErrorCode.UNKNOWN_ITERATOR));
+
+        final List<Map.Entry<DateTime, TimeSeriesValue>> result = fetchFromIter(iter.getIterator(), fetch, MAX_GROUP_STREAM_FETCH);
+        return EncDec.encodeStreamGroupIterResponse(new EncDec.IterSuccessResponseImpl<>(result, iter.getIterator().atEnd(), iter.getCookie()));
+    }
+
+    @Override
+    public final void closeGroupIter_1(long id, long cookie) {
+        final IteratorAndCookie<Map.Entry<DateTime, TimeSeriesValue>> iter = GROUP_STREAM_ITERS.getIfPresent(id);
+        if (iter != null && iter.update(cookie))
+            GROUP_STREAM_ITERS.invalidate(id);
+    }
+
+    @Override
+    public final group_stream_response streamGroup_1(timestamp_msec begin, literals_group_name group, int fetch) {
+        try {
+            return newGroupStream(streamGroup(EncDec.decodeTimestamp(begin), EncDec.decodeLiteralsGroupName(group)), fetch);
+        } catch (RuntimeException ex) {
+            LOG.log(Level.WARNING, "unable to stream groups", ex);
+            throw ex;
+        }
+    }
+
     @RequiredArgsConstructor
     @Getter
     private static class IteratorAndCookie<T> {
@@ -329,8 +438,9 @@ public abstract class AbstractServer extends rh_protoServerStub {
 
         /**
          * Change the cookie.
-         * @return True indicating the expected value matched and the cookie was changed.
-         *   If the operation fails, false is returned.
+         *
+         * @return True indicating the expected value matched and the cookie was
+         * changed. If the operation fails, false is returned.
          */
         synchronized public boolean update(long expected) {
             if (cookie != expected) return false;
