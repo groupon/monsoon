@@ -35,7 +35,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
-import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Collection;
 import java.util.HashSet;
@@ -88,9 +87,7 @@ public class MetricMatcher {
      * Create a stream of TimeSeriesMetricDeltas with values.
      */
     public Stream<Entry<MatchedName, MetricValue>> filter(Context t) {
-        return t.getTSData().getCurrentCollection().getGroupPaths(this::match).stream()
-                .map((SimpleGroupPath group) -> t.getTSData().getTSValue(group))
-                .flatMap(TimeSeriesValueSet::stream)
+        return t.getTSData().getCurrentCollection().get(this::match, x -> true).stream()
                 .flatMap(tsv -> {
                     return metric_match_cache_.getUnchecked(new HashSet<>(tsv.getMetrics().keySet())).stream()
                             .map(metric_name -> {
