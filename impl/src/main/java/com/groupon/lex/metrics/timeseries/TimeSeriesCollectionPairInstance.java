@@ -31,35 +31,143 @@
  */
 package com.groupon.lex.metrics.timeseries;
 
+import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MutableTimeSeriesCollectionPair;
+import com.groupon.lex.metrics.SimpleGroupPath;
+import com.groupon.lex.metrics.history.CollectHistory;
+import java.util.List;
+import java.util.Optional;
+import lombok.Getter;
+import lombok.ToString;
 import org.joda.time.DateTime;
+import org.joda.time.Duration;
 
 /**
  *
  * @author ariane
  */
-public class TimeSeriesCollectionPairInstance extends AbstractTSCPair implements MutableTimeSeriesCollectionPair {
-    private final MutableTimeSeriesCollection current_;
+@ToString
+public class TimeSeriesCollectionPairInstance implements MutableTimeSeriesCollectionPair {
+    @Getter
+    private final MutableTimeSeriesCollection currentCollection;
+    private Impl impl = new InMemoryImplementation();
 
     public TimeSeriesCollectionPairInstance(DateTime now) {
-        current_ = new MutableTimeSeriesCollection(now);
-    }
-
-    @Override
-    public MutableTimeSeriesCollection getCurrentCollection() {
-        return current_;
+        currentCollection = new MutableTimeSeriesCollection(now);
     }
 
     public TimeSeriesCollectionPairInstance startNewCycle(DateTime timestamp, ExpressionLookBack lookback) {
-        update(
-                new SimpleTimeSeriesCollection(current_.getTimestamp(), current_.getTSValues()),
-                lookback,
-                () -> current_.clear(timestamp));
+        impl.startNewCycle(lookback, () -> currentCollection.clear(timestamp));
         return this;
     }
 
+    public void initWithHistoricalData(CollectHistory history, ExpressionLookBack lookback) {
+        impl = new HistoryBackedImplementation(history, lookback);
+    }
+
     @Override
-    public String toString() {
-        return "TimeSeriesCollectionPairInstance{current_=" + current_ + ", " + super.toString() + '}';
+    public TimeSeriesCollection getPreviousCollection() {
+        return impl.getPreviousCollection();
+    }
+
+    @Override
+    public Optional<TimeSeriesCollection> getPreviousCollection(int n) {
+        return impl.getPreviousCollection(n);
+    }
+
+    @Override
+    public Optional<TimeSeriesCollection> getPreviousCollection(Duration duration) {
+        return impl.getPreviousCollection(duration);
+    }
+
+    @Override
+    public TimeSeriesCollectionPair getPreviousCollectionPair(int n) {
+        return impl.getPreviousCollectionPair(n);
+    }
+
+    @Override
+    public TimeSeriesCollectionPair getPreviousCollectionPair(Duration duration) {
+        return impl.getPreviousCollectionPair(duration);
+    }
+
+    @Override
+    public List<TimeSeriesCollectionPair> getCollectionPairsSince(Duration duration) {
+        return impl.getCollectionPairsSince(duration);
+    }
+
+    @Override
+    public TimeSeriesCollection getPreviousCollectionAt(DateTime ts) {
+        return impl.getPreviousCollectionAt(ts);
+    }
+
+    @Override
+    public TimeSeriesCollection getPreviousCollectionAt(Duration duration) {
+        return impl.getPreviousCollectionAt(duration);
+    }
+
+    @Override
+    public TimeSeriesCollectionPair getPreviousCollectionPairAt(DateTime ts) {
+        return impl.getPreviousCollectionPairAt(ts);
+    }
+
+    @Override
+    public TimeSeriesCollectionPair getPreviousCollectionPairAt(Duration duration) {
+        return impl.getPreviousCollectionPairAt(duration);
+    }
+
+    @Override
+    public Duration getCollectionInterval() {
+        return impl.getCollectionInterval();
+    }
+
+    @Override
+    public TimeSeriesValueSet getTSValue(SimpleGroupPath name) {
+        return impl.getTSValue(name);
+    }
+
+    @Override
+    public Optional<TimeSeriesValueSet> getTSDeltaByName(GroupName name) {
+        return impl.getTSDeltaByName(name);
+    }
+
+    @Override
+    public int size() {
+        return impl.size();
+    }
+
+    private static interface Impl extends TimeSeriesCollectionPair {
+        public void startNewCycle(ExpressionLookBack lookback, Runnable doBeforeValidation);
+    }
+
+    @ToString(callSuper = true)
+    private class InMemoryImplementation extends AbstractTSCPair implements Impl {
+        @Override
+        public TimeSeriesCollection getCurrentCollection() {
+            return TimeSeriesCollectionPairInstance.this.getCurrentCollection();
+        }
+
+        @Override
+        public void startNewCycle(ExpressionLookBack lookback, Runnable doBeforeValidation) {
+            update(new SimpleTimeSeriesCollection(getCurrentCollection().getTimestamp(), getCurrentCollection().getTSValues()),
+                    lookback,
+                    doBeforeValidation);
+        }
+    }
+
+    @ToString(callSuper = true)
+    private class HistoryBackedImplementation extends ChainingTSCPair implements Impl {
+        public HistoryBackedImplementation(CollectHistory history, ExpressionLookBack lookback) {
+            super(history, lookback);
+        }
+
+        @Override
+        public TimeSeriesCollection getCurrentCollection() {
+            return TimeSeriesCollectionPairInstance.this.getCurrentCollection();
+        }
+
+        @Override
+        public void startNewCycle(ExpressionLookBack lookback, Runnable doBeforeValidation) {
+            update(getCurrentCollection(), lookback, doBeforeValidation);
+        }
     }
 }
