@@ -34,7 +34,6 @@ package com.groupon.lex.metrics;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.groupon.lex.metrics.lib.MemoidOne;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
 import com.groupon.lex.metrics.timeseries.expression.Context;
@@ -57,7 +56,6 @@ public class MetricMatcher {
     private static final Logger LOG = Logger.getLogger(MetricMatcher.class.getName());
     private final PathMatcher groups_;
     private final PathMatcher metric_;
-    private final MemoidOne<Collection<SimpleGroupPath>, Collection<SimpleGroupPath>> group_names_;
     private final LoadingCache<Set<MetricName>, Collection<MetricName>> metric_match_cache_;
 
     @Value
@@ -73,11 +71,6 @@ public class MetricMatcher {
     public MetricMatcher(PathMatcher groups, PathMatcher metric) {
         groups_ = requireNonNull(groups);
         metric_ = requireNonNull(metric);
-        group_names_ = new MemoidOne<>(group_names -> {
-            return group_names.stream()
-                    .filter(this::match)
-                    .collect(Collectors.toList());
-        });
         metric_match_cache_ = CacheBuilder.newBuilder()
                 .softValues()
                 .build(CacheLoader.from((Set<MetricName> names) -> names.stream().filter(this::match).collect(Collectors.toList())));
@@ -95,7 +88,7 @@ public class MetricMatcher {
      * Create a stream of TimeSeriesMetricDeltas with values.
      */
     public Stream<Entry<MatchedName, MetricValue>> filter(Context t) {
-        return group_names_.apply(new HashSet<>(t.getTSData().getCurrentCollection().getGroupPaths())).stream()
+        return t.getTSData().getCurrentCollection().getGroupPaths(this::match).stream()
                 .map((SimpleGroupPath group) -> t.getTSData().getTSValue(group))
                 .flatMap(TimeSeriesValueSet::stream)
                 .flatMap(tsv -> {

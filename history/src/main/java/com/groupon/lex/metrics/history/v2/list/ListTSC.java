@@ -116,9 +116,10 @@ public class ListTSC extends AbstractTimeSeriesCollection {
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
         return decode(data).keySet().stream()
                 .map(GroupName::getPath)
+                .filter(filter)
                 .collect(Collectors.toSet());
     }
 

@@ -63,7 +63,7 @@ public class EmptyTimeSeriesCollection extends AbstractTimeSeriesCollection {
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
         return EMPTY_SET;
     }
 

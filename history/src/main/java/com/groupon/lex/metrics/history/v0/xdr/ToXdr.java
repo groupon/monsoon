@@ -19,7 +19,8 @@ import org.joda.time.DateTimeZone;
  * @author ariane
  */
 public class ToXdr {
-    private ToXdr() {}
+    private ToXdr() {
+    }
 
     public static path groupname(SimpleGroupPath p) {
         path result = new path();
@@ -121,7 +122,7 @@ public class ToXdr {
     public static tsfile_datapoint datapoints(TimeSeriesCollection tsdata) {
         tsfile_datapoint result = new tsfile_datapoint();
         result.ts = timestamp(tsdata.getTimestamp());
-        result.groups = tsdata.getGroupPaths().stream()
+        result.groups = tsdata.getGroupPaths(x -> true).stream()
                 .map(path -> datapoint(path, tsdata.getTSValue(path).stream()))
                 .toArray(tsfile_pathgroup[]::new);
         return result;

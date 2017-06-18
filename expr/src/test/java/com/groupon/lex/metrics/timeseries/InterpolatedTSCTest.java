@@ -156,7 +156,7 @@ public class InterpolatedTSCTest {
 
         assertThat(interpolatedTSC.getGroups(x -> true),
                 containsInAnyOrder(TESTGROUP, GroupName.valueOf("mid", "point")));
-        assertThat(interpolatedTSC.getGroupPaths(),
+        assertThat(interpolatedTSC.getGroupPaths(x -> true),
                 containsInAnyOrder(TESTGROUP.getPath(), SimpleGroupPath.valueOf("mid", "point")));
     }
 
@@ -167,7 +167,7 @@ public class InterpolatedTSCTest {
 
         assertThat(interpolatedTSC.getGroups(x -> true),
                 contains(TESTGROUP));
-        assertThat(interpolatedTSC.getGroupPaths(),
+        assertThat(interpolatedTSC.getGroupPaths(x -> true),
                 contains(TESTGROUP.getPath()));
         assertSame(presentValue, interpolatedTSC.get(TESTGROUP).get());
     }

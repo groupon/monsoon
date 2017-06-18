@@ -39,7 +39,6 @@ import java.util.Collection;
 import static java.util.Collections.singletonMap;
 import static java.util.Collections.unmodifiableCollection;
 import static java.util.Collections.unmodifiableMap;
-import static java.util.Collections.unmodifiableSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -163,8 +162,10 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
-        return unmodifiableSet(new HashSet<>(data_by_path_.keySet()));
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
+        return data_by_path_.keySet().stream()
+                .filter(filter)
+                .collect(Collectors.toSet());
     }
 
     @Override

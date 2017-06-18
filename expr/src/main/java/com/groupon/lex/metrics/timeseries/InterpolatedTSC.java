@@ -44,7 +44,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Collections.unmodifiableMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -129,12 +128,9 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
-        Set<SimpleGroupPath> paths = new HashSet<>(current.getGroupPaths());
-        interpolatedTsvMap.keySet().stream()
-                .map(GroupName::getPath)
-                .forEach(paths::add);
-        return paths;
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
+        return Stream.concat(current.getGroupPaths(filter).stream(), interpolatedTsvMap.keySet().stream().map(GroupName::getPath).filter(filter))
+                .collect(Collectors.toSet());
     }
 
     @Override

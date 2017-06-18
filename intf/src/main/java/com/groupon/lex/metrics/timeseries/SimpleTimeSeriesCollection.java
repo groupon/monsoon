@@ -36,7 +36,6 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import gnu.trove.map.hash.THashMap;
 import java.util.Collection;
 import static java.util.Collections.unmodifiableCollection;
-import static java.util.Collections.unmodifiableSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -118,8 +117,10 @@ public class SimpleTimeSeriesCollection extends AbstractTimeSeriesCollection {
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
-        return unmodifiableSet(pathMap.keySet());
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
+        return pathMap.keySet().stream()
+                .filter(filter)
+                .collect(Collectors.toSet());
     }
 
     @Override

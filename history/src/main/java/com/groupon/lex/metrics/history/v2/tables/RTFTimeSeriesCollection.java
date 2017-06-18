@@ -76,8 +76,9 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
         return table.decodeOrThrow().entrySet().stream()
+                .filter(pathMap -> filter.test(pathMap.getKey()))
                 .filter(pathMap -> {
                     Map<GroupName, SegmentReader<RTFGroupTable>> grpMap = pathMap.getValue();
                     return grpMap.values().stream()

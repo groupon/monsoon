@@ -316,8 +316,9 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
         }
 
         @Override
-        public Set<SimpleGroupPath> getGroupPaths() {
+        public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
             return tsvSet.entrySet().stream()
+                    .filter(entry -> filter.test(entry.getKey().getPath()))
                     .collect(Collectors.groupingBy(entry -> entry.getKey().getPath())).entrySet().stream()
                     .filter(listing -> listing.getValue().stream().map(Map.Entry::getValue).anyMatch(Optional::isPresent))
                     .map(Map.Entry::getKey)

@@ -225,9 +225,9 @@ public class Util {
         }
 
         @Override
-        public Set<SimpleGroupPath> getGroupPaths() {
+        public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
             return underlying.stream()
-                    .flatMap(tsc -> tsc.getGroupPaths().stream())
+                    .flatMap(tsc -> tsc.getGroupPaths(filter).stream())
                     .collect(Collectors.toSet());
         }
 
