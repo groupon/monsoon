@@ -34,9 +34,8 @@ package com.groupon.lex.metrics;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.groupon.lex.metrics.lib.MemoidOne;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
-import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
+import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Collection;
 import java.util.HashSet;
@@ -57,13 +56,16 @@ public class MetricMatcher {
     private static final Logger LOG = Logger.getLogger(MetricMatcher.class.getName());
     private final PathMatcher groups_;
     private final PathMatcher metric_;
-    private final MemoidOne<Collection<SimpleGroupPath>, Collection<SimpleGroupPath>> group_names_;
     private final LoadingCache<Set<MetricName>, Collection<MetricName>> metric_match_cache_;
 
     @Value
     public static final class MatchedName {
-        private final GroupName group;
+        private final TimeSeriesValue matchedGroup;
         private final MetricName metric;
+
+        public GroupName getGroup() {
+            return matchedGroup.getGroup();
+        }
 
         public Tags getTags() {
             return getGroup().getTags();
@@ -73,11 +75,6 @@ public class MetricMatcher {
     public MetricMatcher(PathMatcher groups, PathMatcher metric) {
         groups_ = requireNonNull(groups);
         metric_ = requireNonNull(metric);
-        group_names_ = new MemoidOne<>(group_names -> {
-            return group_names.stream()
-                    .filter(this::match)
-                    .collect(Collectors.toList());
-        });
         metric_match_cache_ = CacheBuilder.newBuilder()
                 .softValues()
                 .build(CacheLoader.from((Set<MetricName> names) -> names.stream().filter(this::match).collect(Collectors.toList())));
@@ -95,14 +92,12 @@ public class MetricMatcher {
      * Create a stream of TimeSeriesMetricDeltas with values.
      */
     public Stream<Entry<MatchedName, MetricValue>> filter(Context t) {
-        return group_names_.apply(new HashSet<>(t.getTSData().getCurrentCollection().getGroupPaths())).stream()
-                .map((SimpleGroupPath group) -> t.getTSData().getTSValue(group))
-                .flatMap(TimeSeriesValueSet::stream)
+        return t.getTSData().getCurrentCollection().get(this::match, x -> true).stream()
                 .flatMap(tsv -> {
                     return metric_match_cache_.getUnchecked(new HashSet<>(tsv.getMetrics().keySet())).stream()
                             .map(metric_name -> {
                                 return SimpleMapEntry.create(
-                                        new MatchedName(tsv.getGroup(), metric_name),
+                                        new MatchedName(tsv, metric_name),
                                         tsv.findMetric(metric_name).orElseThrow(() -> new IllegalStateException("resolved metric name was not present")));
                             });
                 });

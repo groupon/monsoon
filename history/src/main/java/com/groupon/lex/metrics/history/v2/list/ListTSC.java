@@ -54,12 +54,12 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import static java.util.Collections.unmodifiableMap;
-import static java.util.Collections.unmodifiableSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BinaryOperator;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -109,14 +109,17 @@ public class ListTSC extends AbstractTimeSeriesCollection {
     }
 
     @Override
-    public Set<GroupName> getGroups() {
-        return unmodifiableSet(decode(data).keySet());
+    public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
+        return decode(data).keySet().stream()
+                .filter(filter)
+                .collect(Collectors.toSet());
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
         return decode(data).keySet().stream()
                 .map(GroupName::getPath)
+                .filter(filter)
                 .collect(Collectors.toSet());
     }
 
@@ -136,6 +139,14 @@ public class ListTSC extends AbstractTimeSeriesCollection {
     @Override
     public Optional<TimeSeriesValue> get(GroupName name) {
         return Optional.ofNullable(decode(data).get(name));
+    }
+
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return new TimeSeriesValueSet(decode(data).entrySet().stream()
+                .filter(entry -> pathFilter.test(entry.getKey().getPath()))
+                .filter(entry -> groupFilter.test(entry.getKey()))
+                .map(Map.Entry::getValue));
     }
 
     @RequiredArgsConstructor

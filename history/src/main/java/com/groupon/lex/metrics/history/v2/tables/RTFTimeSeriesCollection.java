@@ -43,6 +43,7 @@ import static java.util.Collections.emptyMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.joda.time.DateTime;
@@ -65,17 +66,19 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
     }
 
     @Override
-    public Set<GroupName> getGroups() {
+    public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
         return table.decodeOrThrow().values().stream()
                 .flatMap(grpMap -> grpMap.entrySet().stream())
+                .filter(groupEntry -> filter.test(groupEntry.getKey()))
                 .filter(groupEntry -> groupEntry.getValue().decodeOrThrow().contains(index))
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
         return table.decodeOrThrow().entrySet().stream()
+                .filter(pathMap -> filter.test(pathMap.getKey()))
                 .filter(pathMap -> {
                     Map<GroupName, SegmentReader<RTFGroupTable>> grpMap = pathMap.getValue();
                     return grpMap.values().stream()
@@ -113,5 +116,16 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
                 .map(grpSegment -> grpSegment.decodeOrThrow())
                 .filter(grpTbl -> grpTbl.contains(index))
                 .map(grpTbl -> newTSV(name, grpTbl));
+    }
+
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return new TimeSeriesValueSet(table.decodeOrThrow().entrySet().stream()
+                .filter(entry -> pathFilter.test(entry.getKey()))
+                .flatMap(entry -> entry.getValue().entrySet().stream())
+                .filter(entry -> groupFilter.test(entry.getKey()))
+                .map(grpSegmentEntry -> SimpleMapEntry.create(grpSegmentEntry.getKey(), grpSegmentEntry.getValue().decodeOrThrow()))
+                .filter(grpTblEntry -> grpTblEntry.getValue().contains(index))
+                .map(grpTblEntry -> newTSV(grpTblEntry.getKey(), grpTblEntry.getValue())));
     }
 }

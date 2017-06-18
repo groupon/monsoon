@@ -37,12 +37,14 @@ import java.util.Collection;
 import static java.util.Collections.EMPTY_SET;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.joda.time.DateTime;
 
 /**
  * An empty time series collection.
+ *
  * @author ariane
  */
 @RequiredArgsConstructor
@@ -56,12 +58,12 @@ public class EmptyTimeSeriesCollection extends AbstractTimeSeriesCollection {
     }
 
     @Override
-    public Set<GroupName> getGroups() {
+    public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
         return EMPTY_SET;
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
         return EMPTY_SET;
     }
 
@@ -78,5 +80,10 @@ public class EmptyTimeSeriesCollection extends AbstractTimeSeriesCollection {
     @Override
     public Optional<TimeSeriesValue> get(GroupName name) {
         return Optional.empty();
+    }
+
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return TimeSeriesValueSet.EMPTY;
     }
 }

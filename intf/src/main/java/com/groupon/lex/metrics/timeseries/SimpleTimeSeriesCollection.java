@@ -36,12 +36,12 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import gnu.trove.map.hash.THashMap;
 import java.util.Collection;
 import static java.util.Collections.unmodifiableCollection;
-import static java.util.Collections.unmodifiableSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BinaryOperator;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -50,8 +50,9 @@ import lombok.NonNull;
 import org.joda.time.DateTime;
 
 /**
- * A simple time series collection.
- * This implementation uses trove hashmap to minimize memory usage.
+ * A simple time series collection. This implementation uses trove hashmap to
+ * minimize memory usage.
+ *
  * @author ariane
  */
 public class SimpleTimeSeriesCollection extends AbstractTimeSeriesCollection {
@@ -61,19 +62,27 @@ public class SimpleTimeSeriesCollection extends AbstractTimeSeriesCollection {
     private final Map<SimpleGroupPath, List<TimeSeriesValue>> pathMap;
 
     private static BinaryOperator<TimeSeriesValue> throwing_merger_() {
-        return (x, y) -> { throw new IllegalArgumentException("duplicate group " + x.getGroup()); };
+        return (x, y) -> {
+            throw new IllegalArgumentException("duplicate group " + x.getGroup());
+        };
     }
 
-    /** HashMap constructor, so we can create hashmaps with an altered load factor. */
+    /**
+     * HashMap constructor, so we can create hashmaps with an altered load
+     * factor.
+     */
     private static <K, V> Supplier<Map<K, V>> hashmap_constructor_() {
         return () -> new THashMap<>(1, 1);
     }
 
     /**
      * Construct a time series collection.
+     *
      * @param timestamp The timestamp of the collection.
-     * @param tsv A stream of values for the collection.  The values stream may not have duplicate group names.
-     * @throws IllegalArgumentException if the time series values contain duplicate group names.
+     * @param tsv A stream of values for the collection. The values stream may
+     * not have duplicate group names.
+     * @throws IllegalArgumentException if the time series values contain
+     * duplicate group names.
      */
     public SimpleTimeSeriesCollection(@NonNull DateTime timestamp, @NonNull Stream<? extends TimeSeriesValue> tsv) {
         this.timestamp = timestamp;
@@ -84,9 +93,12 @@ public class SimpleTimeSeriesCollection extends AbstractTimeSeriesCollection {
 
     /**
      * Construct a time series collection.
+     *
      * @param timestamp The timestamp of the collection.
-     * @param tsv A collection of values for the collection.  The values stream may not have duplicate group names.
-     * @throws IllegalArgumentException if the time series values contain duplicate group names.
+     * @param tsv A collection of values for the collection. The values stream
+     * may not have duplicate group names.
+     * @throws IllegalArgumentException if the time series values contain
+     * duplicate group names.
      */
     public SimpleTimeSeriesCollection(@NonNull DateTime timestamp, @NonNull Collection<? extends TimeSeriesValue> tsv) {
         this(timestamp, tsv.stream());
@@ -98,13 +110,17 @@ public class SimpleTimeSeriesCollection extends AbstractTimeSeriesCollection {
     }
 
     @Override
-    public Set<GroupName> getGroups() {
-        return unmodifiableSet(groupMap.keySet());
+    public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
+        return groupMap.keySet().stream()
+                .filter(filter)
+                .collect(Collectors.toSet());
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
-        return unmodifiableSet(pathMap.keySet());
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
+        return pathMap.keySet().stream()
+                .filter(filter)
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -122,5 +138,13 @@ public class SimpleTimeSeriesCollection extends AbstractTimeSeriesCollection {
     @Override
     public Optional<TimeSeriesValue> get(GroupName name) {
         return Optional.ofNullable(groupMap.get(name));
+    }
+
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return new TimeSeriesValueSet(groupMap.entrySet().stream()
+                .filter(entry -> pathFilter.test(entry.getKey().getPath()))
+                .filter(entry -> groupFilter.test(entry.getKey()))
+                .map(Map.Entry::getValue));
     }
 }

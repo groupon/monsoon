@@ -44,12 +44,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Collections.unmodifiableMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -122,19 +122,15 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
     }
 
     @Override
-    public Set<GroupName> getGroups() {
-        Set<GroupName> groups = new HashSet<>(current.getGroups());
-        groups.addAll(interpolatedTsvMap.keySet());
-        return groups;
+    public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
+        return Stream.concat(current.getGroups(filter).stream(), interpolatedTsvMap.keySet().stream().filter(filter))
+                .collect(Collectors.toSet());
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
-        Set<SimpleGroupPath> paths = new HashSet<>(current.getGroupPaths());
-        interpolatedTsvMap.keySet().stream()
-                .map(GroupName::getPath)
-                .forEach(paths::add);
-        return paths;
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
+        return Stream.concat(current.getGroupPaths(filter).stream(), interpolatedTsvMap.keySet().stream().map(GroupName::getPath).filter(filter))
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -160,20 +156,26 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
         return current.get(name);
     }
 
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return new TimeSeriesValueSet(interpolatedTsvMap.entrySet().stream()
+                .filter(entry -> pathFilter.test(entry.getKey().getPath()))
+                .filter(entry -> groupFilter.test(entry.getKey()))
+                .map(Map.Entry::getValue));
+    }
+
     /**
      * Calculate all names that can be interpolated. The returned set will not
      * have any names present in the current collection.
      */
     private static Set<GroupName> calculateNames(TimeSeriesCollection current, Collection<TimeSeriesCollection> backward, Collection<TimeSeriesCollection> forward) {
         final Set<GroupName> names = backward.stream()
-                .map(TimeSeriesCollection::getGroups)
-                .flatMap(Collection::stream)
+                .flatMap(tsc -> tsc.getGroups(x -> true).stream())
                 .collect(Collectors.toCollection(THashSet::new));
         names.retainAll(forward.stream()
-                .map(TimeSeriesCollection::getGroups)
-                .flatMap(Collection::stream)
+                .flatMap(tsc -> tsc.getGroups(x -> true).stream())
                 .collect(Collectors.toSet()));
-        names.removeAll(current.getGroups());
+        names.removeAll(current.getGroups(x -> true));
         return names;
     }
 

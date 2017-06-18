@@ -52,6 +52,7 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.NonNull;
 import org.joda.time.DateTime;
@@ -217,16 +218,16 @@ public class Util {
         }
 
         @Override
-        public Set<GroupName> getGroups() {
+        public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
             return underlying.stream()
-                    .flatMap(tsc -> tsc.getGroups().stream())
+                    .flatMap(tsc -> tsc.getGroups(filter).stream())
                     .collect(Collectors.toSet());
         }
 
         @Override
-        public Set<SimpleGroupPath> getGroupPaths() {
+        public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
             return underlying.stream()
-                    .flatMap(tsc -> tsc.getGroupPaths().stream())
+                    .flatMap(tsc -> tsc.getGroupPaths(filter).stream())
                     .collect(Collectors.toSet());
         }
 
@@ -253,6 +254,15 @@ public class Util {
                     .filter(Optional::isPresent)
                     .map(Optional::get)
                     .findFirst();
+        }
+
+        @Override
+        public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+            return new TimeSeriesValueSet(underlying.stream()
+                    .map(tsc -> tsc.get(pathFilter, groupFilter))
+                    .flatMap(tsvSet -> tsvSet.stream())
+                    .collect(Collectors.toMap(TimeSeriesValue::getGroup, Function.identity(), (x, y) -> x)) // Conflict resolution: use first occurance.
+                    .values());
         }
     }
 }

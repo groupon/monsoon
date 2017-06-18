@@ -39,15 +39,16 @@ import java.util.Collection;
 import static java.util.Collections.singletonMap;
 import static java.util.Collections.unmodifiableCollection;
 import static java.util.Collections.unmodifiableMap;
-import static java.util.Collections.unmodifiableSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -154,13 +155,17 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
     }
 
     @Override
-    public Set<GroupName> getGroups() {
-        return unmodifiableSet(new HashSet<>(data_.keySet()));  // Copy of the keyset, since Map.keySet is a view.
+    public Set<GroupName> getGroups(Predicate<? super GroupName> predicate) {
+        return data_.keySet().stream()
+                .filter(predicate)
+                .collect(Collectors.toSet());
     }
 
     @Override
-    public Set<SimpleGroupPath> getGroupPaths() {
-        return unmodifiableSet(new HashSet<>(data_by_path_.keySet()));
+    public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
+        return data_by_path_.keySet().stream()
+                .filter(filter)
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -179,6 +184,15 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
     @Override
     public Optional<TimeSeriesValue> get(GroupName name) {
         return Optional.ofNullable(data_.get(name));
+    }
+
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return new TimeSeriesValueSet(data_by_path_.entrySet().stream()
+                .filter(entry -> pathFilter.test(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .flatMap(Collection::stream)
+                .filter(tsv -> groupFilter.test(tsv.getGroup())));
     }
 
     public Map<GroupName, TimeSeriesValue> getData() {

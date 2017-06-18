@@ -369,7 +369,7 @@ public final class ReadWriteState implements State {
 
     private static EncodedTscHeaderForWrite writeTSC(Writer writer, TimeSeriesCollection tsc, DictionaryForWrite dict) throws IOException, OncRpcException {
         final List<record> recordList = new ArrayList<>();
-        for (SimpleGroupPath path : tsc.getGroupPaths()) {
+        for (SimpleGroupPath path : tsc.getGroupPaths(x -> true)) {
             record r = new record();
             r.path_ref = dict.getPathTable().getOrCreate(path.getPath());
             r.tags = writeTSCTags(writer, path, tsc, dict);
@@ -383,7 +383,8 @@ public final class ReadWriteState implements State {
 
     private static record_tags[] writeTSCTags(Writer writer, SimpleGroupPath path, TimeSeriesCollection tsc, DictionaryForWrite dict) throws IOException, OncRpcException {
         final List<record_tags> recordList = new ArrayList<>();
-        for (TimeSeriesValue tsv : tsc.getTSValue(path).stream().collect(Collectors.toList())) {
+        for (TimeSeriesValue tsv
+             : tsc.getTSValue(path).stream().collect(Collectors.toList())) {
             record_tags rt = new record_tags();
             rt.tag_ref = dict.getTagsTable().getOrCreate(tsv.getTags());
             rt.pos = ToXdr.filePos(writeMetrics(writer, tsv.getMetrics(), dict));
