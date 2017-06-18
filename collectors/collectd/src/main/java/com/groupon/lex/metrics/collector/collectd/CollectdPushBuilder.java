@@ -35,7 +35,8 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.builders.collector.AcceptAsPath;
 import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
 import com.groupon.lex.metrics.builders.collector.MainString;
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
+import java.util.function.BiConsumer;
+import javax.servlet.http.HttpServlet;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -48,7 +49,7 @@ public class CollectdPushBuilder implements CollectorBuilder, MainString, Accept
     private SimpleGroupPath asPath;
 
     @Override
-    public CollectdPushCollector build(EndpointRegistration er) throws Exception {
+    public CollectdPushCollector build(BiConsumer<String, HttpServlet> er) throws Exception {
         return new CollectdPushCollector(er, asPath, main);
     }
 }

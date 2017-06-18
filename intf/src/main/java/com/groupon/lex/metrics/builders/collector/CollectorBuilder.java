@@ -32,36 +32,41 @@
 package com.groupon.lex.metrics.builders.collector;
 
 import com.groupon.lex.metrics.GroupGenerator;
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
+import java.util.function.BiConsumer;
+import javax.servlet.http.HttpServlet;
 
 /**
  * Builder interface for a collector.
  *
  * An implementation of this class must:
  * <ol>
- *   <li>implement at least one of the Main* classes: MainNone, MainString or MainStringList</li>
+ * <li>implement at least one of the Main* classes: MainNone, MainString or
+ * MainStringList</li>
  * </ol>
  *
  * An implementation of this class may:
  * <ol>
- *   <li>implement one of AcceptAsPath, AcceptOptAsPath</li>
- *   <li>implement AcceptTagSet</li>
+ * <li>implement one of AcceptAsPath, AcceptOptAsPath</li>
+ * <li>implement AcceptTagSet</li>
  * </ol>
  *
- * These extra interfaces are used to instruct the parser to handle the collector
- * statements appropriately.
+ * These extra interfaces are used to instruct the parser to handle the
+ * collector statements appropriately.
+ *
  * @author ariane
  */
 public interface CollectorBuilder {
     /**
      * Create the actual collector.
      *
-     * The parser will call each of the setters from the Main* and Accept*
-     * base classes of the implementation exactly once, before calling this function.
+     * The parser will call each of the setters from the Main* and Accept* base
+     * classes of the implementation exactly once, before calling this function.
      * The function must be able to return multiple instances of the collector.
+     *
      * @param er Endpoint registration API. Used for registering HTTP endpoints.
-     * @return A GroupGenerator implementation that performs the desired collection.
+     * @return A GroupGenerator implementation that performs the desired
+     * collection.
      * @throws Exception If the implementation fails to create the collector.
      */
-    public GroupGenerator build(EndpointRegistration er) throws Exception;
+    public GroupGenerator build(BiConsumer<String, HttpServlet> er) throws Exception;
 }

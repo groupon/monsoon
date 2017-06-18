@@ -44,7 +44,6 @@ import com.groupon.lex.metrics.SimpleMetricGroup;
 import com.groupon.lex.metrics.SynchronousGroupGenerator;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.collector.collectd.grammar.CollectdTags;
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import java.io.IOException;
@@ -66,6 +65,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -230,11 +230,11 @@ public class CollectdPushCollector extends SynchronousGroupGenerator {
         }
     }
 
-    public CollectdPushCollector(@NonNull EndpointRegistration er, @NonNull SimpleGroupPath base_path, @NonNull String name) {
+    public CollectdPushCollector(@NonNull BiConsumer<String, HttpServlet> er, @NonNull SimpleGroupPath base_path, @NonNull String name) {
         if (name.isEmpty())
             throw new IllegalArgumentException("empty endpoint name");
 
-        er.addEndpoint(API_ENDPOINT_BASE + name, new Endpoint());
+        er.accept(API_ENDPOINT_BASE + name, new Endpoint());
         basePath = base_path;
     }
 

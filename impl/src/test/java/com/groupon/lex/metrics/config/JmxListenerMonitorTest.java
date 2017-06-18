@@ -73,7 +73,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -207,7 +206,6 @@ public class JmxListenerMonitorTest {
 
         verify(nbr, times(1)).resolve();
         verify(mri, times(1)).add(Mockito.any());
-        verify(mri, atLeast(0)).getApi();
         verifyNoMoreInteractions(mri, nbr);
     }
 
@@ -231,7 +229,6 @@ public class JmxListenerMonitorTest {
 
         verify(nbr, times(1)).resolve();
         verify(mri, times(1)).add(Mockito.any());
-        verify(mri, atLeast(0)).getApi();
         verifyNoMoreInteractions(mri, nbr);
     }
 
@@ -285,7 +282,6 @@ public class JmxListenerMonitorTest {
 
         verify(nbr, times(1)).resolve();
         verify(mri, times(1)).add(Mockito.any());
-        verify(mri, atLeast(0)).getApi();
         verifyNoMoreInteractions(mri, nbr);
     }
 
@@ -337,7 +333,6 @@ public class JmxListenerMonitorTest {
 
         verify(nbr, times(1)).resolve();
         verify(mri, times(1)).add(Mockito.any());
-        verify(mri, atLeast(0)).getApi();
         verifyNoMoreInteractions(mri, nbr);
     }
 

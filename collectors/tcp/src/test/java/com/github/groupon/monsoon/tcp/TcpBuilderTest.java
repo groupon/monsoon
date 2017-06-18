@@ -5,13 +5,14 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.lib.Any3;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
 import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
+import java.util.function.BiConsumer;
+import javax.servlet.http.HttpServlet;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasProperty;
 import static org.hamcrest.Matchers.instanceOf;
@@ -43,7 +44,7 @@ public class TcpBuilderTest {
     private static final GroupName EXPECTED_GROUP = GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar", "baz"), EXPECTED_TAGS);
 
     @Mock
-    private EndpointRegistration er;
+    private BiConsumer<String, HttpServlet> er;
     @Mock
     private NameBoundResolver resolver;
 

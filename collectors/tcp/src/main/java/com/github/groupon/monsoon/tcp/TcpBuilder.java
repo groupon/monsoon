@@ -38,14 +38,15 @@ import com.groupon.lex.metrics.builders.collector.AcceptAsPath;
 import com.groupon.lex.metrics.builders.collector.AcceptTagSet;
 import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
 import com.groupon.lex.metrics.builders.collector.MainNone;
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
 import com.groupon.lex.metrics.resolver.NamedResolverMap;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
+import javax.servlet.http.HttpServlet;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -59,7 +60,7 @@ public class TcpBuilder implements CollectorBuilder, MainNone, AcceptAsPath, Acc
     private NameBoundResolver tagSet;
 
     @Override
-    public ResolverGroupGenerator build(EndpointRegistration er) throws Exception {
+    public ResolverGroupGenerator build(BiConsumer<String, HttpServlet> er) throws Exception {
         final Set<Any2<Integer, String>> keySet = tagSet.getKeys().collect(Collectors.toSet());
         if (!keySet.containsAll(Arrays.asList(Any2.right("host"), Any2.right("port"))))
             throw new IllegalArgumentException("'host' and 'port' arguments must be supplied");

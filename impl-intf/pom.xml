@@ -38,11 +38,6 @@
             <artifactId>monsoon-expr</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
-        <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.4</version>
-        </dependency>
     </dependencies>
 
     <build>

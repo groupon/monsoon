@@ -40,6 +40,7 @@ import com.groupon.lex.metrics.config.ConfigurationException;
 import com.groupon.lex.metrics.config.parser.ReplayCollector.AlertStream;
 import com.groupon.lex.metrics.config.parser.ReplayCollector.DataPointIdentifier;
 import com.groupon.lex.metrics.config.parser.ReplayCollector.DataPointStream;
+import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.timeseries.Alert;
 import com.groupon.lex.metrics.timeseries.AlertState;
 import java.io.StringReader;
@@ -79,22 +80,22 @@ public abstract class AbstractAlertTest {
     protected DataPointStream newDatapoint(GroupName group, MetricName metric, Number... values) {
         return new DataPointStream(new DataPointIdentifier(group, metric),
                 Arrays.stream(values)
-                        .map(Optional::ofNullable)
-                        .map((opt) -> opt.map(MetricValue::fromNumberValue)));
+                .map(Optional::ofNullable)
+                .map((opt) -> opt.map(MetricValue::fromNumberValue)));
     }
 
     protected DataPointStream newDatapoint(GroupName group, MetricName var, Boolean... values) {
         return new DataPointStream(new DataPointIdentifier(group, var),
                 Arrays.stream(values)
-                        .map(Optional::ofNullable)
-                        .map((opt) -> opt.map(MetricValue::fromBoolean)));
+                .map(Optional::ofNullable)
+                .map((opt) -> opt.map(MetricValue::fromBoolean)));
     }
 
     protected DataPointStream newDatapoint(GroupName group, MetricName var, String... values) {
         return new DataPointStream(new DataPointIdentifier(group, var),
                 Arrays.stream(values)
-                        .map(Optional::ofNullable)
-                        .map((opt) -> opt.map(MetricValue::fromStrValue)));
+                .map(Optional::ofNullable)
+                .map((opt) -> opt.map(MetricValue::fromStrValue)));
     }
 
     protected AlertStream newDatapoint(GroupName group, AlertState... values) {
@@ -104,7 +105,9 @@ public abstract class AbstractAlertTest {
     public static final class AlertValidator implements AutoCloseable {
         private final PushMetricRegistryInstance registry_;
 
-        private AlertValidator(PushMetricRegistryInstance registry) { registry_ = registry; }
+        private AlertValidator(PushMetricRegistryInstance registry) {
+            registry_ = registry;
+        }
 
         public void validate(AlertStream... alerts) {
             final Map<GroupName, Iterator<AlertState>> expect = Arrays.stream(alerts).collect(Collectors.toMap(AlertStream::getIdentifier, AlertStream::iterator));
@@ -150,7 +153,7 @@ public abstract class AbstractAlertTest {
 
         try {
             final PushMetricRegistryInstance registry = Configuration.readFromFile(null, new StringReader(configuration))
-                    .create(PushMetricRegistryInstance::new, datetime_supplier, (pattern, handler) -> {});
+                    .create(PushMetricRegistryInstance::new, datetime_supplier, EndpointRegistration.DUMMY);
             registry.add(new ReplayCollector(input));
             return new AlertValidator(registry);
         } catch (ConfigurationException ex) {

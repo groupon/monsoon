@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics;
 
+import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.timeseries.Alert;
 import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
@@ -76,8 +77,7 @@ public class MetricRegistryInstanceTest {
     private MetricRegistryInstance.CollectionContext cctx;
 
     private MetricRegistryInstance create(boolean has_config) {
-        return new MetricRegistryInstance(has_config, (pattern, handler) -> {
-        }) {
+        return new MetricRegistryInstance(has_config, EndpointRegistration.DUMMY) {
             @Override
             protected MetricRegistryInstance.CollectionContext beginCollection(DateTime now) {
                 when(cctx.alertManager()).thenReturn((Alert alert) -> {
@@ -95,8 +95,7 @@ public class MetricRegistryInstanceTest {
     }
 
     private MetricRegistryInstance create(boolean has_config, DateTime now) {
-        return new MetricRegistryInstance(() -> now, has_config, (pattern, handler) -> {
-        }) {
+        return new MetricRegistryInstance(() -> now, has_config, EndpointRegistration.DUMMY) {
             @Override
             protected MetricRegistryInstance.CollectionContext beginCollection(DateTime now) {
                 when(cctx.alertManager()).thenReturn((Alert alert) -> {

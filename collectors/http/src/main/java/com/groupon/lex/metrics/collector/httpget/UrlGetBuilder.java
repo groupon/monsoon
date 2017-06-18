@@ -36,8 +36,9 @@ import com.groupon.lex.metrics.builders.collector.AcceptAsPath;
 import com.groupon.lex.metrics.builders.collector.AcceptTagSet;
 import com.groupon.lex.metrics.builders.collector.CollectorBuilder;
 import com.groupon.lex.metrics.builders.collector.MainString;
-import com.groupon.lex.metrics.httpd.EndpointRegistration;
 import com.groupon.lex.metrics.resolver.NameBoundResolver;
+import java.util.function.BiConsumer;
+import javax.servlet.http.HttpServlet;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -51,7 +52,7 @@ public class UrlGetBuilder implements CollectorBuilder, MainString, AcceptAsPath
     private String main;
 
     @Override
-    public UrlGetCollector build(EndpointRegistration er) throws Exception {
+    public UrlGetCollector build(BiConsumer<String, HttpServlet> er) throws Exception {
         return new UrlGetCollector(asPath, new UrlPattern(main, tagSet));
     }
 }
