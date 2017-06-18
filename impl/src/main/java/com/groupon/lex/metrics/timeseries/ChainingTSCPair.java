@@ -358,10 +358,15 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
         }
 
         private Optional<TimeSeriesValue> faultGroup(GroupName name) {
-            final TsvChain tsvChain = data.get(name);
-            if (tsvChain == null)
-                return Optional.empty();
-            return tsvChain.get(name, ts);
+            try {
+                final TsvChain tsvChain = data.get(name);
+                if (tsvChain == null)
+                    return Optional.empty();
+                return tsvChain.get(name, ts);
+            } catch (Exception ex) {
+                LOG.log(Level.WARNING, "error while retrieving historical data", ex);
+                return Optional.empty(); // Pretend data is absent.
+            }
         }
     }
 
