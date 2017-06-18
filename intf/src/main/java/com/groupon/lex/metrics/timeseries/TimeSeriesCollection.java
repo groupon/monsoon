@@ -64,12 +64,7 @@ public interface TimeSeriesCollection extends Comparable<TimeSeriesCollection> {
 
     public Optional<TimeSeriesValue> get(GroupName name);
 
-    public default TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
-        return new TimeSeriesValueSet(getGroups(name -> pathFilter.test(name.getPath()) && groupFilter.test(name)).stream()
-                .map(this::get)
-                .filter(Optional::isPresent)
-                .map(Optional::get));
-    }
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter);
 
     public default Optional<TimeSeriesValueSet> getTSDeltaByName(GroupName name) {
         return get(name)

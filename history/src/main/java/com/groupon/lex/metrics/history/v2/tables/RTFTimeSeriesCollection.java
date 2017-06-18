@@ -117,4 +117,15 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
                 .filter(grpTbl -> grpTbl.contains(index))
                 .map(grpTbl -> newTSV(name, grpTbl));
     }
+
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return new TimeSeriesValueSet(table.decodeOrThrow().entrySet().stream()
+                .filter(entry -> pathFilter.test(entry.getKey()))
+                .flatMap(entry -> entry.getValue().entrySet().stream())
+                .filter(entry -> groupFilter.test(entry.getKey()))
+                .map(grpSegmentEntry -> SimpleMapEntry.create(grpSegmentEntry.getKey(), grpSegmentEntry.getValue().decodeOrThrow()))
+                .filter(grpTblEntry -> grpTblEntry.getValue().contains(index))
+                .map(grpTblEntry -> newTSV(grpTblEntry.getKey(), grpTblEntry.getValue())));
+    }
 }

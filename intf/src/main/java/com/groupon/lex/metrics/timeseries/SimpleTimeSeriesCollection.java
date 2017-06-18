@@ -139,4 +139,12 @@ public class SimpleTimeSeriesCollection extends AbstractTimeSeriesCollection {
     public Optional<TimeSeriesValue> get(GroupName name) {
         return Optional.ofNullable(groupMap.get(name));
     }
+
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return new TimeSeriesValueSet(groupMap.entrySet().stream()
+                .filter(entry -> pathFilter.test(entry.getKey().getPath()))
+                .filter(entry -> groupFilter.test(entry.getKey()))
+                .map(Map.Entry::getValue));
+    }
 }

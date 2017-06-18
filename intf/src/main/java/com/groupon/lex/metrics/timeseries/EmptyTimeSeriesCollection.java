@@ -81,4 +81,9 @@ public class EmptyTimeSeriesCollection extends AbstractTimeSeriesCollection {
     public Optional<TimeSeriesValue> get(GroupName name) {
         return Optional.empty();
     }
+
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return TimeSeriesValueSet.EMPTY;
+    }
 }

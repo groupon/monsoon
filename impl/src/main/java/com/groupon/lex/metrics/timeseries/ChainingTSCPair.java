@@ -347,6 +347,16 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
             return tsvSet.getOrDefault(name, Optional.empty());
         }
 
+        @Override
+        public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+            return new TimeSeriesValueSet(tsvSet.entrySet().stream()
+                    .filter(entry -> pathFilter.test(entry.getKey().getPath()))
+                    .filter(entry -> groupFilter.test(entry.getKey()))
+                    .map(Map.Entry::getValue)
+                    .filter(Optional::isPresent)
+                    .map(Optional::get));
+        }
+
         private Optional<TimeSeriesValue> faultGroup(GroupName name) {
             final TsvChain tsvChain = data.get(name);
             if (tsvChain == null)

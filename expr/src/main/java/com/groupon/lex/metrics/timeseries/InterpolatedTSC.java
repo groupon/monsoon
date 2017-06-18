@@ -156,6 +156,14 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
         return current.get(name);
     }
 
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return new TimeSeriesValueSet(interpolatedTsvMap.entrySet().stream()
+                .filter(entry -> pathFilter.test(entry.getKey().getPath()))
+                .filter(entry -> groupFilter.test(entry.getKey()))
+                .map(Map.Entry::getValue));
+    }
+
     /**
      * Calculate all names that can be interpolated. The returned set will not
      * have any names present in the current collection.

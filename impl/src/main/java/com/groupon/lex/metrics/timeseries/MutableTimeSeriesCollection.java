@@ -186,6 +186,15 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
         return Optional.ofNullable(data_.get(name));
     }
 
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return new TimeSeriesValueSet(data_by_path_.entrySet().stream()
+                .filter(entry -> pathFilter.test(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .flatMap(Collection::stream)
+                .filter(tsv -> groupFilter.test(tsv.getGroup())));
+    }
+
     public Map<GroupName, TimeSeriesValue> getData() {
         return unmodifiableMap(data_);
     }

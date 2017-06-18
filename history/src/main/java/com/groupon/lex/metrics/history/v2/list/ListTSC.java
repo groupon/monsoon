@@ -141,6 +141,14 @@ public class ListTSC extends AbstractTimeSeriesCollection {
         return Optional.ofNullable(decode(data).get(name));
     }
 
+    @Override
+    public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+        return new TimeSeriesValueSet(decode(data).entrySet().stream()
+                .filter(entry -> pathFilter.test(entry.getKey().getPath()))
+                .filter(entry -> groupFilter.test(entry.getKey()))
+                .map(Map.Entry::getValue));
+    }
+
     @RequiredArgsConstructor
     private static class RecordArray {
         private final DateTime ts;

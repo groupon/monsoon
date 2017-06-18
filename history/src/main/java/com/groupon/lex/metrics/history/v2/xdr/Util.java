@@ -255,5 +255,14 @@ public class Util {
                     .map(Optional::get)
                     .findFirst();
         }
+
+        @Override
+        public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
+            return new TimeSeriesValueSet(underlying.stream()
+                    .map(tsc -> tsc.get(pathFilter, groupFilter))
+                    .flatMap(tsvSet -> tsvSet.stream())
+                    .collect(Collectors.toMap(TimeSeriesValue::getGroup, Function.identity(), (x, y) -> x)) // Conflict resolution: use first occurance.
+                    .values());
+        }
     }
 }
