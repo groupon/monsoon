@@ -50,6 +50,7 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -122,10 +123,9 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
     }
 
     @Override
-    public Set<GroupName> getGroups() {
-        Set<GroupName> groups = new HashSet<>(current.getGroups());
-        groups.addAll(interpolatedTsvMap.keySet());
-        return groups;
+    public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
+        return Stream.concat(current.getGroups(filter).stream(), interpolatedTsvMap.keySet().stream().filter(filter))
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -166,14 +166,12 @@ public class InterpolatedTSC extends AbstractTimeSeriesCollection implements Tim
      */
     private static Set<GroupName> calculateNames(TimeSeriesCollection current, Collection<TimeSeriesCollection> backward, Collection<TimeSeriesCollection> forward) {
         final Set<GroupName> names = backward.stream()
-                .map(TimeSeriesCollection::getGroups)
-                .flatMap(Collection::stream)
+                .flatMap(tsc -> tsc.getGroups(x -> true).stream())
                 .collect(Collectors.toCollection(THashSet::new));
         names.retainAll(forward.stream()
-                .map(TimeSeriesCollection::getGroups)
-                .flatMap(Collection::stream)
+                .flatMap(tsc -> tsc.getGroups(x -> true).stream())
                 .collect(Collectors.toSet()));
-        names.removeAll(current.getGroups());
+        names.removeAll(current.getGroups(x -> true));
         return names;
     }
 

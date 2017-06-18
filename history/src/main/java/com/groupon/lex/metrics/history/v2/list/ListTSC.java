@@ -54,12 +54,12 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import static java.util.Collections.unmodifiableMap;
-import static java.util.Collections.unmodifiableSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BinaryOperator;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -109,8 +109,10 @@ public class ListTSC extends AbstractTimeSeriesCollection {
     }
 
     @Override
-    public Set<GroupName> getGroups() {
-        return unmodifiableSet(decode(data).keySet());
+    public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
+        return decode(data).keySet().stream()
+                .filter(filter)
+                .collect(Collectors.toSet());
     }
 
     @Override

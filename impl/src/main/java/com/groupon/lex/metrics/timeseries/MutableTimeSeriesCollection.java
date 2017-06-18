@@ -46,8 +46,10 @@ import java.util.Map;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -154,8 +156,10 @@ public class MutableTimeSeriesCollection extends AbstractTimeSeriesCollection im
     }
 
     @Override
-    public Set<GroupName> getGroups() {
-        return unmodifiableSet(new HashSet<>(data_.keySet()));  // Copy of the keyset, since Map.keySet is a view.
+    public Set<GroupName> getGroups(Predicate<? super GroupName> predicate) {
+        return data_.keySet().stream()
+                .filter(predicate)
+                .collect(Collectors.toSet());
     }
 
     @Override

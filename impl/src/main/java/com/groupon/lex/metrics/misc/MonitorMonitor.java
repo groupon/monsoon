@@ -55,8 +55,10 @@ import org.joda.time.Duration;
 /**
  * Provides an alert for wether the monitor is running.
  *
- * The alert never fires, but is intended to be hooked up to an external alert manager,
- * which can alert if the alert hasn't been marked as OK sufficiently recently.
+ * The alert never fires, but is intended to be hooked up to an external alert
+ * manager, which can alert if the alert hasn't been marked as OK sufficiently
+ * recently.
+ *
  * @author ariane
  */
 public class MonitorMonitor implements TimeSeriesTransformer {
@@ -88,6 +90,7 @@ public class MonitorMonitor implements TimeSeriesTransformer {
 
     /**
      * Get metrics for the monitor.
+     *
      * @return All metrics for the monitor.
      */
     private Map<MetricName, MetricValue> get_metrics_(DateTime now, Context ctx) {
@@ -112,7 +115,7 @@ public class MonitorMonitor implements TimeSeriesTransformer {
 
         Map<MetricName, MetricValue> result = new HashMap<>();
         result.put(FAILED_COLLECTIONS_METRIC, MetricValue.fromIntValue(failed_collections));
-        result.put(GROUP_COUNT_METRIC, MetricValue.fromIntValue(ctx.getTSData().getCurrentCollection().getGroups().size()));
+        result.put(GROUP_COUNT_METRIC, MetricValue.fromIntValue(ctx.getTSData().getCurrentCollection().getGroups(x -> true).size()));
         result.put(METRIC_COUNT_METRIC, MetricValue.fromIntValue(metric_count));
         result.put(CONFIG_PRESENT_METRIC, MetricValue.fromBoolean(has_config));
         result.put(SCRAPE_DURATION, opt_duration_to_metricvalue_(scrape_duration));
@@ -127,6 +130,7 @@ public class MonitorMonitor implements TimeSeriesTransformer {
 
     /**
      * Emit an alert monitor.down, which is in the OK state.
+     *
      * @param ctx Rule evaluation context.
      */
     @Override
@@ -143,6 +147,7 @@ public class MonitorMonitor implements TimeSeriesTransformer {
      *
      * The returned metric value is expressed as the duration in milliseconds.
      * If the Optional is empty, an empty metric value is emitted.
+     *
      * @param duration The duration to express.
      * @return A metric value representing the duration.
      */
@@ -156,6 +161,7 @@ public class MonitorMonitor implements TimeSeriesTransformer {
      * Convert a duration to a metric value.
      *
      * The returned metric value is expressed as the duration in milliseconds.
+     *
      * @param duration The duration to express.
      * @return A metric value representing the duration.
      */

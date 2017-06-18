@@ -154,7 +154,7 @@ public class InterpolatedTSCTest {
         TimeSeriesCollection present = new SimpleTimeSeriesCollection(midDate, singletonList(new ImmutableTimeSeriesValue(GroupName.valueOf("mid", "point"), emptyMap())));
         InterpolatedTSC interpolatedTSC = new InterpolatedTSC(present, singletonList(past), singletonList(future));
 
-        assertThat(interpolatedTSC.getGroups(),
+        assertThat(interpolatedTSC.getGroups(x -> true),
                 containsInAnyOrder(TESTGROUP, GroupName.valueOf("mid", "point")));
         assertThat(interpolatedTSC.getGroupPaths(),
                 containsInAnyOrder(TESTGROUP.getPath(), SimpleGroupPath.valueOf("mid", "point")));
@@ -165,7 +165,7 @@ public class InterpolatedTSCTest {
         TimeSeriesCollection present = new SimpleTimeSeriesCollection(midDate, singletonList(presentValue));
         InterpolatedTSC interpolatedTSC = new InterpolatedTSC(present, singletonList(past), singletonList(future));
 
-        assertThat(interpolatedTSC.getGroups(),
+        assertThat(interpolatedTSC.getGroups(x -> true),
                 contains(TESTGROUP));
         assertThat(interpolatedTSC.getGroupPaths(),
                 contains(TESTGROUP.getPath()));

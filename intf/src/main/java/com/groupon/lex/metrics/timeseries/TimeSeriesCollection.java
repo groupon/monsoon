@@ -36,6 +36,7 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -50,11 +51,17 @@ public interface TimeSeriesCollection extends Comparable<TimeSeriesCollection> {
     }
 
     public DateTime getTimestamp();
+
     public boolean isEmpty();
-    public Set<GroupName> getGroups();
+
+    public Set<GroupName> getGroups(Predicate<? super GroupName> filter);
+
     public Set<SimpleGroupPath> getGroupPaths();
+
     public Collection<TimeSeriesValue> getTSValues();
+
     public TimeSeriesValueSet getTSValue(SimpleGroupPath name);
+
     public Optional<TimeSeriesValue> get(GroupName name);
 
     public default Optional<TimeSeriesValueSet> getTSDeltaByName(GroupName name) {

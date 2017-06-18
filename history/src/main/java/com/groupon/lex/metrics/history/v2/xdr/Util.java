@@ -52,6 +52,7 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.NonNull;
 import org.joda.time.DateTime;
@@ -217,9 +218,9 @@ public class Util {
         }
 
         @Override
-        public Set<GroupName> getGroups() {
+        public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
             return underlying.stream()
-                    .flatMap(tsc -> tsc.getGroups().stream())
+                    .flatMap(tsc -> tsc.getGroups(filter).stream())
                     .collect(Collectors.toSet());
         }
 

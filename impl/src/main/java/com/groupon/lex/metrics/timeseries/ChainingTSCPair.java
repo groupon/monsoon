@@ -19,11 +19,11 @@ import static java.lang.Long.min;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -303,12 +303,13 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
 
         @Override
         public boolean isEmpty() {
-            return getGroups().isEmpty();
+            return tsvSet.values().stream().noneMatch(Optional::isPresent);
         }
 
         @Override
-        public Set<GroupName> getGroups() {
+        public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
             return tsvSet.entrySet().stream()
+                    .filter(entry -> filter.test(entry.getKey()))
                     .filter(entry -> entry.getValue().isPresent())
                     .map(Map.Entry::getKey)
                     .collect(Collectors.toSet());
@@ -366,9 +367,7 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
             final long tsMillis = tsc.getTimestamp().getMillis();
             timestamps.add(tsMillis);
 
-            final List<GroupName> updateGroups = tsc.getGroups().stream()
-                    .filter(group -> !groups.containsKey(group) || tsMillis > groups.get(group))
-                    .collect(Collectors.toList());
+            final Set<GroupName> updateGroups = tsc.getGroups(group -> !groups.containsKey(group) || tsMillis > groups.get(group));
             updateGroups.forEach(group -> groups.put(group, tsMillis));
         }
 

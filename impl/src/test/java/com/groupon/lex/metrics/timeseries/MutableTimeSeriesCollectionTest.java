@@ -69,7 +69,7 @@ public class MutableTimeSeriesCollectionTest {
 
         assertEquals(t0, ts_data.getTimestamp());
         assertTrue(ts_data.getTSValues().isEmpty());
-        assertTrue(ts_data.getGroups().isEmpty());
+        assertTrue(ts_data.getGroups(x -> true).isEmpty());
         assertTrue(ts_data.isEmpty());
     }
 
@@ -81,7 +81,7 @@ public class MutableTimeSeriesCollectionTest {
         assertThat(ts_data.getTSValues().stream()
                 .collect(Collectors.toList()),
                 hasItem(ts_value));
-        assertThat(ts_data.getGroups(),
+        assertThat(ts_data.getGroups(x -> true),
                 hasItem(GroupName.valueOf(group_name, EMPTY_MAP)));
         assertFalse(ts_data.isEmpty());
     }
@@ -162,7 +162,7 @@ public class MutableTimeSeriesCollectionTest {
         assertThat(ts_data.getTSValues().stream()
                 .collect(Collectors.toList()),
                 hasItem(EXPECT_TS_AFTER_RENAME));
-        assertThat(ts_data.getGroups(),
+        assertThat(ts_data.getGroups(x -> true),
                 hasItem(GroupName.valueOf("post", "rename")));
         assertFalse(ts_data.isEmpty());
     }

@@ -43,6 +43,7 @@ import static java.util.Collections.emptyMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.joda.time.DateTime;
@@ -65,9 +66,10 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
     }
 
     @Override
-    public Set<GroupName> getGroups() {
+    public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
         return table.decodeOrThrow().values().stream()
                 .flatMap(grpMap -> grpMap.entrySet().stream())
+                .filter(groupEntry -> filter.test(groupEntry.getKey()))
                 .filter(groupEntry -> groupEntry.getValue().decodeOrThrow().contains(index))
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
