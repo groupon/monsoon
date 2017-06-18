@@ -5,8 +5,8 @@
  */
 package com.groupon.lex.metrics.history;
 
+import com.groupon.lex.metrics.timeseries.EmptyTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
-import com.groupon.lex.metrics.timeseries.MutableTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
@@ -38,9 +38,9 @@ public class HistoryContextTest {
         input = unmodifiableList(Stream.of(10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
                 .map(Duration::standardMinutes)
                 .map(now::minus)
-                .map(MutableTimeSeriesCollection::new)
+                .map(EmptyTimeSeriesCollection::new)
                 .collect(Collectors.toList()));
-        dummy = new MutableTimeSeriesCollection(now.minus(Duration.standardDays(7)));
+        dummy = new EmptyTimeSeriesCollection(now.minus(Duration.standardDays(7)));
         LOG.log(Level.INFO, "now={0}", now);
         LOG.log(Level.INFO, "input={0}", input);
     }
@@ -53,16 +53,16 @@ public class HistoryContextTest {
                 .collect(Collectors.toList());
         LOG.log(Level.INFO, "visited={0}", visited);
 
-        assertSame(input.get( 0), visited.get( 0));
-        assertSame(input.get( 1), visited.get( 1));
-        assertSame(input.get( 2), visited.get( 2));
-        assertSame(input.get( 3), visited.get( 3));
-        assertSame(input.get( 4), visited.get( 4));
-        assertSame(input.get( 5), visited.get( 5));
-        assertSame(input.get( 6), visited.get( 6));
-        assertSame(input.get( 7), visited.get( 7));
-        assertSame(input.get( 8), visited.get( 8));
-        assertSame(input.get( 9), visited.get( 9));
+        assertSame(input.get(0), visited.get(0));
+        assertSame(input.get(1), visited.get(1));
+        assertSame(input.get(2), visited.get(2));
+        assertSame(input.get(3), visited.get(3));
+        assertSame(input.get(4), visited.get(4));
+        assertSame(input.get(5), visited.get(5));
+        assertSame(input.get(6), visited.get(6));
+        assertSame(input.get(7), visited.get(7));
+        assertSame(input.get(8), visited.get(8));
+        assertSame(input.get(9), visited.get(9));
         assertSame(input.get(10), visited.get(10));
     }
 
@@ -74,16 +74,16 @@ public class HistoryContextTest {
                 .collect(Collectors.toList());
         LOG.log(Level.INFO, "visited={0}", visited);
 
-        assertEquals(input.get( 0).getTimestamp(), visited.get( 1).getTimestamp());
-        assertEquals(input.get( 1).getTimestamp(), visited.get( 2).getTimestamp());
-        assertEquals(input.get( 2).getTimestamp(), visited.get( 3).getTimestamp());
-        assertEquals(input.get( 3).getTimestamp(), visited.get( 4).getTimestamp());
-        assertEquals(input.get( 4).getTimestamp(), visited.get( 5).getTimestamp());
-        assertEquals(input.get( 5).getTimestamp(), visited.get( 6).getTimestamp());
-        assertEquals(input.get( 6).getTimestamp(), visited.get( 7).getTimestamp());
-        assertEquals(input.get( 7).getTimestamp(), visited.get( 8).getTimestamp());
-        assertEquals(input.get( 8).getTimestamp(), visited.get( 9).getTimestamp());
-        assertEquals(input.get( 9).getTimestamp(), visited.get(10).getTimestamp());
+        assertEquals(input.get(0).getTimestamp(), visited.get(1).getTimestamp());
+        assertEquals(input.get(1).getTimestamp(), visited.get(2).getTimestamp());
+        assertEquals(input.get(2).getTimestamp(), visited.get(3).getTimestamp());
+        assertEquals(input.get(3).getTimestamp(), visited.get(4).getTimestamp());
+        assertEquals(input.get(4).getTimestamp(), visited.get(5).getTimestamp());
+        assertEquals(input.get(5).getTimestamp(), visited.get(6).getTimestamp());
+        assertEquals(input.get(6).getTimestamp(), visited.get(7).getTimestamp());
+        assertEquals(input.get(7).getTimestamp(), visited.get(8).getTimestamp());
+        assertEquals(input.get(8).getTimestamp(), visited.get(9).getTimestamp());
+        assertEquals(input.get(9).getTimestamp(), visited.get(10).getTimestamp());
     }
 
     @Test
@@ -95,16 +95,16 @@ public class HistoryContextTest {
         LOG.log(Level.INFO, "visited.size()={0}", visited.size());
         LOG.log(Level.INFO, "visited={0}", visited);
 
-        assertEquals(input.get( 0).getTimestamp(), visited.get( 1));
-        assertEquals(input.get( 1).getTimestamp(), visited.get( 2));
-        assertEquals(input.get( 2).getTimestamp(), visited.get( 3));
-        assertEquals(input.get( 3).getTimestamp(), visited.get( 4));
-        assertEquals(input.get( 4).getTimestamp(), visited.get( 5));
-        assertEquals(input.get( 5).getTimestamp(), visited.get( 6));
-        assertEquals(input.get( 6).getTimestamp(), visited.get( 7));
-        assertEquals(input.get( 7).getTimestamp(), visited.get( 8));
-        assertEquals(input.get( 8).getTimestamp(), visited.get( 9));
-        assertEquals(input.get( 9).getTimestamp(), visited.get(10));
+        assertEquals(input.get(0).getTimestamp(), visited.get(1));
+        assertEquals(input.get(1).getTimestamp(), visited.get(2));
+        assertEquals(input.get(2).getTimestamp(), visited.get(3));
+        assertEquals(input.get(3).getTimestamp(), visited.get(4));
+        assertEquals(input.get(4).getTimestamp(), visited.get(5));
+        assertEquals(input.get(5).getTimestamp(), visited.get(6));
+        assertEquals(input.get(6).getTimestamp(), visited.get(7));
+        assertEquals(input.get(7).getTimestamp(), visited.get(8));
+        assertEquals(input.get(8).getTimestamp(), visited.get(9));
+        assertEquals(input.get(9).getTimestamp(), visited.get(10));
     }
 
     @Test
@@ -115,14 +115,14 @@ public class HistoryContextTest {
                 .collect(Collectors.toList());
         LOG.log(Level.INFO, "visited={0}", visited);
 
-        assertEquals(input.get( 0).getTimestamp(), visited.get( 2).getTimestamp());
-        assertEquals(input.get( 1).getTimestamp(), visited.get( 3).getTimestamp());
-        assertEquals(input.get( 2).getTimestamp(), visited.get( 4).getTimestamp());
-        assertEquals(input.get( 3).getTimestamp(), visited.get( 5).getTimestamp());
-        assertEquals(input.get( 4).getTimestamp(), visited.get( 6).getTimestamp());
-        assertEquals(input.get( 5).getTimestamp(), visited.get( 7).getTimestamp());
-        assertEquals(input.get( 6).getTimestamp(), visited.get( 8).getTimestamp());
-        assertEquals(input.get( 7).getTimestamp(), visited.get( 9).getTimestamp());
-        assertEquals(input.get( 8).getTimestamp(), visited.get(10).getTimestamp());
+        assertEquals(input.get(0).getTimestamp(), visited.get(2).getTimestamp());
+        assertEquals(input.get(1).getTimestamp(), visited.get(3).getTimestamp());
+        assertEquals(input.get(2).getTimestamp(), visited.get(4).getTimestamp());
+        assertEquals(input.get(3).getTimestamp(), visited.get(5).getTimestamp());
+        assertEquals(input.get(4).getTimestamp(), visited.get(6).getTimestamp());
+        assertEquals(input.get(5).getTimestamp(), visited.get(7).getTimestamp());
+        assertEquals(input.get(6).getTimestamp(), visited.get(8).getTimestamp());
+        assertEquals(input.get(7).getTimestamp(), visited.get(9).getTimestamp());
+        assertEquals(input.get(8).getTimestamp(), visited.get(10).getTimestamp());
     }
 }

@@ -12,7 +12,7 @@ import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport0;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport1;
-import com.groupon.lex.metrics.timeseries.MutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.nio.file.Files;
@@ -70,7 +70,7 @@ public class UnmappedReadonlyTSDataFileTest {
         tsdata = new ArrayList<>();
         for (int i = 0; i < 100; ++i) {
             tsdata.add(new SimpleTimeSeriesCollection(now.plusMinutes(i), Stream.of(
-                    new MutableTimeSeriesValue(
+                    new ImmutableTimeSeriesValue(
                             GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar")),
                             singletonMap(MetricName.valueOf("x"), MetricValue.fromIntValue(i))))));
         }

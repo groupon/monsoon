@@ -30,7 +30,7 @@
         </dependency>
         <dependency>
             <groupId>com.github.groupon.monsoon</groupId>
-            <artifactId>monsoon-engine</artifactId>
+            <artifactId>monsoon-impl-intf</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>

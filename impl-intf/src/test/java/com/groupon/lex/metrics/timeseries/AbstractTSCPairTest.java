@@ -23,7 +23,7 @@ public class AbstractTSCPairTest {
         public TimeSeriesCollection current;
 
         public Impl(DateTime now) {
-            current = new MutableTimeSeriesCollection(now);
+            current = new EmptyTimeSeriesCollection(now);
         }
 
         @Override
@@ -38,7 +38,7 @@ public class AbstractTSCPairTest {
 
     private DateTime now;
     private Impl impl;
-    private List<MutableTimeSeriesCollection> input;
+    private List<TimeSeriesCollection> input;
 
     private void setup(ExpressionLookBack lookback) {
         now = new DateTime(DateTimeZone.UTC);
@@ -48,14 +48,15 @@ public class AbstractTSCPairTest {
         input = unmodifiableList(Stream.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
                 .map(Duration::standardMinutes)
                 .map(now::minus)
-                .map(MutableTimeSeriesCollection::new)
+                .map(EmptyTimeSeriesCollection::new)
                 .collect(Collectors.toList()));
         LOG.log(Level.INFO, "input = {0}", input);
         impl.current = input.get(0);
         Stream.of(10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
                 .map(input::get)
                 .peek(tsc -> LOG.log(Level.INFO, "impl.update({0})", tsc))
-                .forEach(tsc -> impl.update(tsc, lookback, () -> {}));
+                .forEach(tsc -> impl.update(tsc, lookback, () -> {
+                }));
         LOG.log(Level.INFO, "impl = {0}", impl.debugString());
     }
 

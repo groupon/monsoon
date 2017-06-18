@@ -25,6 +25,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonMap;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -44,7 +45,6 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.acplt.oncrpc.OncRpcException;
-import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -72,7 +72,7 @@ public class TSDataFileChain extends SequenceTSData {
                 }
             });
     private final Path dir_;
-    private final Set<Key> readKeys = new ConcurrentHashSet<>();
+    private final Set<Key> readKeys = new HashSet<>();
     private Optional<AppendFile> appendFile = Optional.empty();
     private final ReentrantReadWriteLock guard = new ReentrantReadWriteLock(true);  // Protects readKeys and appendFile.
 
@@ -574,7 +574,7 @@ public class TSDataFileChain extends SequenceTSData {
         final ReentrantReadWriteLock.ReadLock lock = guard.readLock();
         lock.lock();
         try {
-            return Collections.unmodifiableSet(readKeys);
+            return Collections.unmodifiableSet(new HashSet<>(readKeys));
         } finally {
             lock.unlock();
         }

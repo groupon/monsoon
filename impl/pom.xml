@@ -41,6 +41,11 @@
         </dependency>
         <dependency>
             <groupId>com.github.groupon.monsoon</groupId>
+            <artifactId>monsoon-impl-intf</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.groupon.monsoon</groupId>
             <artifactId>monsoon-collector-http</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
