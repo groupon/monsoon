@@ -53,9 +53,16 @@ import com.groupon.monsoon.remote.history.xdr.duration_msec;
 import com.groupon.monsoon.remote.history.xdr.evaluate_iter_response;
 import com.groupon.monsoon.remote.history.xdr.evaluate_iter_response_success;
 import com.groupon.monsoon.remote.history.xdr.evaluate_response;
+import com.groupon.monsoon.remote.history.xdr.group_stream_iter_response;
+import com.groupon.monsoon.remote.history.xdr.group_stream_iter_response_success;
+import com.groupon.monsoon.remote.history.xdr.group_stream_response;
 import com.groupon.monsoon.remote.history.xdr.histogram_entry;
 import com.groupon.monsoon.remote.history.xdr.iter_result_code;
 import com.groupon.monsoon.remote.history.xdr.list_of_timeseries_collection;
+import com.groupon.monsoon.remote.history.xdr.list_of_timestamped_tsfile_record;
+import com.groupon.monsoon.remote.history.xdr.literals_group_name;
+import com.groupon.monsoon.remote.history.xdr.literals_metric_value;
+import com.groupon.monsoon.remote.history.xdr.literals_tag;
 import com.groupon.monsoon.remote.history.xdr.metric_value;
 import com.groupon.monsoon.remote.history.xdr.metrickind;
 import com.groupon.monsoon.remote.history.xdr.named_evaluation;
@@ -76,6 +83,7 @@ import com.groupon.monsoon.remote.history.xdr.tags;
 import com.groupon.monsoon.remote.history.xdr.timeseries_collection;
 import com.groupon.monsoon.remote.history.xdr.timeseries_metric_delta_set;
 import com.groupon.monsoon.remote.history.xdr.timestamp_msec;
+import com.groupon.monsoon.remote.history.xdr.timestamped_tsfile_record;
 import com.groupon.monsoon.remote.history.xdr.tsfile_record;
 import com.groupon.monsoon.remote.history.xdr.tsfile_record_entry;
 import java.util.ArrayList;
@@ -317,6 +325,154 @@ public class EncDec {
 
     public static Duration decodeDuration(duration_msec d) {
         return new Duration(d.value);
+    }
+
+    public static group_stream_iter_response encodeStreamGroupIterResponse(IterErrorResponse r) {
+        group_stream_iter_response result = new group_stream_iter_response();
+        result.result = r.getError().getEncoded();
+        return result;
+    }
+
+    public static group_stream_iter_response encodeStreamGroupIterResponse(IterSuccessResponse<Map.Entry<DateTime, TimeSeriesValue>> r) {
+        group_stream_iter_response result = new group_stream_iter_response();
+        result.result = iter_result_code.SUCCESS;
+        result.response = new group_stream_iter_response_success();
+        result.response.last = r.isLast();
+        result.response.rv = encodeStreamGroup(r.getData());
+        result.response.cookie = r.getCookie();
+        return result;
+    }
+
+    public static Any2<IterSuccessResponse<Map.Entry<DateTime, TimeSeriesValue>>, IterErrorResponse> decodeStreamGroupIterResponse(group_stream_iter_response r) {
+        final Any2<IterSuccessResponse<Map.Entry<DateTime, TimeSeriesValue>>, IterErrorResponse> result;
+        switch (r.result) {
+            case iter_result_code.SUCCESS:
+                result = Any2.left(new IterSuccessResponseImpl<>(decodeStreamGroup(r.response.rv), r.response.last, r.response.cookie));
+                break;
+            default:
+                result = Any2.right(new IterErrorResponse(IteratorErrorCode.fromEncodedForm(r.result)));
+        }
+        return result;
+    }
+
+    public static group_stream_response encodeStreamGroupResponse(NewIterResponse<Map.Entry<DateTime, TimeSeriesValue>> r) {
+        group_stream_response result = new group_stream_response();
+        result.iter_id = r.getIterIdx();
+        result.first_response = new group_stream_iter_response_success();
+        result.first_response.last = r.isLast();
+        result.first_response.rv = encodeStreamGroup(r.getData());
+        result.first_response.cookie = r.getCookie();
+        return result;
+    }
+
+    public static NewIterResponse<Map.Entry<DateTime, TimeSeriesValue>> decodeStreamGroupResponse(group_stream_response r) {
+        return new NewIterResponse<>(r.iter_id, decodeStreamGroup(r.first_response.rv), r.first_response.last, r.first_response.cookie);
+    }
+
+    public static list_of_timestamped_tsfile_record encodeStreamGroup(Collection<Map.Entry<DateTime, TimeSeriesValue>> data) {
+        final ActiveDict dict = new ActiveDict();
+        final list_of_timestamped_tsfile_record result = new list_of_timestamped_tsfile_record();
+        result.records = data.stream()
+                .map(entry -> {
+                    final DictDelta dd = new DictDelta(dict);
+                    timestamped_tsfile_record r = new timestamped_tsfile_record();
+                    r.ts = encodeTimestamp(entry.getKey());
+                    r.record = encodeTSV(dd, entry.getValue());
+                    r.dd = dd.encodedForm();
+                    return r;
+                })
+                .toArray(timestamped_tsfile_record[]::new);
+        return result;
+    }
+
+    public static List<Map.Entry<DateTime, TimeSeriesValue>> decodeStreamGroup(list_of_timestamped_tsfile_record r) {
+        final ActiveDict dict = new ActiveDict();
+        return Arrays.stream(r.records)
+                .map(record -> {
+                    final DateTime ts = decodeTimestamp(record.ts);
+                    dict.apply(record.dd);
+                    return SimpleMapEntry.create(ts, decodeTSV(dict, ts, record.record));
+                })
+                .collect(Collectors.toList());
+    }
+
+    public static literals_group_name encodeLiteralsGroupName(GroupName g) {
+        literals_group_name result = new literals_group_name();
+        result.group_path = new path();
+        result.group_path.elems = g.getPath().getPath().stream()
+                .map(path_elem::new)
+                .toArray(path_elem[]::new);
+        result.tags = g.getTags().stream()
+                .map(tag -> {
+                    literals_tag lt = new literals_tag();
+                    lt.name = tag.getKey();
+                    lt.value = encodeLiteralsMetricValue(tag.getValue());
+                    return lt;
+                })
+                .toArray(literals_tag[]::new);
+        return result;
+    }
+
+    public static GroupName decodeLiteralsGroupName(literals_group_name g) {
+        final SimpleGroupPath simplePath = SimpleGroupPath.valueOf(Arrays.stream(g.group_path.elems)
+                .map(pathElem -> pathElem.value)
+                .toArray(String[]::new));
+        final Tags tags = Tags.valueOf(Arrays.stream(g.tags)
+                .map(tag -> SimpleMapEntry.create(tag.name, decodeLiteralsMetricValue(tag.value))));
+        return GroupName.valueOf(simplePath, tags);
+    }
+
+    public static literals_metric_value encodeLiteralsMetricValue(MetricValue mv) {
+        literals_metric_value result = new literals_metric_value();
+        result.kind = metrickind.EMPTY;
+        if (mv.getBoolValue() != null) {
+            result.kind = metrickind.BOOL;
+            result.bool_value = mv.getBoolValue();
+        }
+        if (mv.getIntValue() != null) {
+            result.kind = metrickind.INT;
+            result.int_value = mv.getIntValue();
+        }
+        if (mv.getFltValue() != null) {
+            result.kind = metrickind.FLOAT;
+            result.dbl_value = mv.getFltValue();
+        }
+        if (mv.getStrValue() != null) {
+            result.kind = metrickind.STRING;
+            result.str_value = mv.getStrValue();
+        }
+        if (mv.getHistValue() != null) {
+            result.kind = metrickind.HISTOGRAM;
+            result.hist_value = encodeHistValue(mv.getHistValue());
+        }
+        return result;
+    }
+
+    public static MetricValue decodeLiteralsMetricValue(literals_metric_value mv) {
+        final MetricValue result;
+        switch (mv.kind) {
+            case metrickind.BOOL:
+                result = MetricValue.fromBoolean(mv.bool_value);
+                break;
+            case metrickind.INT:
+                result = MetricValue.fromIntValue(mv.int_value);
+                break;
+            case metrickind.FLOAT:
+                result = MetricValue.fromDblValue(mv.dbl_value);
+                break;
+            case metrickind.STRING:
+                result = MetricValue.fromStrValue(mv.str_value);
+                break;
+            case metrickind.HISTOGRAM:
+                result = MetricValue.fromHistValue(decodeHistValue(mv.hist_value));
+                break;
+            case metrickind.EMPTY:
+                result = MetricValue.EMPTY;
+                break;
+            default:
+                throw new IllegalArgumentException("metric kind " + mv.kind + " not recognized");
+        }
+        return result;
     }
 
     public static named_evaluation_map encodeEvaluationMap(Map<String, ? extends TimeSeriesMetricExpression> expressions) {

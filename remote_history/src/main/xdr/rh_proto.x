@@ -6,6 +6,16 @@ struct path {
     path_elem elems<>;
 };
 
+struct literals_tag {
+    string name<>;
+    literals_metric_value value;
+};
+
+struct literals_group_name {
+    path group_path;
+    literals_tag tags<>;
+};
+
 enum metrickind {
     BOOL = 0,
     INT = 1,
@@ -29,6 +39,21 @@ case FLOAT:
     double dbl_value;
 case STRING:
     int str_dict_ref;
+case HISTOGRAM:
+    histogram_entry hist_value<>;
+case EMPTY:
+    /* skip */
+};
+
+union literals_metric_value switch(metrickind kind) {
+case BOOL:
+    bool bool_value;
+case INT:
+    hyper int_value;
+case FLOAT:
+    double dbl_value;
+case STRING:
+    string str_value<>;
 case HISTOGRAM:
     histogram_entry hist_value<>;
 case EMPTY:
@@ -83,6 +108,12 @@ struct tsfile_record {
     tsfile_record_entry metrics<>;
 };
 
+struct timestamped_tsfile_record {
+    timestamp_msec ts;
+    dictionary_delta *dd;
+    tsfile_record record;
+};
+
 struct timeseries_collection {
     timestamp_msec ts;
     dictionary_delta *dd;
@@ -91,6 +122,10 @@ struct timeseries_collection {
 
 struct list_of_timeseries_collection {
     timeseries_collection collections<>;
+};
+
+struct list_of_timestamped_tsfile_record {
+    timestamped_tsfile_record records<>;
 };
 
 struct tagged_metric_value {
@@ -138,6 +173,19 @@ case UNKNOWN_ITER:
     void;
 };
 
+struct group_stream_iter_response_success {
+    hyper cookie;
+    bool last;
+    list_of_timestamped_tsfile_record rv;
+};
+
+union group_stream_iter_response switch(iter_result_code result) {
+case SUCCESS:
+    group_stream_iter_response_success response;
+case UNKNOWN_ITER:
+    void;
+};
+
 struct stream_response {
     hyper iter_id;
     stream_iter_tsc_response_success first_response;
@@ -159,6 +207,11 @@ case UNKNOWN_ITER:
 struct evaluate_response {
     hyper iter_id;
     evaluate_iter_response_success first_response;
+};
+
+struct group_stream_response {
+    hyper iter_id;
+    group_stream_iter_response_success first_response;
 };
 
 
@@ -184,5 +237,9 @@ program rhistory {
         evaluate_response evaluate(named_evaluation_map, duration_msec, int) = 210;
         evaluate_response evaluateFrom(named_evaluation_map, timestamp_msec, duration_msec, int) = 211;
         evaluate_response evaluateFromTo(named_evaluation_map, timestamp_msec, timestamp_msec, duration_msec, int) = 212;
+
+        group_stream_iter_response streamGroupIterNext(hyper, hyper, int) = 300;
+        void closeGroupIter(hyper, hyper) = 301;
+        group_stream_response streamGroup(timestamp_msec, literals_group_name, int) = 310;
     } = 1;
 } = 0x20131719;

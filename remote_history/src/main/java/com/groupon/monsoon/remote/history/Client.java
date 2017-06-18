@@ -31,10 +31,12 @@
  */
 package com.groupon.monsoon.remote.history;
 
+import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.lib.Any2;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
+import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import static com.groupon.monsoon.remote.history.EncDec.decodeTimestamp;
 import static com.groupon.monsoon.remote.history.EncDec.encodeTSCCollection;
 import com.groupon.monsoon.remote.history.xdr.list_of_timeseries_collection;
@@ -70,12 +72,16 @@ import org.joda.time.DateTime;
 import org.joda.time.Duration;
 
 public class Client implements CollectHistory {
-    /** Default port for the RPC server. */
+    /**
+     * Default port for the RPC server.
+     */
     public static final int DEFAULT_PORT = 9996;
     private static final int TSC_INITIAL_BATCH_SIZE = 10;
     private static final int TSC_BATCH_SIZE = 50;
     private static final int EVAL_INITIAL_BATCH_SIZE = 50;
     private static final int EVAL_BATCH_SIZE = 250;
+    private static final int STREAM_GROUP_INITIAL_BATCH_SIZE = 5000;
+    private static final int STREAM_GROUP_BATCH_SIZE = 25000;
     private static final Logger LOG = Logger.getLogger(Client.class.getName());
     private final InetAddress host;
     private final int port;
@@ -111,13 +117,17 @@ public class Client implements CollectHistory {
         return client;
     }
 
-    /** Add a TimeSeriesCollection to the history. */
+    /**
+     * Add a TimeSeriesCollection to the history.
+     */
     @Override
     public boolean add(TimeSeriesCollection tsv) {
         return addAll(singletonList(tsv));
     }
 
-    /** Add multiple TimeSeriesCollections to the history. */
+    /**
+     * Add multiple TimeSeriesCollections to the history.
+     */
     @Override
     public boolean addAll(Collection<? extends TimeSeriesCollection> c) {
         try {
@@ -136,6 +146,7 @@ public class Client implements CollectHistory {
 
     /**
      * Check disk space usage (bytes).
+     *
      * @return The disk space used for storing metrics.
      */
     @Override
@@ -155,6 +166,7 @@ public class Client implements CollectHistory {
 
     /**
      * Return the highest timestamp in the stored metrics.
+     *
      * @return The highest timestamp in the stored metrics.
      */
     @Override
@@ -174,6 +186,7 @@ public class Client implements CollectHistory {
 
     /**
      * Iterate the history in reverse chronological order.
+     *
      * @return A TimeSeriesCollection stream, in reverse chronological order.
      */
     @Override
@@ -203,6 +216,7 @@ public class Client implements CollectHistory {
 
     /**
      * Iterate the entire history.
+     *
      * @return A TimeSeriesCollection stream, in chronological order.
      */
     @Override
@@ -232,6 +246,7 @@ public class Client implements CollectHistory {
 
     /**
      * Iterate the entire history.
+     *
      * @param stepSizeArg The minimum time difference between metrics.
      * @return A TimeSeriesCollection stream, in chronological order.
      */
@@ -268,6 +283,7 @@ public class Client implements CollectHistory {
 
     /**
      * Iterate the history, starting at the given timestamp.
+     *
      * @param begin The timestamp from which to start iterating the history.
      * @return A TimeSeriesCollection stream, in chronological order.
      */
@@ -295,6 +311,7 @@ public class Client implements CollectHistory {
 
     /**
      * Iterate the history, starting at the given timestamp.
+     *
      * @param begin The timestamp from which to start iterating the history.
      * @param stepSizeArg The minimum time difference between metrics.
      * @return A TimeSeriesCollection stream, in chronological order.
@@ -329,8 +346,10 @@ public class Client implements CollectHistory {
 
     /**
      * Iterate the history, between the given timestamps.
+     *
      * @param begin The timestamp from which to start iterating the history.
-     * @param end The timestamp (inclusive) at which to stop iterating the history.
+     * @param end The timestamp (inclusive) at which to stop iterating the
+     * history.
      * @return A TimeSeriesCollection stream, in chronological order.
      */
     @Override
@@ -357,8 +376,10 @@ public class Client implements CollectHistory {
 
     /**
      * Iterate the history, between the given timestamps.
+     *
      * @param begin The timestamp from which to start iterating the history.
-     * @param end The timestamp (inclusive) at which to stop iterating the history.
+     * @param end The timestamp (inclusive) at which to stop iterating the
+     * history.
      * @param stepSizeArg The minimum time difference between metrics.
      * @return A TimeSeriesCollection stream, in chronological order.
      */
@@ -392,7 +413,9 @@ public class Client implements CollectHistory {
 
     /**
      * Evaluate expressions over the history.
-     * @param expression The query describing one or more expressions to evaluate.
+     *
+     * @param expression The query describing one or more expressions to
+     * evaluate.
      * @param stepSizeArg The minimum time difference between metrics.
      * @return A stream of evaluations, in chronological order.
      */
@@ -419,10 +442,10 @@ public class Client implements CollectHistory {
                     },
                     (data) -> {
                         return data.stream()
-                                .flatMap(Collection::stream)
-                                .map(NamedEvaluation::getDatetime)
-                                .max(Comparator.naturalOrder())
-                                .map(ts -> ts.plus(stepSize));
+                        .flatMap(Collection::stream)
+                        .map(NamedEvaluation::getDatetime)
+                        .max(Comparator.naturalOrder())
+                        .map(ts -> ts.plus(stepSize));
                     },
                     null);
             return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iter, NONNULL | IMMUTABLE | ORDERED), false);
@@ -434,7 +457,9 @@ public class Client implements CollectHistory {
 
     /**
      * Evaluate expressions over the history, starting at the given timestamp.
-     * @param expression The query describing one or more expressions to evaluate.
+     *
+     * @param expression The query describing one or more expressions to
+     * evaluate.
      * @param begin The starting point for iteration.
      * @param stepSizeArg The minimum time difference between metrics.
      * @return A stream of evaluations, in chronological order.
@@ -459,10 +484,10 @@ public class Client implements CollectHistory {
                     },
                     (data) -> {
                         return data.stream()
-                                .flatMap(Collection::stream)
-                                .map(NamedEvaluation::getDatetime)
-                                .max(Comparator.naturalOrder())
-                                .map(ts -> ts.plus(stepSize));
+                        .flatMap(Collection::stream)
+                        .map(NamedEvaluation::getDatetime)
+                        .max(Comparator.naturalOrder())
+                        .map(ts -> ts.plus(stepSize));
                     },
                     begin);
             return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iter, NONNULL | IMMUTABLE | ORDERED), false);
@@ -474,7 +499,9 @@ public class Client implements CollectHistory {
 
     /**
      * Evaluate expressions over the history, between the given timestamps.
-     * @param expression The query describing one or more expressions to evaluate.
+     *
+     * @param expression The query describing one or more expressions to
+     * evaluate.
      * @param begin The starting point for iteration.
      * @param end The end point (inclusive) for iteration.
      * @param stepSizeArg The minimum time difference between metrics.
@@ -500,10 +527,34 @@ public class Client implements CollectHistory {
                     },
                     (data) -> {
                         return data.stream()
-                                .flatMap(Collection::stream)
-                                .map(NamedEvaluation::getDatetime)
-                                .max(Comparator.naturalOrder())
-                                .map(ts -> ts.plus(stepSize));
+                        .flatMap(Collection::stream)
+                        .map(NamedEvaluation::getDatetime)
+                        .max(Comparator.naturalOrder())
+                        .map(ts -> ts.plus(stepSize));
+                    },
+                    begin);
+            return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iter, NONNULL | IMMUTABLE | ORDERED), false);
+        } catch (OncRpcException | IOException ex) {
+            LOG.log(Level.SEVERE, "stream RPC call failed", ex);
+            throw new RuntimeException("RPC call failed", ex);
+        }
+    }
+
+    @Override
+    public Stream<Map.Entry<DateTime, TimeSeriesValue>> streamGroup(DateTime begin, GroupName group) {
+        try {
+            final RpcIterator<Map.Entry<DateTime, TimeSeriesValue>> iter = new RpcIterator<>(
+                    getRpcClient(OncRpcProtocols.ONCRPC_TCP),
+                    (rh_protoClient rpcClient, DateTime ts) -> {
+                        return EncDec.decodeStreamGroupResponse(rpcClient.streamGroup_1(EncDec.encodeTimestamp(ts), EncDec.encodeLiteralsGroupName(group), STREAM_GROUP_INITIAL_BATCH_SIZE));
+                    },
+                    (rh_protoClient rpcClient, long id, long cookie) -> {
+                        return EncDec.decodeStreamGroupIterResponse(rpcClient.streamGroupIterNext_1(id, cookie, STREAM_GROUP_BATCH_SIZE));
+                    },
+                    (data) -> {
+                        if (data.isEmpty())
+                            return Optional.empty();
+                        return Optional.of(data.get(data.size() - 1).getKey().plus(1));
                     },
                     begin);
             return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iter, NONNULL | IMMUTABLE | ORDERED), false);
@@ -530,10 +581,10 @@ public class Client implements CollectHistory {
         private final RpcContinue<T> continueCall;
 
         public RpcIterator(@NonNull rh_protoClient rpcClient,
-                @NonNull RpcCall<DateTime, EncDec.NewIterResponse<T>> restartCall,
-                @NonNull RpcContinue<T> continueCall,
-                @NonNull Function<List<? extends T>, Optional<DateTime>> computeRestartTs,
-                DateTime initialTime) throws IOException, OncRpcException {
+                           @NonNull RpcCall<DateTime, EncDec.NewIterResponse<T>> restartCall,
+                           @NonNull RpcContinue<T> continueCall,
+                           @NonNull Function<List<? extends T>, Optional<DateTime>> computeRestartTs,
+                           DateTime initialTime) throws IOException, OncRpcException {
             this.rpcClient = rpcClient;
             this.restartTS = initialTime;
             this.computeRestartTs = computeRestartTs;
@@ -570,7 +621,7 @@ public class Client implements CollectHistory {
         public T next() {
             ensureNextValues();
             if (nextValues.isEmpty()) {
-                assert(fin);
+                assert (fin);
                 throw new NoSuchElementException("no more values");
             }
             return nextValues.remove(0);
@@ -582,7 +633,7 @@ public class Client implements CollectHistory {
 
         private void loadNextValues() {
             if (fin) return;
-            assert(nextValues.isEmpty());
+            assert (nextValues.isEmpty());
 
             do {
                 final Any2<EncDec.IterSuccessResponse<T>, EncDec.IterErrorResponse> response;
@@ -600,7 +651,7 @@ public class Client implements CollectHistory {
                 }
 
                 final Optional<EncDec.IterErrorResponse> lost = response.getRight();
-                assert(lost.isPresent());
+                assert (lost.isPresent());
                 switch (lost.get().getError()) {
                     case UNKNOWN_ITERATOR:
                         restart();
@@ -610,7 +661,7 @@ public class Client implements CollectHistory {
         }
 
         private void applyValues(EncDec.IterSuccessResponse<T> sr) {
-            assert(this.nextValues.isEmpty());
+            assert (this.nextValues.isEmpty());
             this.nextValues = sr.getData();
             this.fin = sr.isLast();
             this.cookie = sr.getCookie();
@@ -654,7 +705,9 @@ public class Client implements CollectHistory {
         public Any2<EncDec.IterSuccessResponse<T>, EncDec.IterErrorResponse> call(rh_protoClient rpcClient, long id, long cookie) throws IOException, OncRpcException;
     }
 
-    /** Wrapper around RPC calls, to play nice with ForkJoinPool. */
+    /**
+     * Wrapper around RPC calls, to play nice with ForkJoinPool.
+     */
     @RequiredArgsConstructor
     private static class BlockingWrapper<T> implements ForkJoinPool.ManagedBlocker {
         private T result;
@@ -670,7 +723,10 @@ public class Client implements CollectHistory {
         }
 
         public static void execute(RpcRunnable call) throws InterruptedException, IOException, OncRpcException, RuntimeException {
-            final BlockingWrapper<Void> blocker = new BlockingWrapper<>(() -> { call.call(); return null; });
+            final BlockingWrapper<Void> blocker = new BlockingWrapper<>(() -> {
+                call.call();
+                return null;
+            });
             ForkJoinPool.managedBlock(blocker);
             blocker.get();  // Propagate exceptions.
         }
