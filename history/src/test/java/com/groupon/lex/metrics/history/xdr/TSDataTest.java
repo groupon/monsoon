@@ -11,6 +11,7 @@ import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.history.TSData;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.list.FileListFileSupport;
 import com.groupon.lex.metrics.history.v2.tables.FileTableFileSupport;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
@@ -37,6 +38,9 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.Setter;
 import org.hamcrest.Matchers;
 import org.hamcrest.collection.IsIterableContainingInOrder;
 import org.joda.time.DateTime;
@@ -302,6 +306,15 @@ public class TSDataTest {
     }
 
     private class TSDataMock implements TSData {
+        @NonNull
+        @Getter
+        @Setter
+        private Compression appendCompression = Compression.DEFAULT_APPEND;
+        @NonNull
+        @Getter
+        @Setter
+        private Compression optimizedCompression = Compression.DEFAULT_OPTIMIZED;
+
         @Override
         public DateTime getBegin() {
             return NOW;

@@ -1,5 +1,6 @@
 package com.groupon.lex.metrics;
 
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.DirCollectHistory;
 import com.groupon.lex.metrics.lib.BufferedIterator;
 import java.io.IOException;
@@ -25,6 +26,12 @@ public class FileConvert {
 
     @Option(name = "-v", usage = "verbose")
     private boolean verbose = false;
+
+    @Option(name = "-C", usage = "compression for active file", handler = Compression.CompressionOptionHandler.class)
+    private Compression compression = Compression.DEFAULT_APPEND;
+
+    @Option(name = "-O", usage = "optimized-compression for archived data", handler = Compression.CompressionOptionHandler.class)
+    private Compression optimizedCompression = Compression.DEFAULT_OPTIMIZED;
 
     @Argument(metaVar = "/src/dir", usage = "path: which dir contains source files", index = 0)
     private String srcdir;
@@ -78,6 +85,8 @@ public class FileConvert {
     public void run() throws IOException {
         final DirCollectHistory src = new DirCollectHistory(srcdir_path_);
         final DirCollectHistory dst = new DirCollectHistory(dstdir_path_);
+        dst.setAppendCompression(compression);
+        dst.setOptimizedCompression(optimizedCompression);
         BufferedIterator.stream(ForkJoinPool.commonPool(), src.stream())
                 .forEach(dst::add);
 

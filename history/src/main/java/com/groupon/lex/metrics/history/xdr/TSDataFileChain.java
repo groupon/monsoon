@@ -4,6 +4,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.groupon.lex.metrics.history.TSData;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.list.RWListFile;
 import com.groupon.lex.metrics.history.v2.xdr.Util;
 import com.groupon.lex.metrics.history.xdr.TSDataScanDir.MetaData;
@@ -43,6 +44,7 @@ import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.Value;
 import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
@@ -75,6 +77,15 @@ public class TSDataFileChain extends SequenceTSData {
     private final Set<Key> readKeys = new HashSet<>();
     private Optional<AppendFile> appendFile = Optional.empty();
     private final ReentrantReadWriteLock guard = new ReentrantReadWriteLock(true);  // Protects readKeys and appendFile.
+
+    @NonNull
+    @Getter
+    @Setter
+    private volatile Compression appendCompression = Compression.DEFAULT_APPEND;
+    @NonNull
+    @Getter
+    @Setter
+    private volatile Compression optimizedCompression = Compression.DEFAULT_OPTIMIZED;
 
     private static SequenceTSData getFile(Key key) throws IOException {
         try {
@@ -225,7 +236,7 @@ public class TSDataFileChain extends SequenceTSData {
         try {
             final FileUtil.NamedFileChannel newFile = FileUtil.createNewFile(dir_, prefix, ".tsd");
             try {
-                final RWListFile fd = RWListFile.newFile(new GCCloseable<>(newFile.getFileChannel()));
+                final RWListFile fd = RWListFile.newFile(new GCCloseable<>(newFile.getFileChannel()), appendCompression);
                 final AppendFile newAppendFile = new AppendFile(newFile.getFileName(), fd);
                 installAppendFile(newAppendFile);
                 return newAppendFile;
@@ -387,6 +398,7 @@ public class TSDataFileChain extends SequenceTSData {
         LOG.log(Level.INFO, "kicking off optimization of {0}", keys.stream().map(Key::getFile).collect(Collectors.toList()));
 
         CompletableFuture<Void> task = new TSDataOptimizerTask(dir_)
+                .withCompression(optimizedCompression)
                 .addAll(files.values())
                 .run()
                 .thenAccept((newFile) -> {
