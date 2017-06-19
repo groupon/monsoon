@@ -32,6 +32,7 @@
 package com.groupon.monsoon.remote.history.server;
 
 import com.groupon.lex.metrics.history.CollectHistory;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.DirCollectHistory;
 import com.groupon.lex.metrics.lib.BytesParser.BytesParserOptionHandler;
 import com.groupon.monsoon.remote.history.CollectHistoryServer;
@@ -67,6 +68,12 @@ public class RhistMain {
 
     @Option(name = "-O", usage = "optimize existing files")
     private boolean optimizeOld = false;
+
+    @Option(name = "--compress", usage = "compression for active file", handler = Compression.CompressionOptionHandler.class)
+    private Compression compression = Compression.DEFAULT_APPEND;
+
+    @Option(name = "--archive-compress", usage = "optimized-compression for archived data", handler = Compression.CompressionOptionHandler.class)
+    private Compression optimizedCompression = Compression.DEFAULT_OPTIMIZED;
 
     @Argument(metaVar = "/path/to/history/dir", usage = "path: which dir contains the history files", index = 0)
     private String dir;
@@ -123,6 +130,8 @@ public class RhistMain {
 
     private CollectHistory openHistory() throws IOException {
         DirCollectHistory history = new DirCollectHistory(path_, size);
+        history.setAppendCompression(compression);
+        history.setOptimizedCompression(optimizedCompression);
         if (optimizeOld)
             history.optimizeOldFiles();
         return history;

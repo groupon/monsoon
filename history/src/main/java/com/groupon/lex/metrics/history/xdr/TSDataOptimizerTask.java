@@ -25,6 +25,7 @@ import java.util.logging.Logger;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -74,6 +75,11 @@ public class TSDataOptimizerTask {
      * for temporary files.
      */
     private final Path destDir;
+
+    @NonNull
+    @Getter
+    @Setter
+    private Compression compression = Compression.DEFAULT_OPTIMIZED;
 
     /**
      * List of files to add to the generated tables file.
@@ -149,6 +155,17 @@ public class TSDataOptimizerTask {
     }
 
     /**
+     * Use the specified compression method for creating the optimized file.
+     *
+     * @param compression The compression method to use.
+     * @return this TSDataOptimizerTask.
+     */
+    public TSDataOptimizerTask withCompression(Compression compression) {
+        setCompression(compression);
+        return this;
+    }
+
+    /**
      * Start creating the optimized file. This operation resets the state of the
      * optimizer task, so it can be re-used for subsequent invocations.
      *
@@ -158,7 +175,7 @@ public class TSDataOptimizerTask {
         LOG.log(Level.FINE, "starting optimized file creation for {0} files", files.size());
         CompletableFuture<NewFile> fileCreation = new CompletableFuture<>();
         final List<TSData> fjpFiles = this.files;  // We clear out files below, which makes createTmpFile see an empty map if we don't use a separate variable.
-        TASK_POOL.execute(() -> createTmpFile(fileCreation, destDir, fjpFiles));
+        TASK_POOL.execute(() -> createTmpFile(fileCreation, destDir, fjpFiles, getCompression()));
         synchronized (OUTSTANDING) {
             OUTSTANDING.add(fileCreation);
         }
@@ -177,7 +194,7 @@ public class TSDataOptimizerTask {
      * temporary file creation.
      * @param files the list of files that make up the resulting file.
      */
-    private static void createTmpFile(CompletableFuture<NewFile> fileCreation, Path destDir, List<TSData> files) {
+    private static void createTmpFile(CompletableFuture<NewFile> fileCreation, Path destDir, List<TSData> files, Compression compression) {
         LOG.log(Level.FINE, "starting temporary file creation...");
 
         try {
@@ -186,7 +203,7 @@ public class TSDataOptimizerTask {
             final FileChannel fd = FileUtil.createTempFile(destDir, "monsoon-", ".optimize-tmp");
             try {
                 final DateTime begin;
-                try (ToXdrTables output = new ToXdrTables(fd, Compression.DEFAULT_OPTIMIZED)) {
+                try (ToXdrTables output = new ToXdrTables(fd, compression)) {
                     while (!files.isEmpty()) {
                         TSData tsdata = files.remove(0);
                         if (fileCreation.isCancelled())
@@ -199,7 +216,7 @@ public class TSDataOptimizerTask {
                         throw new IOException("aborted due to canceled execution");
                 }  // Closing output takes a lot of time.
 
-                if (fileCreation.isCancelled())  // Recheck after closing output.
+                if (fileCreation.isCancelled()) // Recheck after closing output.
                     throw new IOException("aborted due to canceled execution");
 
                 // Forward the temporary file to the installation, which will complete the operation.

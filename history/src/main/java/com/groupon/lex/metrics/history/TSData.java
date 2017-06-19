@@ -1,5 +1,6 @@
 package com.groupon.lex.metrics.history;
 
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.support.SequenceTSData;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -48,6 +49,34 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
      * Retrieve the filesize used by the TSData.
      */
     public long getFileSize();
+
+    /**
+     * Get the compression used for append files.
+     *
+     * @return The compression used for append files.
+     */
+    public Compression getAppendCompression();
+
+    /**
+     * Set the compression used for append files.
+     *
+     * @param compression The compression used for append files.
+     */
+    public void setAppendCompression(Compression compression);
+
+    /**
+     * Get the compression used for optimized files.
+     *
+     * @return The compression used for optimized files.
+     */
+    public Compression getOptimizedCompression();
+
+    /**
+     * Set the compression used for optimized files.
+     *
+     * @param compression The compression used for optimized files.
+     */
+    public void setOptimizedCompression(Compression compression);
 
     /**
      * Returns the major version of the TSData file. Note that this is the

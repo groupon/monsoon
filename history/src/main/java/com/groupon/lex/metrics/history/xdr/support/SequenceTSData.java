@@ -2,6 +2,7 @@ package com.groupon.lex.metrics.history.xdr.support;
 
 import com.google.common.collect.Iterators;
 import com.groupon.lex.metrics.history.TSData;
+import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.lib.sequence.EqualRange;
 import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
 import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
@@ -148,5 +149,25 @@ public abstract class SequenceTSData implements TSData {
                 return false;
         }
         return true;
+    }
+
+    @Override
+    public Compression getAppendCompression() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public void setAppendCompression(Compression compression) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public Compression getOptimizedCompression() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public void setOptimizedCompression(Compression compression) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 }
