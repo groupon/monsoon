@@ -175,16 +175,8 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
             return timestamps.size();
         }
 
-        public boolean contains(long v) {
-            return timestamps.binarySearch(v) >= 0;
-        }
-
         public long get(int idx) {
             return timestamps.get(timestamps.size() - 1 - idx);
-        }
-
-        public LongStream streamReverse() {
-            return LongStream.of(timestamps.toArray());
         }
 
         public LongStream stream() {
