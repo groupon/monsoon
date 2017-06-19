@@ -27,10 +27,10 @@ public class FileConvert {
     @Option(name = "-v", usage = "verbose")
     private boolean verbose = false;
 
-    @Option(name = "-C", usage = "compression for active file", handler = Compression.CompressionOptionHandler.class)
+    @Option(name = "--compress", usage = "compression for active file", handler = Compression.CompressionOptionHandler.class)
     private Compression compression = Compression.DEFAULT_APPEND;
 
-    @Option(name = "-O", usage = "optimized-compression for archived data", handler = Compression.CompressionOptionHandler.class)
+    @Option(name = "--archive-compress", usage = "optimized-compression for archived data", handler = Compression.CompressionOptionHandler.class)
     private Compression optimizedCompression = Compression.DEFAULT_OPTIMIZED;
 
     @Argument(metaVar = "/src/dir", usage = "path: which dir contains source files", index = 0)
