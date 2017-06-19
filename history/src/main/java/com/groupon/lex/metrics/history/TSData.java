@@ -1,6 +1,7 @@
 package com.groupon.lex.metrics.history;
 
 import com.groupon.lex.metrics.history.v2.Compression;
+import com.groupon.lex.metrics.history.xdr.ColumnMajorTSData;
 import com.groupon.lex.metrics.history.xdr.support.SequenceTSData;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -254,4 +255,13 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
      * descriptor. Returns Optional.empty() for memory mapped files.
      */
     public Optional<GCCloseable<FileChannel>> getFileChannel();
+
+    /**
+     * Returns the data in column major format.
+     *
+     * The TSData instance may perform expensive computation to make this work.
+     *
+     * @return The data in column major format.
+     */
+    public ColumnMajorTSData asColumnMajorTSData();
 }
