@@ -390,7 +390,7 @@ public class EncDec {
         return Arrays.stream(r.records)
                 .map(record -> {
                     final DateTime ts = decodeTimestamp(record.ts);
-                    dict.apply(record.dd);
+                    if (record.dd != null) dict.apply(record.dd);
                     return SimpleMapEntry.create(ts, decodeTSV(dict, ts, record.record));
                 })
                 .collect(Collectors.toList());
