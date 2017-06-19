@@ -37,11 +37,13 @@ import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.CollectHistory;
+import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
+import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.util.Collection;
@@ -87,6 +89,7 @@ public class ClientServerTest {
     private static final int COUNT = 100;
     private static final Logger LOG = Logger.getLogger(ClientServerTest.class.getName());
     private static final DateTime T0 = new DateTime(DateTimeZone.UTC);
+    private static final GroupName TEST_GROUP = GroupName.valueOf(SimpleGroupPath.valueOf("test", "group"), Tags.valueOf(singletonMap("x", MetricValue.fromStrValue("x"))));
 
     @Mock
     private CollectHistory history;
@@ -204,6 +207,22 @@ public class ClientServerTest {
         assertEquals(expected, result);
 
         verify(history, times(1)).stream();
+        verifyNoMoreInteractions(history);
+    }
+
+    @Test
+    public void streamGroup() {
+        final List<Map.Entry<DateTime, TimeSeriesValue>> expected = generateCollection()
+                .map(tsc -> SimpleMapEntry.create(tsc.getTimestamp(), tsc.get(TEST_GROUP).get()))
+                .collect(Collectors.toList());
+        when(history.streamGroup(Mockito.isA(DateTime.class), Mockito.any()))
+                .thenAnswer((invocation) -> expected.stream());
+
+        final List<Map.Entry<DateTime, TimeSeriesValue>> result = client.streamGroup(T0, TEST_GROUP).collect(Collectors.toList());
+
+        assertEquals(expected, result);
+
+        verify(history, times(1)).streamGroup(Mockito.eq(T0), Mockito.eq(TEST_GROUP));
         verifyNoMoreInteractions(history);
     }
 
@@ -435,14 +454,13 @@ public class ClientServerTest {
 
     private static Stream<TimeSeriesCollection> generateCollection() {
         final MetricName metricName = MetricName.valueOf("counter");
-        final GroupName groupName = GroupName.valueOf(SimpleGroupPath.valueOf("test", "group"), Tags.valueOf(singletonMap("x", MetricValue.fromStrValue("x"))));
 
         return generate()
                 .limit(COUNT)
                 .map(i -> {
                     final DateTime t = T0.plus(Duration.standardSeconds(10 * i));
                     final MetricValue counter = MetricValue.fromIntValue(i);
-                    return new SimpleTimeSeriesCollection(t, Stream.of(new ImmutableTimeSeriesValue(groupName, singletonMap(metricName, counter))));
+                    return new SimpleTimeSeriesCollection(t, Stream.of(new ImmutableTimeSeriesValue(TEST_GROUP, singletonMap(metricName, counter))));
                 });
     }
 
