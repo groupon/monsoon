@@ -27,6 +27,7 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import lombok.NonNull;
@@ -109,7 +110,7 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
     }
 
     private void apply_lookback_(ExpressionLookBack lookBack) {
-        final TLongHashSet retainTs = lookBack.filter(new ForwardIterator<>(timestamps.streamReverse().mapToObj(TSCollectionImpl::new).iterator()))
+        final TLongHashSet retainTs = lookBack.filter(new ForwardIterator<>(timestamps.stream().mapToObj(TSCollectionImpl::new).iterator()))
                 .map(TimeSeriesCollection::getTimestamp)
                 .mapToLong(DateTime::getMillis)
                 .collect(TLongHashSet::new, TLongHashSet::add, TLongHashSet::addAll);
@@ -184,6 +185,11 @@ public abstract class ChainingTSCPair implements TimeSeriesCollectionPair {
 
         public LongStream streamReverse() {
             return LongStream.of(timestamps.toArray());
+        }
+
+        public LongStream stream() {
+            return IntStream.range(0, size())
+                    .mapToLong(this::get);
         }
 
         public DateTime front() {

@@ -9,6 +9,7 @@ import java.util.Collections;
 import static java.util.Collections.EMPTY_MAP;
 import static java.util.Collections.singleton;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -20,6 +21,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.runners.MockitoJUnitRunner;
 
@@ -29,6 +32,8 @@ public class ChainingTSCPairTest {
     private CollectHistory history;
     @Mock
     private TimeSeriesCollection current;
+    @Mock
+    private Runnable runnable;
 
     private static final DateTime TS0 = DateTime.now(DateTimeZone.UTC);
     private static final GroupName GROUP_NAME = GroupName.valueOf("GROUP");
@@ -64,5 +69,35 @@ public class ChainingTSCPairTest {
         assertSame(current, tsdata.getPreviousCollection(0).get());
         assertEquals(tsc1, tsdata.getPreviousCollection());
         assertEquals(tsc2, tsdata.getPreviousCollection(2).get());
+    }
+
+    @Test
+    public void cycle() {
+        final TimeSeriesCollection update = new EmptyTimeSeriesCollection(TS0.minus(Duration.standardSeconds(15)));
+        class Impl extends ChainingTSCPair {
+            public Impl(CollectHistory history, ExpressionLookBack lookback) {
+                super(history, lookback);
+            }
+
+            @Override
+            public TimeSeriesCollection getCurrentCollection() {
+                return current;
+            }
+
+            public void updateCycle() {
+                update(update, ExpressionLookBack.fromScrapeCount(2), runnable);
+            }
+        }
+        Impl tsdata = new Impl(history, ExpressionLookBack.fromScrapeCount(3));
+
+        tsdata.updateCycle();
+
+        assertEquals(3, tsdata.size());
+        assertSame(current, tsdata.getPreviousCollection(0).get());
+        assertEquals(update, tsdata.getPreviousCollection(1).get());
+        assertEquals(tsc1, tsdata.getPreviousCollection(2).get());
+        assertEquals(Optional.empty(), tsdata.getPreviousCollection(3));
+
+        verify(runnable, times(1)).run();
     }
 }
