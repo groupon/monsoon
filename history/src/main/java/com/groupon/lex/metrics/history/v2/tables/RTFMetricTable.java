@@ -49,26 +49,26 @@ import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.history.xdr.support.IntegrityException;
 
 public class RTFMetricTable {
-    private final MtBoolValues m_bool;
-    private final Mt16BitValues m_16bit;
-    private final Mt32BitValues m_32bit;
-    private final Mt64BitValues m_64bit;
-    private final MtDblValues m_dbl;
-    private final MtStrValues m_str;
-    private final MtHistValues m_hist;
-    private final MtEmptyValues m_empty;
-    private final MtOtherValues m_other;
+    private final MtTable m_bool;
+    private final MtTable m_16bit;
+    private final MtTable m_32bit;
+    private final MtTable m_64bit;
+    private final MtTable m_dbl;
+    private final MtTable m_str;
+    private final MtTable m_hist;
+    private final MtTable m_empty;
+    private final MtTable m_other;
 
     public RTFMetricTable(metric_table input, DictionaryDelta dictionary) {
-        m_bool = new MtBoolValues(input.metrics_bool);
-        m_16bit = new Mt16BitValues(input.metrics_16bit);
-        m_32bit = new Mt32BitValues(input.metrics_32bit);
-        m_64bit = new Mt64BitValues(input.metrics_64bit);
-        m_dbl = new MtDblValues(input.metrics_dbl);
-        m_str = new MtStrValues(input.metrics_str, dictionary);
-        m_hist = new MtHistValues(input.metrics_hist);
-        m_empty = new MtEmptyValues(input.metrics_hist);
-        m_other = new MtOtherValues(input.metrics_other, dictionary);
+        m_bool = optimizeEmpty(new MtBoolValues(input.metrics_bool));
+        m_16bit = optimizeEmpty(new Mt16BitValues(input.metrics_16bit));
+        m_32bit = optimizeEmpty(new Mt32BitValues(input.metrics_32bit));
+        m_64bit = optimizeEmpty(new Mt64BitValues(input.metrics_64bit));
+        m_dbl = optimizeEmpty(new MtDblValues(input.metrics_dbl));
+        m_str = optimizeEmpty(new MtStrValues(input.metrics_str, dictionary));
+        m_hist = optimizeEmpty(new MtHistValues(input.metrics_hist));
+        m_empty = optimizeEmpty(new MtEmptyValues(input.metrics_hist));
+        m_other = optimizeEmpty(new MtOtherValues(input.metrics_other, dictionary));
     }
 
     public boolean contains(int index) {
@@ -170,6 +170,15 @@ public class RTFMetricTable {
 
             if (innerSize() != expectedCount)
                 throw new IntegrityException("mismatch in metric table encoding");
+        }
+
+        public final boolean isEmpty() {
+            final int size = innerSize();
+            for (int idx = 0; idx < size; ++idx) {
+                if (contains(idx))
+                    return false;
+            }
+            return true;
         }
 
         protected abstract MetricValue doGet(int innerIdx);
@@ -350,4 +359,22 @@ public class RTFMetricTable {
             return values.length;
         }
     }
+
+    private static <T extends MtTable> MtTable optimizeEmpty(T table) {
+        return (table.isEmpty() ? EMPTY_TABLE : table);
+    }
+
+    private static final bitset EMPTY_BITSET = new bitset(new short[]{});
+
+    private static final MtTable EMPTY_TABLE = new MtTable(EMPTY_BITSET) {
+        @Override
+        protected MetricValue doGet(int innerIdx) {
+            return null;
+        }
+
+        @Override
+        protected int innerSize() {
+            return 0;
+        }
+    };
 }
