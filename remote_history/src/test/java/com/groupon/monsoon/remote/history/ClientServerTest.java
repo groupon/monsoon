@@ -32,6 +32,7 @@
 package com.groupon.monsoon.remote.history;
 
 import com.groupon.lex.metrics.GroupName;
+import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
@@ -49,6 +50,7 @@ import java.net.Inet4Address;
 import java.util.Collection;
 import java.util.Collections;
 import static java.util.Collections.reverse;
+import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import java.util.List;
 import java.util.Map;
@@ -369,6 +371,68 @@ public class ClientServerTest {
                 Mockito.eq(end),
                 Mockito.eq(stepSize));
         verifyNoMoreInteractions(history);
+    }
+
+    /**
+     * Test encoding/decoding using a specific metric value. The test uses the
+     * StreamGroup method and puts the metric value in both the requested group
+     * name and the returned response.
+     *
+     * This ensures both literal and dictionary-based encoding of the metric
+     * value is tested.
+     *
+     * @param metricValue The metric value to test encoding/decoding on.
+     */
+    private void typedEncodingDecodingTest(MetricValue metricValue) {
+        final GroupName testGroup;
+        if (!metricValue.isPresent() || metricValue.getHistValue() != null)
+            testGroup = TEST_GROUP; // Empty and histogram are not valid in tags.
+        else
+            testGroup = GroupName.valueOf(SimpleGroupPath.valueOf("x", "y"), Tags.valueOf(singletonMap("z", metricValue)));
+
+        final List<Map.Entry<DateTime, TimeSeriesValue>> expected = singletonList(SimpleMapEntry.create(T0, new ImmutableTimeSeriesValue(testGroup, singletonMap(MetricName.valueOf("foo"), metricValue))));
+        when(history.streamGroup(Mockito.isA(DateTime.class), Mockito.any()))
+                .thenAnswer((invocation) -> expected.stream());
+
+        final List<Map.Entry<DateTime, TimeSeriesValue>> result = client.streamGroup(T0, testGroup).collect(Collectors.toList());
+
+        assertEquals(expected, result);
+        verify(history, times(1)).streamGroup(Mockito.eq(T0), Mockito.eq(testGroup));
+    }
+
+    @Test
+    public void typedEncodingDecodingEmpty() {
+        typedEncodingDecodingTest(MetricValue.EMPTY);
+    }
+
+    @Test
+    public void typedEncodingDecodingTrue() {
+        typedEncodingDecodingTest(MetricValue.TRUE);
+    }
+
+    @Test
+    public void typedEncodingDecodingFalse() {
+        typedEncodingDecodingTest(MetricValue.TRUE);
+    }
+
+    @Test
+    public void typedEncodingDecodingInt() {
+        typedEncodingDecodingTest(MetricValue.fromIntValue(19));
+    }
+
+    @Test
+    public void typedEncodingDecodingFloat() {
+        typedEncodingDecodingTest(MetricValue.fromDblValue(Math.E));
+    }
+
+    @Test
+    public void typedEncodingDecodingString() {
+        typedEncodingDecodingTest(MetricValue.fromStrValue("chocoladevla"));
+    }
+
+    @Test
+    public void typedEncodingDecodingHistogram() {
+        typedEncodingDecodingTest(MetricValue.fromHistValue(new Histogram(new Histogram.RangeWithCount(0.1, 0.9, 7.3), new Histogram.RangeWithCount(5.9, 5.98, Math.PI))));
     }
 
     // Triggers the min-timeout durations.
