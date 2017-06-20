@@ -205,8 +205,12 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
             @Override
             public Iterator<Map.Entry<DateTime, MetricValue>> iterator() {
                 return StreamSupport.stream(Spliterators.spliteratorUnknownSize(groupData.iterator(timestamps), 0), false)
-                        .map(timestampedTsv -> SimpleMapEntry.create(timestampedTsv.getTimestamp(), timestampedTsv.getTsv().get(metric)))
-                        .filter(entry -> entry.getValue() != null)
+                        .map(timestampedTsv -> {
+                            final MetricValue metricValue = timestampedTsv.getTsv().get(metric);
+                            if (metricValue == null) return null;
+                            return SimpleMapEntry.create(timestampedTsv.getTimestamp(), metricValue);
+                        })
+                        .filter(entry -> entry != null)
                         .iterator();
             }
 
