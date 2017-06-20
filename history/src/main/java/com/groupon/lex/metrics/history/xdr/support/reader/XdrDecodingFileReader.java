@@ -43,7 +43,7 @@ import org.acplt.oncrpc.XdrDecodingStream;
 
 public class XdrDecodingFileReader extends XdrDecodingStream implements Closeable {
     private static final int MIN_BUFSIZ = 4;
-    private static final int DEFAULT_BUFSIZ = 64 * 1024;
+    private static final int DEFAULT_BUFSIZ = 128;
     private final FileReader in;
     private final ByteBuffer buf;
 
