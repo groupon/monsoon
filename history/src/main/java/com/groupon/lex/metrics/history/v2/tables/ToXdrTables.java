@@ -136,6 +136,8 @@ public class ToXdrTables implements Closeable {
                     .distinct()
                     .sorted()
                     .collect(TLongArrayList::new, TLongArrayList::add, TLongArrayList::addAll));
+            if (timestamps.isEmpty())
+                throw new IllegalStateException("empty tables file is not allowed");
             tsBegin = new DateTime(timestamps.get(0).get(0), DateTimeZone.UTC);
             tsEnd = new DateTime(timestamps.get(timestamps.size() - 1).get(timestamps.get(timestamps.size() - 1).size() - 1));
 
