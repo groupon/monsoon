@@ -40,9 +40,14 @@ public class TSDataOptimizerTask {
     /**
      * The task pool handles the creation of temporary files containing all
      * data. The task is highly CPU bound (especially the gathering of data
-     * stage in ToXdrTables).
+     * stage in ToXdrTables). Limiting it to 1 thread ensures the tasks don't
+     * overwhelm the ForkJoinPool and the limit of 1 thread means multiple
+     * compression actions will be queued one-after-the-other.
+     *
+     * The task itself mainly uses the ForkJoinPool, so this thread spends most
+     * of the time waiting for work to complete (or new work to come in).
      */
-    private static final ExecutorService TASK_POOL = Executors.newFixedThreadPool(Integer.max(1, Runtime.getRuntime().availableProcessors() - 1));
+    private static final ExecutorService TASK_POOL = Executors.newFixedThreadPool(1);
 
     /**
      * The install pool handles the file installation part of creating a new
@@ -53,7 +58,7 @@ public class TSDataOptimizerTask {
      * separate thread from the task pool, to allow the task pool to pick up a
      * new file while the old file is being written out.
      */
-    private static final ExecutorService INSTALL_POOL = Executors.newFixedThreadPool(2);
+    private static final ExecutorService INSTALL_POOL = Executors.newFixedThreadPool(1);
 
     /**
      * List of outstanding futures. The list is used during program termination
