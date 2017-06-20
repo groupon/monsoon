@@ -254,7 +254,7 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
             return new IteratorImpl(tmpFile, timestamps);
         }
 
-        private class IteratorImpl implements Iterator<TimestampedTsv> {
+        private static class IteratorImpl implements Iterator<TimestampedTsv> {
             private final TLongIterator timestampIter;
             private final Iterator<XdrAbleMetricMap> inner;
             private DictionaryDelta dictionary = new DictionaryDelta();
