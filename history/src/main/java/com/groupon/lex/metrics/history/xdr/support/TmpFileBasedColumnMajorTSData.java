@@ -352,7 +352,9 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
 
     @Value
     private static class TimestampedTsv {
+        @NonNull
         private final DateTime timestamp;
+        @NonNull
         private final Map<MetricName, MetricValue> tsv;
     }
 }
