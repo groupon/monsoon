@@ -180,6 +180,13 @@ public class ReadonlyTableFile extends SequenceTSData implements ColumnMajorTSDa
     }
 
     @Override
+    public Collection<DateTime> getGroupTimestamps(GroupName group) {
+        return body.decodeOrThrow().getBlocks().stream()
+                .flatMap(block -> getGroupTimestamps(block, group))
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public Set<MetricName> getMetricNames(GroupName group) {
         return body.map(tables -> tables.getGroupReaders(group)).decodeOrThrow().stream()
                 .map(segmentReader -> {
@@ -213,6 +220,17 @@ public class ReadonlyTableFile extends SequenceTSData implements ColumnMajorTSDa
         return IntStream.range(0, timestamps.length)
                 .filter(idx -> metrics[idx] != null)
                 .mapToObj(idx -> SimpleMapEntry.create(new DateTime(timestamps[idx], DateTimeZone.UTC), metrics[idx]));
+    }
+
+    private static Stream<DateTime> getGroupTimestamps(RTFFileDataTablesBlock block, GroupName group) {
+        final long[] timestamps = block.getTimestamps();
+        final SegmentReader<RTFGroupTable> groupTable = block.getTable().decodeOrThrow().getOrDefault(group.getPath(), emptyMap()).get(group);
+        if (groupTable == null)
+            return Stream.empty();
+
+        return IntStream.range(0, timestamps.length)
+                .filter(groupTable.decodeOrThrow()::contains)
+                .mapToObj(idx -> new DateTime(timestamps[idx], DateTimeZone.UTC));
     }
 
     @Override

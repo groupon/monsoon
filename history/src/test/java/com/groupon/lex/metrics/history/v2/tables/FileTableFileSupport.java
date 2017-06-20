@@ -46,8 +46,9 @@ import java.util.Collection;
 public class FileTableFileSupport implements FileSupport.Writer {
     @Override
     public void create_file(TSDataVersionDispatch.Releaseable<FileChannel> fd, Collection<? extends TimeSeriesCollection> tsdata, boolean compress) throws IOException {
-        try (ToXdrTables newTables = new ToXdrTables(fd.get(), compress ? Compression.DEFAULT_OPTIMIZED : Compression.NONE)) {
+        try (ToXdrTables newTables = new ToXdrTables()) {
             newTables.addAll(tsdata);
+            newTables.build(fd.get(), compress ? Compression.DEFAULT_OPTIMIZED : Compression.NONE);
         }
     }
 

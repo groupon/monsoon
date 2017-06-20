@@ -24,6 +24,14 @@ public interface ColumnMajorTSData {
     public Set<GroupName> getGroupNames();
 
     /**
+     * Retrieve all timestamps at which this group exists.
+     *
+     * @return The timestamps at which the group exists. Timestamps may be
+     * unordered.
+     */
+    public Collection<DateTime> getGroupTimestamps(GroupName group);
+
+    /**
      * Retrieve all metric names in the specific group.
      *
      * @param group The group for which to look up metric names.

@@ -34,30 +34,25 @@ package com.groupon.lex.metrics.history.v2.tables;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.SimpleGroupPath;
+import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
-import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
-import static com.groupon.lex.metrics.history.v2.xdr.ToXdr.createPresenceBitset;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables_block;
 import com.groupon.lex.metrics.history.v2.xdr.group_table;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
-import com.groupon.lex.metrics.history.v2.xdr.metric_value;
 import com.groupon.lex.metrics.history.v2.xdr.tables;
 import com.groupon.lex.metrics.history.v2.xdr.tables_group;
 import com.groupon.lex.metrics.history.v2.xdr.tables_metric;
 import com.groupon.lex.metrics.history.v2.xdr.tables_tag;
-import com.groupon.lex.metrics.history.v2.xdr.timestamp_msec;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
 import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.writeMimeHeader;
-import com.groupon.lex.metrics.history.xdr.support.FJPTaskExecutor;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import com.groupon.lex.metrics.history.xdr.support.Monitor;
-import com.groupon.lex.metrics.history.xdr.support.TmpFile;
+import com.groupon.lex.metrics.history.xdr.support.TmpFileBasedColumnMajorTSData;
 import com.groupon.lex.metrics.history.xdr.support.writer.AbstractSegmentWriter.Writer;
 import com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter;
 import static com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingFileWriter.CRC_LEN;
@@ -65,41 +60,40 @@ import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
-import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
-import gnu.trove.iterator.TIntIterator;
+import gnu.trove.iterator.TLongIterator;
+import gnu.trove.list.TLongList;
+import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.TLongIntMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
-import gnu.trove.set.TLongSet;
-import gnu.trove.set.hash.TLongHashSet;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
+import static java.util.Collections.emptyList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.OptionalInt;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.function.IntFunction;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrAble;
-import org.acplt.oncrpc.XdrDecodingStream;
-import org.acplt.oncrpc.XdrEncodingStream;
+import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
 /**
@@ -110,327 +104,419 @@ import org.joda.time.DateTimeZone;
  *
  * @author ariane
  */
-@RequiredArgsConstructor
 public class ToXdrTables implements Closeable {
     private static final Logger LOG = Logger.getLogger(ToXdrTables.class.getName());
     private static final int HDR_SPACE = MIME_HEADER_LEN + HDR_3_LEN + CRC_LEN;
     private static final int MAX_BLOCK_RECORDS = 10000;
-    private static final Compression TMPFILE_COMPRESSION = Compression.SNAPPY;
-    @NonNull
-    private final FileChannel out;
-    @NonNull
-    private final Compression compression;
 
-    private final TLongSet timestamps = new TLongHashSet();
-    private final ConcurrentMap<GroupName, GroupTmpFile> groups = new ConcurrentHashMap<>(1000, 0.5f, FJPTaskExecutor.DEFAULT_CONCURRENCY);
-    private DictionaryForWrite dictionary;
-    private final List<file_data_tables_block> blocks = new ArrayList<>();
-    private Long firstTs = null, lastTs = null;  // Timestamps in current block.
-    private long fileOffset = HDR_SPACE;
-    @Getter
-    private Long hdrBegin, hdrEnd;  // Timestamps for the entire file.
-
-    public void add(@NonNull TimeSeriesCollection tsc) throws IOException {
-        final long ts0 = System.currentTimeMillis();
-        try {
-            final long timestamp = tsc.getTimestamp().toDateTime(DateTimeZone.UTC).getMillis();
-            if (hdrBegin == null)
-                hdrBegin = timestamp;
-            else
-                hdrBegin = Long.min(hdrBegin, timestamp);
-            if (hdrEnd == null)
-                hdrEnd = timestamp;
-            else
-                hdrEnd = Long.max(hdrEnd, timestamp);
-
-            try {
-                // Decide if we should flush out the current block.
-                if (firstTs != null && lastTs != null) {
-                    assert !timestamps.isEmpty();
-                    boolean flushNow = timestamps.size() >= MAX_BLOCK_RECORDS;
-                    if (timestamp > lastTs && timestamp - lastTs > Integer.MAX_VALUE)
-                        flushNow = true;
-                    if (timestamp < firstTs && firstTs - timestamp > Integer.MAX_VALUE)
-                        flushNow = true;
-                    if (flushNow) {
-                        LOG.log(Level.INFO, "creating block {0}", blocks.size());
-                        blocks.add(createBlock(new Context()));
-                    }
-                }
-                // Update firstTs and lastTs for current block.
-                if (firstTs != null) {  // Existing block.
-                    assert lastTs != null;
-                    assert !timestamps.isEmpty();
-                    assert dictionary != null;
-                    firstTs = Long.min(firstTs, timestamp);
-                    lastTs = Long.max(lastTs, timestamp);
-                } else {  // First record on new block.
-                    assert timestamps.isEmpty();
-                    assert lastTs == null;
-                    assert dictionary == null;
-                    firstTs = lastTs = timestamp;
-                    dictionary = new DictionaryForWrite();
-                }
-
-                timestamps.add(timestamp);
-                new FJPTaskExecutor<>(tsc.getTSValues(), tsv -> processGroup(timestamp, tsv))
-                        .join();
-            } catch (OncRpcException ex) {
-                throw new IOException("encoding error", ex);
-            }
-        } finally {
-            LOG.log(Level.FINE, "adding timeseries {0} took {1} msec", new Object[]{tsc.getTimestamp(), System.currentTimeMillis() - ts0});
-        }
-    }
-
-    private void processGroup(long timestamp, @NonNull TimeSeriesValue tsv) throws IOException, OncRpcException {
-        final GroupTmpFile group = groups.computeIfAbsent(
-                tsv.getGroup(),
-                grp -> {
-                    try {
-                        return new GroupTmpFile(dictionary);
-                    } catch (IOException ex) {
-                        throw new RuntimeException("unable to create temporary file for " + grp, ex);
-                    }
-                });
-        group.add(timestamp, tsv.getMetrics());
-    }
-
-    public void addAll(Collection<? extends TimeSeriesCollection> tscCollection) throws IOException {
-        for (TimeSeriesCollection tsc : tscCollection)
-            add(tsc);
-    }
-
-    public void write() throws OncRpcException, IOException {
-        writeFile();
-    }
+    private final TmpFileBasedColumnMajorTSData.Builder tsdataBuilder = TmpFileBasedColumnMajorTSData.builder();
 
     @Override
     public void close() throws IOException {
-        try {
-            while (!timestamps.isEmpty())
-                blocks.add(createBlock(new Context()));
-            writeFile();
-        } catch (OncRpcException ex) {
-            throw new IOException("encoding error", ex);
-        } finally {
-            closeGroups();
-        }
+        /* SKIP */
     }
 
-    public void closeGroups() throws IOException {
-        IOException exception = null;
-        try {
-            for (Closeable group : groups.values()) {
-                try {
-                    group.close();
-                } catch (IOException ex) {
-                    if (exception == null)
-                        exception = ex;
-                    else
-                        exception.addSuppressed(ex);
+    public void add(@NonNull TimeSeriesCollection tsc) throws IOException {
+        tsdataBuilder.with(tsc);
+    }
+
+    public void addAll(Collection<? extends TimeSeriesCollection> tscCollection) throws IOException {
+        tsdataBuilder.with(tscCollection);
+    }
+
+    public DateTime build(FileChannel out, Compression compression) throws IOException {
+        final CompletableFuture<tsfile_header> header;
+        final DateTime tsBegin, tsEnd;
+
+        try (final Context ctx = new Context(out, HDR_SPACE, compression)) {
+            final TmpFileBasedColumnMajorTSData tsdata = tsdataBuilder.build();
+
+            final List<TLongList> timestamps = partitionTimestamps(tsdata.getTimestamps().stream()
+                    .mapToLong(DateTime::getMillis)
+                    .distinct()
+                    .sorted()
+                    .collect(TLongArrayList::new, TLongArrayList::add, TLongArrayList::addAll));
+            tsBegin = new DateTime(timestamps.get(0).get(0), DateTimeZone.UTC);
+            tsEnd = new DateTime(timestamps.get(timestamps.size() - 1).get(timestamps.get(timestamps.size() - 1).size() - 1));
+
+            final TLongIntMap lookupTable = buildTimestampLookupTable(timestamps);
+
+            final List<BlockBuilder> blocks = timestamps.stream()
+                    .map(timestampsPerBlock -> new BlockBuilder(timestampsPerBlock, ctx))
+                    .collect(Collectors.toList());
+
+            for (GroupName group : tsdata.getGroupNames()) {
+                for (DateTime timestamp : tsdata.getGroupTimestamps(group)) {
+                    final long ts = timestamp.getMillis();
+                    final int blockIndex = lookupTable.get(ts);
+                    if (blockIndex != lookupTable.getNoEntryValue())
+                        blocks.get(blockIndex).accept(ts, group);
+                }
+
+                for (MetricName metric : tsdata.getMetricNames(group)) {
+                    final TsvMetricBuilder[] tsvMetricBuilders = new TsvMetricBuilder[blocks.size()];
+
+                    for (Map.Entry<DateTime, MetricValue> tsValue
+                                 : tsdata.getMetricValues(group, metric).entrySet()) {
+                        final long ts = tsValue.getKey().getMillis();
+                        final int blockIndex = lookupTable.get(ts);
+                        if (blockIndex == lookupTable.getNoEntryValue())
+                            continue;
+
+                        if (tsvMetricBuilders[blockIndex] == null)
+                            tsvMetricBuilders[blockIndex] = blocks.get(blockIndex).newMetricBuilder(metric);
+                        blocks.get(blockIndex).getTimestampIndex(ts)
+                                .ifPresent(tsIndex -> tsvMetricBuilders[blockIndex].accept(tsIndex, tsValue.getValue()));
+                    }
+
+                    for (int i = 0; i < tsvMetricBuilders.length; ++i) {
+                        if (tsvMetricBuilders[i] != null)
+                            blocks.get(i).accept(group, metric, tsvMetricBuilders[i]);
+                    }
                 }
             }
-        } finally {
-            groups.clear();
-        }
-        if (exception != null)
-            throw exception;
-    }
 
-    private void writeFile() throws IOException, OncRpcException {
-        if (blocks.isEmpty())
-            throw new IllegalStateException("table files may not be empty");
-        Collections.sort(blocks, Comparator.comparing(block -> block.tsd.first));
+            final CompletableFuture<file_data_tables> fdt = futuresToArray(blocks.stream().map(BlockBuilder::build).collect(Collectors.toList()), file_data_tables_block[]::new)
+                    .thenApply(fdtBlocks -> {
+                        file_data_tables result = new file_data_tables();
+                        result.blocks = fdtBlocks;
+                        return result;
+                    });
 
-        final FilePos bodyPos;
-        final long fileEnd;
-        {
-            final Context ctx = new Context();
-            bodyPos = writeBody(ctx);
-            fileEnd = fileOffset = ctx.getFd().getOffset();
+            header = ctx.write(fdt)
+                    .thenApply(fileDataPos -> encodeHeader(fileDataPos, ctx.getFd().getOffset(), true, true, compression, tsBegin, tsEnd));
         }
 
         try (XdrEncodingFileWriter xdr = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(out, 0), HDR_SPACE), 0), HDR_SPACE)) {
             xdr.beginEncoding();
             writeMimeHeader(xdr);
-            final boolean blocksAreOrdered = blocksAreOrdered(blocks);
-            final boolean blocksAreDistinct = blocksAreOrdered || blocksAreDistinct(blocks);
-            encodeHeader(bodyPos, fileEnd, blocksAreOrdered, blocksAreDistinct).xdrEncode(xdr);
+            deref(header).xdrEncode(xdr);
             xdr.endEncoding();
-        }
-    }
-
-    private static boolean blocksAreOrdered(List<file_data_tables_block> blocks) {
-        if (blocks.size() <= 1)
-            return true;
-        final Iterator<file_data_tables_block> iter = blocks.iterator();
-
-        // Initialization: figure out end of first block.
-        long predecessorTs;  // Invariant: last timestamp (long) of block preceding iter.next().
-        {
-            long[] predecessorTsd = FromXdr.timestamp_delta(iter.next().tsd);
-            predecessorTs = predecessorTsd[predecessorTsd.length - 1];
+        } catch (OncRpcException ex) {
+            throw new IOException("encoding error", ex);
         }
 
-        while (iter.hasNext()) {
-            final file_data_tables_block current = iter.next();
-            if (current.tsd.first <= predecessorTs)  // Intersection: blocks are not ordered.
-                return false;
+        return tsBegin;
+    }
 
-            long[] currentTsd = FromXdr.timestamp_delta(current.tsd);
-            predecessorTs = currentTsd[currentTsd.length - 1];
+    @Value
+    private static class BlockDerivedHeaderValues {
+        private final boolean isOrdered;
+        private final boolean isSorted;
+    }
+
+    private static class BlockBuilder {
+        private final TLongList timestamps;
+        private final TLongIntMap lookupTable;
+        private final DictionaryForWrite dictionary = new DictionaryForWrite();
+        private final Context ctx;
+        private final TablesBuilder tablesBuilder;
+
+        public BlockBuilder(@NonNull TLongList timestamps, @NonNull Context ctx) {
+            this.timestamps = timestamps;
+            this.lookupTable = buildTimestampLookupTable(this.timestamps);
+            this.ctx = ctx;
+            this.tablesBuilder = new TablesBuilder(this.ctx, this.timestamps.size());
         }
-        return true;
-    }
 
-    private static boolean blocksAreDistinct(List<file_data_tables_block> blocks) {
-        if (blocks.size() <= 1)
-            return true;
-        final TLongIntHashMap tsWithCount = blocks.parallelStream()
-                .flatMapToLong(block -> Arrays.stream(FromXdr.timestamp_delta(block.tsd)))
-                .collect(
-                        TLongIntHashMap::new,
-                        (map, value) -> map.adjustOrPutValue(value, 1, 1),
-                        (result, add) -> {
-                            add.forEachEntry((ts, count) -> {
-                                result.adjustOrPutValue(ts, count, count);
-                                return true;
-                            });
-                        });
-
-        final TIntIterator countIter = tsWithCount.valueCollection().iterator();
-        while (countIter.hasNext())
-            if (countIter.next() > 1)
-                return false;
-        return true;
-    }
-
-    private FilePos writeBody(Context ctx) throws IOException, OncRpcException {
-        file_data_tables result = new file_data_tables();
-
-        if (blocks.isEmpty())
-            throw new IOException("table file may not be empty");
-        result.blocks = blocks.toArray(new file_data_tables_block[blocks.size()]);
-
-        return deref(ctx.write(result));
-    }
-
-    private file_data_tables_block createBlock(Context ctx) throws IOException, OncRpcException {
-        ctx.setTsdata(timestamps);
-        Future<FilePos> tables = ctx.write(createTables(ctx));  // Writes dependency data.
-        Future<FilePos> encodedDictionary = ctx.write(dictionary.encode());  // Must be last.
-
-        file_data_tables_block result = new file_data_tables_block();
-        result.tables_data = ToXdr.filePos(deref(tables));
-        result.dictionary = ToXdr.filePos(deref(encodedDictionary));
-        result.tsd = ToXdr.timestamp_delta(ctx.getTimestamps());
-
-        // Reset state.
-        timestamps.clear();
-        dictionary = null;
-        try {
-            closeGroups();
-        } catch (Exception ex) {
-            LOG.log(Level.WARNING, "unable to close temporary files properly", ex);
+        public TsvMetricBuilder newMetricBuilder(MetricName metric) {
+            return new TsvMetricBuilder(dictionary, ctx, timestamps.size(), dictionary.getPathTable().getOrCreate(metric.getPath()));
         }
-        firstTs = lastTs = null;
-        fileOffset = ctx.getFd().getOffset();  // Update file offset after successful write.
 
-        return result;
-    }
+        public OptionalInt getTimestampIndex(long ts) {
+            int index = lookupTable.get(ts);
+            return (index == lookupTable.getNoEntryValue() ? OptionalInt.empty() : OptionalInt.of(index));
+        }
 
-    private tables createTables(Context ctx) throws IOException, OncRpcException {
-        TIntObjectMap<List<tables_tag>> groupPathMap = new TIntObjectHashMap<>();
+        public void accept(long ts, GroupName group) {
+            getTimestampIndex(ts)
+                    .ifPresent((index) -> tablesBuilder.accept(index, dictionary, group));
+        }
 
-        // Write dependency data.
-        new FJPTaskExecutor<>(
-                groups.entrySet(),
-                grpEntry -> {
-                    final SimpleGroupPath grp = grpEntry.getKey().getPath();
-                    final int grpRef = dictionary.getPathTable().getOrCreate(grp.getPath());
-                    final List<tables_tag> tagList;
-                    synchronized (groupPathMap) {
-                        if (!groupPathMap.containsKey(grpRef))
-                            groupPathMap.put(grpRef, new ArrayList<>());
-                        tagList = groupPathMap.get(grpRef);
-                    }
+        public void accept(GroupName group, MetricName metric, TsvMetricBuilder metricBuilder) {
+            tablesBuilder.accept(dictionary, group, metric, metricBuilder);
+        }
 
-                    final tables_tag tables_tag = createTagTable(grpEntry.getKey(), grpEntry.getValue(), ctx);
-                    synchronized (tagList) {
-                        tagList.add(tables_tag);
-                    }
-                })
-                .join();
+        public CompletableFuture<file_data_tables_block> build() {
+            final CompletableFuture<FilePos> tables = ctx.write(tablesBuilder.build()); // Writes dependency data.
+            final CompletableFuture<FilePos> encodedDictionary = ctx.write(dictionary.encode()); // Must be last.
 
-        // yield encoded table
-        return new tables(Arrays.stream(groupPathMap.keys())
-                .mapToObj(pathIdx -> {
-                    tables_group tg = new tables_group();
-                    tg.group_ref = pathIdx;
-                    tg.tag_tbl = groupPathMap.get(pathIdx).toArray(new tables_tag[0]);
-                    assert tg.tag_tbl.length > 0;
-                    return tg;
-                })
-                .toArray(tables_group[]::new));
-    }
-
-    private tables_tag createTagTable(GroupName grpName, GroupTmpFile grpData, Context ctx) throws IOException, OncRpcException {
-        // Write dependency data.
-        final int tagRef = dictionary.getTagsTable().getOrCreate(grpName.getTags());
-        final FilePos groupPos = writeGroupTable(grpData, ctx);
-
-        // yield encoded table
-        tables_tag tt = new tables_tag();
-        tt.tag_ref = tagRef;
-        tt.pos = ToXdr.filePos(groupPos);
-        return tt;
-    }
-
-    private FilePos writeGroupTable(GroupTmpFile grpData, Context ctx) throws IOException, OncRpcException {
-        TLongSet presence = new TLongHashSet();
-
-        grpData.iterator().forEachRemaining(presence::add);
-        TIntObjectMap<FilePos> metricsMap = writeMetrics(grpData.getMetricData(), ctx);  // Write dependency tables.
-
-        // Write group table.
-        group_table result = new group_table();
-        result.presence = createPresenceBitset(presence, ctx.getTimestamps());
-        result.metric_tbl = Arrays.stream(metricsMap.keys())
-                .mapToObj(mIdx -> {
-                    final tables_metric tm = new tables_metric();
-                    tm.metric_ref = mIdx;
-                    tm.pos = ToXdr.filePos(metricsMap.get(mIdx));
-                    return tm;
-                })
-                .toArray(tables_metric[]::new);
-        return deref(ctx.write(result));
-    }
-
-    private TIntObjectMap<FilePos> writeMetrics(MetricTmpFile metrics, Context ctx) throws IOException, OncRpcException {
-        final TIntObjectMap<Future<FilePos>> futurePos = new TIntObjectHashMap<>();
-        {
-            final TIntObjectMap<MetricTable> metricTbl = new TIntObjectHashMap<>();
-            metrics.iterator().forEachRemaining(timestampedMetric -> {
-                final int nameRef = timestampedMetric.getName();
-                if (!metricTbl.containsKey(nameRef))
-                    metricTbl.put(nameRef, new MetricTable(dictionary));
-                metricTbl.get(nameRef).add(timestampedMetric.getTimestamp(), timestampedMetric.getValue());
+            return tables.thenCombine(encodedDictionary, (FilePos tablesPos, FilePos encDictPos) -> {
+                final file_data_tables_block result = new file_data_tables_block();
+                result.tsd = ToXdr.timestamp_delta(timestamps.toArray());
+                result.tables_data = ToXdr.filePos(tablesPos);
+                result.dictionary = ToXdr.filePos(encDictPos);
+                return result;
             });
+        }
 
-            metricTbl.forEachEntry((nameRef, mt) -> {
-                futurePos.put(nameRef, ctx.write(mt.encode(ctx.getTimestamps())));
+        private static TLongIntMap buildTimestampLookupTable(TLongList timestamps) {
+            final TLongIntMap lookupTable = new TLongIntHashMap(timestamps.size(), 4, -1, -1);
+
+            final TLongIterator iter = timestamps.iterator();
+            for (int idx = 0; iter.hasNext(); ++idx)
+                lookupTable.put(iter.next(), idx);
+
+            return lookupTable;
+        }
+    }
+
+    @RequiredArgsConstructor
+    private static class TablesBuilder {
+        @NonNull
+        private final Context ctx;
+        private final int timestampsSize;
+        private final TIntObjectMap<GroupBuilder> groupBuilder = new TIntObjectHashMap<>();
+
+        public void accept(int tsIndex, DictionaryForWrite dictionary, GroupName group) {
+            final ResolvedGroup resolved = getGroupBuilderFor(dictionary, group);
+            resolved.getBuilder().accept(tsIndex, dictionary, resolved.getPathIndex(), group.getTags());
+        }
+
+        public void accept(DictionaryForWrite dictionary, GroupName group, MetricName metric, TsvMetricBuilder metricBuilder) {
+            final ResolvedGroup resolved = getGroupBuilderFor(dictionary, group);
+            resolved.getBuilder().accept(dictionary, resolved.getPathIndex(), group.getTags(), metric, metricBuilder);
+        }
+
+        private ResolvedGroup getGroupBuilderFor(DictionaryForWrite dictionary, GroupName group) {
+            final int pathIndex = dictionary.getPathTable().getOrCreate(group.getPath().getPath());
+
+            GroupBuilder builder = groupBuilder.get(pathIndex);
+            if (builder == null) {
+                builder = new GroupBuilder(ctx, timestampsSize, pathIndex);
+                groupBuilder.put(pathIndex, builder);
+            }
+
+            return new ResolvedGroup(pathIndex, builder);
+        }
+
+        public CompletableFuture<tables> build() {
+            return futuresToArray(groupBuilder.valueCollection().stream().map(GroupBuilder::build).collect(Collectors.toList()), tables_group[]::new)
+                    .thenApply(tables::new);
+        }
+
+        @RequiredArgsConstructor
+        @Getter
+        private static class ResolvedGroup {
+            private final int pathIndex;
+            private final GroupBuilder builder;
+        }
+    }
+
+    @RequiredArgsConstructor
+    private static class GroupBuilder {
+        @NonNull
+        private final Context ctx;
+        private final int timestampsSize;
+        private final TIntObjectMap<TagsBuilder> tsvBuilder = new TIntObjectHashMap<>();
+        private final int groupRef;
+
+        public void accept(int tsIndex, DictionaryForWrite dictionary, int groupIndex, Tags tags) {
+            assert groupIndex == groupRef;
+            final ResolvedTags resolved = getTsvBuilderFor(dictionary, tags);
+            resolved.getBuilder().accept(tsIndex, dictionary, groupIndex, resolved.getTagIndex());
+        }
+
+        public void accept(DictionaryForWrite dictionary, int groupIndex, Tags tags, MetricName metric, TsvMetricBuilder metricBuilder) {
+            assert groupIndex == groupRef;
+            final ResolvedTags resolved = getTsvBuilderFor(dictionary, tags);
+            resolved.getBuilder().accept(dictionary, groupIndex, resolved.getTagIndex(), metric, metricBuilder);
+        }
+
+        private ResolvedTags getTsvBuilderFor(DictionaryForWrite dictionary, Tags tags) {
+            final int tagIndex = dictionary.getTagsTable().getOrCreate(tags);
+            TagsBuilder builder = tsvBuilder.get(tagIndex);
+            if (builder == null) {
+                builder = new TagsBuilder(ctx, timestampsSize, tagIndex);
+                tsvBuilder.put(tagIndex, builder);
+            }
+            return new ResolvedTags(tagIndex, builder);
+        }
+
+        public CompletableFuture<tables_group> build() {
+            return futuresToArray(tsvBuilder.valueCollection().stream().map(TagsBuilder::build).collect(Collectors.toList()), tables_tag[]::new)
+                    .thenApply(tagTables -> {
+                        tables_group result = new tables_group();
+                        result.group_ref = groupRef;
+                        result.tag_tbl = tagTables;
+                        return result;
+                    });
+        }
+
+        @RequiredArgsConstructor
+        @Getter
+        private static class ResolvedTags {
+            private final int tagIndex;
+            private final TagsBuilder builder;
+        }
+    }
+
+    private static class TagsBuilder {
+        private final Context ctx;
+        private final int tagsRef;
+        private final TsvBuilder tsvBuilder;
+
+        public TagsBuilder(@NonNull Context ctx, int timestampsSize, int tagsRef) {
+            this.ctx = ctx;
+            this.tagsRef = tagsRef;
+            this.tsvBuilder = new TsvBuilder(timestampsSize);
+        }
+
+        public void accept(int tsIndex, DictionaryForWrite dictionary, int groupIndex, int tagsIndex) {
+            assert tagsIndex == tagsRef;
+            tsvBuilder.accept(tsIndex, dictionary);
+        }
+
+        public void accept(DictionaryForWrite dictionary, int groupIndex, int tagsIndex, MetricName metric, TsvMetricBuilder metricBuilder) {
+            assert tagsIndex == tagsRef;
+            tsvBuilder.accept(dictionary, metric, metricBuilder);
+        }
+
+        public CompletableFuture<tables_tag> build() {
+            return ctx.write(tsvBuilder.build())
+                    .thenApply(tsvPos -> {
+                        final tables_tag result = new tables_tag();
+                        result.tag_ref = tagsRef;
+                        result.pos = ToXdr.filePos(tsvPos);
+                        return result;
+                    });
+        }
+    }
+
+    private static class TsvBuilder {
+        private final boolean[] presence;
+        private final TIntObjectMap<CompletableFuture<tables_metric>> tsvMetricFutures = new TIntObjectHashMap<>();
+
+        public TsvBuilder(int timestampsSize) {
+            this.presence = new boolean[timestampsSize];
+            Arrays.fill(this.presence, false);
+        }
+
+        public void accept(int tsIndex, DictionaryForWrite dictionary) {
+            presence[tsIndex] = true;
+        }
+
+        public void accept(DictionaryForWrite dictionary, MetricName metric, TsvMetricBuilder metricBuilder) {
+            final int metricIndex = dictionary.getPathTable().getOrCreate(metric.getPath());
+            tsvMetricFutures.put(metricIndex, metricBuilder.build());
+        }
+
+        public CompletableFuture<group_table> build() {
+            return futuresToArray(tsvMetricFutures.valueCollection(), tables_metric[]::new)
+                    .thenApply(metrics -> {
+                        group_table result = new group_table();
+                        result.presence = ToXdr.bitset(presence);
+                        result.metric_tbl = metrics;
+                        return result;
+                    });
+        }
+
+        @Value
+        private static class ResolvedMetric {
+            private final int metricRef;
+            private final TsvMetricBuilder builder;
+        }
+    }
+
+    private static class TsvMetricBuilder {
+        private final DictionaryForWrite dictionary;
+        private final Context ctx;
+        private final int metricRef;
+        private final MetricTable metricTable;
+
+        public TsvMetricBuilder(@NonNull DictionaryForWrite dictionary, @NonNull Context ctx, int timestampsSize, int metricRef) {
+            this.dictionary = dictionary;
+            this.ctx = ctx;
+            this.metricRef = metricRef;
+            this.metricTable = new MetricTable(timestampsSize);
+        }
+
+        public void accept(int tsIndex, MetricValue value) {
+            metricTable.add(tsIndex, dictionary, value);
+        }
+
+        public CompletableFuture<tables_metric> build() {
+            return ctx.write(metricTable.encode())
+                    .thenApply(mtPos -> {
+                        tables_metric result = new tables_metric();
+                        result.metric_ref = metricRef;
+                        result.pos = ToXdr.filePos(mtPos);
+                        return result;
+                    });
+        }
+    }
+
+    private static <T> CompletableFuture<T[]> futuresToArray(Collection<? extends CompletableFuture<? extends T>> futures, IntFunction<T[]> arrayConstructor) {
+        if (futures.isEmpty())
+            return CompletableFuture.completedFuture(arrayConstructor.apply(0));
+        final T[] result = arrayConstructor.apply(futures.size());
+
+        final CompletableFuture[] combination = new CompletableFuture[futures.size()];
+        final Iterator<? extends CompletableFuture<? extends T>> futuresIter = futures.iterator();
+        for (int idx = 0; idx < futures.size(); ++idx) {
+            final int resultIndex = idx;
+            combination[idx] = (futuresIter.next().thenAccept((T v) -> result[resultIndex] = v));
+        }
+        assert !futuresIter.hasNext();
+
+        return CompletableFuture.allOf(combination)
+                .thenApply((voidValue) -> result);
+    }
+
+    /**
+     * Partition timestamps according to the blocks that they should be in.
+     *
+     * @param timestamps The complete set of timestamps. Must be unique and
+     * ordered.
+     * @return A list of timestamp partitions.
+     */
+    private static List<TLongList> partitionTimestamps(TLongList timestamps) {
+        if (timestamps.isEmpty()) return emptyList();
+        final List<TLongList> partitions = new ArrayList<>();
+
+        TLongList active = new TLongArrayList();
+        final TLongIterator tsIter = timestamps.iterator();
+        active.add(tsIter.next());
+
+        while (tsIter.hasNext()) {
+            final long next = tsIter.next();
+            assert next > active.get(active.size() - 1);
+
+            if (next - active.get(active.size() - 1) > Integer.MAX_VALUE || active.size() >= MAX_BLOCK_RECORDS) {
+                partitions.add(active);
+                active = new TLongArrayList();
+            }
+            active.add(next);
+        }
+        partitions.add(active);
+
+        assert partitions.stream().mapToInt(TLongList::size).sum() == timestamps.size();
+        return partitions;
+    }
+
+    /**
+     * Build a lookup table that maps timestamps to their block index.
+     *
+     * @param partitions The timestamp partition table.
+     * @return A lookup table, with the keys being any of the timestamps,
+     * mapping to the index in the partitions list.
+     */
+    private static TLongIntMap buildTimestampLookupTable(List<TLongList> partitions) {
+        final TLongIntMap lookupTable = new TLongIntHashMap(100, 4, -1, -1);
+
+        final ListIterator<TLongList> iter = partitions.listIterator();
+        while (iter.hasNext()) {
+            final int partitionIndex = iter.nextIndex();
+            iter.next().forEach((ts) -> {
+                lookupTable.put(ts, partitionIndex);
                 return true;
             });
         }
 
-        final TIntObjectMap<FilePos> result = new TIntObjectHashMap<>();
-        for (int nameRef : futurePos.keys())
-            result.put(nameRef, deref(futurePos.get(nameRef)));
-        return result;
+        return lookupTable;
     }
 
-    private tsfile_header encodeHeader(FilePos bodyPos, long fileSize, boolean blocksAreOrdered, boolean blocksAreDistinct) {
+    private tsfile_header encodeHeader(FilePos bodyPos, long fileSize, boolean blocksAreOrdered, boolean blocksAreDistinct, Compression compression, DateTime hdrBegin, DateTime hdrEnd) {
         tsfile_header hdr = new tsfile_header();
         hdr.first = ToXdr.timestamp(hdrBegin);
         hdr.last = ToXdr.timestamp(hdrEnd);
@@ -444,181 +530,31 @@ public class ToXdrTables implements Closeable {
         return hdr;
     }
 
-    private class Context {
-        @Getter
-        private long timestamps[] = null;
+    private static class Context implements AutoCloseable {
         @Getter
         private final ByteBuffer useBuffer;
         @Getter
         private final FileChannelWriter fd;
-        private Long begin = null, end = null;
         private final Monitor<XdrAble, FilePos> writer;
 
-        public Context() {
+        public Context(FileChannel out, long fileOffset, Compression compression) {
             this.useBuffer = (compression == Compression.NONE ? ByteBuffer.allocate(65536) : ByteBuffer.allocateDirect(65536));
             this.fd = new FileChannelWriter(out, fileOffset);
             this.writer = new Monitor<>(new Writer(fd, compression, useBuffer, true)::write);
         }
 
-        public void setTsdata(TLongSet tsdata) {
-            if (tsdata != null) {
-                this.timestamps = tsdata.toArray();
-                Arrays.sort(this.timestamps);
-
-                if (begin == null || timestamps[0] < begin)
-                    begin = timestamps[0];
-                if (end == null || timestamps[timestamps.length - 1] > end)
-                    end = timestamps[timestamps.length - 1];
-            } else {
-                this.timestamps = null;
-            }
-        }
-
-        public Future<FilePos> write(XdrAble data) {
+        public CompletableFuture<FilePos> write(XdrAble data) {
             return writer.enqueue(data);
         }
 
-        public long getBegin() {
-            return begin;
-        }
-
-        public long getEnd() {
-            return end;
-        }
-    }
-
-    private static class GroupTmpFile implements Closeable {
-        private final TmpFile<timestamp_msec> groupData;
-        @Getter
-        private final MetricTmpFile metricData;
-
-        public GroupTmpFile(@NonNull DictionaryForWrite dictionary) throws IOException {
-            this.groupData = new TmpFile<>(TMPFILE_COMPRESSION);
-            this.metricData = new MetricTmpFile(dictionary);
-        }
-
-        public GroupTmpFile(@NonNull Path dir, @NonNull DictionaryForWrite dictionary) throws IOException {
-            this.groupData = new TmpFile<>(dir, TMPFILE_COMPRESSION);
-            this.metricData = new MetricTmpFile(dir, dictionary);
-        }
-
-        public void add(long timestamp, @NonNull Map<MetricName, MetricValue> metrics) throws IOException, OncRpcException {
-            groupData.add(ToXdr.timestamp(timestamp));
-            for (Map.Entry<MetricName, MetricValue> metric : metrics.entrySet())
-                metricData.add(timestamp, metric.getKey(), metric.getValue());
-        }
-
-        public Iterator<Long> iterator() throws IOException, OncRpcException {
-            final Iterator<timestamp_msec> underlying = groupData.iterator(timestamp_msec::new);
-            return new Iterator<Long>() {
-                @Override
-                public boolean hasNext() {
-                    return underlying.hasNext();
-                }
-
-                @Override
-                public Long next() {
-                    return FromXdr.timestamp(underlying.next()).getMillis();
-                }
-            };
+        public CompletableFuture<FilePos> write(CompletableFuture<? extends XdrAble> futureData) {
+            return writer.enqueueFuture(futureData);
         }
 
         @Override
-        public void close() throws IOException {
-            IOException exception = null;
-            try {
-                groupData.close();
-            } catch (IOException ex) {
-                exception = ex;
-            }
-
-            try {
-                metricData.close();
-            } catch (IOException ex) {
-                if (exception != null)
-                    exception.addSuppressed(ex);
-                else
-                    exception = ex;
-            }
-
-            if (exception != null)
-                throw exception;
+        public void close() {
+            writer.close();
         }
-    }
-
-    private static class MetricTmpFile implements Closeable {
-        private final TmpFile<Atom> metricData;
-        private final DictionaryForWrite dictionary;
-
-        public MetricTmpFile(@NonNull DictionaryForWrite dictionary) throws IOException {
-            this.metricData = new TmpFile<>(TMPFILE_COMPRESSION);
-            this.dictionary = dictionary;
-        }
-
-        public MetricTmpFile(@NonNull Path dir, @NonNull DictionaryForWrite dictionary) throws IOException {
-            metricData = new TmpFile<>(dir, TMPFILE_COMPRESSION);
-            this.dictionary = dictionary;
-        }
-
-        public void add(long timestamp, @NonNull MetricName mn, @NonNull MetricValue mv) throws IOException, OncRpcException {
-            metricData.add(new Atom(timestamp, mn, mv, dictionary));
-        }
-
-        public Iterator<MetricRecord> iterator() throws IOException, OncRpcException {
-            Iterator<Atom> underlying = metricData.iterator(() -> new Atom());
-            return new Iterator<MetricRecord>() {
-                @Override
-                public boolean hasNext() {
-                    return underlying.hasNext();
-                }
-
-                @Override
-                public MetricRecord next() {
-                    Atom next = underlying.next();
-                    return new MetricRecord(next.getTimestamp(), next.getMetricName(), next.getMetricValue());
-                }
-            };
-        }
-
-        @Override
-        public void close() throws IOException {
-            metricData.close();
-        }
-
-        @Getter
-        @NoArgsConstructor
-        private static class Atom implements XdrAble {
-            private long timestamp;
-            private int metricName;
-            private metric_value metricValue;
-
-            public Atom(long timestamp, @NonNull MetricName metricName, @NonNull MetricValue metricValue, @NonNull DictionaryForWrite dictionary) {
-                this.timestamp = timestamp;
-                this.metricName = dictionary.getPathTable().getOrCreate(metricName.getPath());
-                this.metricValue = ToXdr.metricValue(metricValue, dictionary.getStringTable()::getOrCreate);
-            }
-
-            @Override
-            public void xdrEncode(@NonNull XdrEncodingStream stream) throws OncRpcException, IOException {
-                ToXdr.timestamp(timestamp).xdrEncode(stream);
-                stream.xdrEncodeInt(metricName);
-                metricValue.xdrEncode(stream);
-            }
-
-            @Override
-            public void xdrDecode(@NonNull XdrDecodingStream stream) throws OncRpcException, IOException {
-                timestamp = FromXdr.timestamp(new timestamp_msec(stream)).getMillis();
-                metricName = stream.xdrDecodeInt();
-                metricValue = new metric_value(stream);
-            }
-        }
-    }
-
-    @Value
-    private static class MetricRecord {
-        private final long timestamp;
-        private final int name;
-        private final metric_value value;
     }
 
     /**
@@ -630,7 +566,7 @@ public class ToXdrTables implements Closeable {
                 return future.get();
             } catch (InterruptedException ex) {
                 LOG.log(Level.WARNING, "interrupted while waiting for future", ex);
-            } catch (ExecutionException | Monitor.MonitorException ex) {
+            } catch (ExecutionException ex) {
                 Throwable cause = ex.getCause();
                 if (cause instanceof Error)
                     throw (Error) cause;
