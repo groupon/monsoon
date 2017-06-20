@@ -2,11 +2,9 @@ package com.groupon.lex.metrics;
 
 import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.DirCollectHistory;
-import com.groupon.lex.metrics.lib.BufferedIterator;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
-import java.util.concurrent.ForkJoinPool;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.NonNull;
@@ -87,8 +85,8 @@ public class FileConvert {
         final DirCollectHistory dst = new DirCollectHistory(dstdir_path_);
         dst.setAppendCompression(compression);
         dst.setOptimizedCompression(optimizedCompression);
-        BufferedIterator.stream(ForkJoinPool.commonPool(), src.stream())
-                .forEach(dst::add);
+        src.getRawCollections().stream()
+                .forEach(dst::addAll);
 
         // Wait for pending optimization to finish.
         src.waitPendingTasks();
