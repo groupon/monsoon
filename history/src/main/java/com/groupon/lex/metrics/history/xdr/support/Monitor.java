@@ -4,11 +4,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 public class Monitor<T, R> implements AutoCloseable {
+    private static final Logger LOG = Logger.getLogger(Monitor.class.getName());
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final MonitorFunction<T, R> monitorFunction;
 
@@ -19,16 +22,26 @@ public class Monitor<T, R> implements AutoCloseable {
     public CompletableFuture<R> enqueue(T argument) {
         final MonitorAction newAction = new MonitorAction(argument);
         try {
-            executor.execute(newAction);
-        } catch (RejectedExecutionException ex) {
-            throw new IllegalStateException("Monitor is closed/closing.", ex);
+            try {
+                executor.execute(newAction);
+            } catch (RejectedExecutionException ex) {
+                throw new IllegalStateException("Monitor is closed/closing.", ex);
+            }
+        } catch (IllegalStateException ex) { // Emit log with stack trace.
+            LOG.log(Level.SEVERE, "attempt to enqueue on closed monitor", ex);
+            throw ex;
         }
         return newAction.getFuture();
     }
 
     public CompletableFuture<R> enqueueFuture(CompletableFuture<? extends T> argument) {
-        if (executor.isShutdown())
-            throw new IllegalStateException("Monitor is closed/closing.");
+        try {
+            if (executor.isShutdown())
+                throw new IllegalStateException("Monitor is closed/closing.");
+        } catch (IllegalStateException ex) { // Emit log with stack trace.
+            LOG.log(Level.SEVERE, "attempt to enqueue on closed monitor", ex);
+            throw ex;
+        }
         return argument.thenCompose(this::enqueue);
     }
 
