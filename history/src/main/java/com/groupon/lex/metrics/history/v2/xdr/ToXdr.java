@@ -36,7 +36,7 @@ import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
 import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TShortArrayList;
-import gnu.trove.set.TLongSet;
+import gnu.trove.set.TIntSet;
 import java.util.Arrays;
 import java.util.function.Function;
 import org.joda.time.DateTime;
@@ -149,11 +149,11 @@ public class ToXdr {
         return new bitset(resultList.toArray());
     }
 
-    public static bitset createPresenceBitset(TLongSet have, long[] want) {
-        boolean bits[] = new boolean[want.length];
+    public static bitset createPresenceBitset(TIntSet have, int timestampsSize) {
+        boolean bits[] = new boolean[timestampsSize];
 
-        for (int i = 0; i < want.length; ++i)
-            bits[i] = have.contains(want[i]);
+        for (int i = 0; i < timestampsSize; ++i)
+            bits[i] = have.contains(i);
         return bitset(bits);
     }
 }

@@ -47,6 +47,7 @@ import com.groupon.lex.metrics.history.v2.xdr.mt_other;
 import com.groupon.lex.metrics.history.v2.xdr.mt_str;
 import com.groupon.lex.metrics.history.xdr.support.DecodingException;
 import com.groupon.lex.metrics.history.xdr.support.IntegrityException;
+import java.util.stream.IntStream;
 
 public class RTFMetricTable {
     private final MtTable m_bool;
@@ -72,18 +73,18 @@ public class RTFMetricTable {
     }
 
     public boolean contains(int index) {
-        return m_bool.contains(index) ||
-                m_16bit.contains(index) ||
-                m_32bit.contains(index) ||
-                m_64bit.contains(index) ||
-                m_dbl.contains(index) ||
-                m_str.contains(index) ||
-                m_hist.contains(index) ||
-                m_empty.contains(index) ||
-                m_other.contains(index);
+        return m_bool.contains(index)
+                || m_16bit.contains(index)
+                || m_32bit.contains(index)
+                || m_64bit.contains(index)
+                || m_dbl.contains(index)
+                || m_str.contains(index)
+                || m_hist.contains(index)
+                || m_empty.contains(index)
+                || m_other.contains(index);
     }
 
-    public MetricValue get(int index) {
+    private MetricValue getOrNull(int index) {
         MetricValue mv;
 
         mv = m_bool.get(index);
@@ -113,7 +114,30 @@ public class RTFMetricTable {
         mv = m_other.get(index);
         if (mv != null) return mv;
 
-        throw new DecodingException("requested metric has not value");
+        return null;
+    }
+
+    public MetricValue get(int index) {
+        MetricValue mv = getOrNull(index);
+        if (mv == null)
+            throw new DecodingException("requested metric has not value");
+        return mv;
+    }
+
+    /**
+     * Returns metric values at the given range.
+     *
+     * Absence of a value is represented by a null value in the array.
+     *
+     * @param startInclusive The first index of the range.
+     * @param endExclusive The past-the-end index of the range.
+     * @return An array of metric values, with null values representing absence
+     * of the metric.
+     */
+    public MetricValue[] getAll(int startInclusive, int endExclusive) {
+        return IntStream.range(startInclusive, endExclusive)
+                .mapToObj(this::getOrNull)
+                .toArray(MetricValue[]::new);
     }
 
     public void validate() {
@@ -145,7 +169,7 @@ public class RTFMetricTable {
                 else
                     map[i] = -1;
             }
-            assert(buildIdx == len);
+            assert (buildIdx == len);
         }
 
         public final boolean contains(int index) {
@@ -182,6 +206,7 @@ public class RTFMetricTable {
         }
 
         protected abstract MetricValue doGet(int innerIdx);
+
         protected abstract int innerSize();
     }
 
@@ -331,7 +356,8 @@ public class RTFMetricTable {
         }
 
         @Override
-        public void validateInner() {}
+        public void validateInner() {
+        }
 
         @Override
         protected int innerSize() {

@@ -1,104 +1,73 @@
 package com.groupon.lex.metrics.history.xdr.support;
 
-import java.util.ArrayDeque;
-import java.util.Queue;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
-import java.util.concurrent.Future;
-import lombok.AccessLevel;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import lombok.Getter;
-import lombok.Setter;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 
 public class Monitor<T, R> implements AutoCloseable {
-    private final Queue<ForkJoinTask<R>> tasks = new ArrayDeque<>();
-    private final ForkJoinPool pool = decideOnAPool();
+    private static final Logger LOG = Logger.getLogger(Monitor.class.getName());
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final MonitorFunction<T, R> monitorFunction;
-    private boolean active = false;
-    private boolean closed = false;
 
     public Monitor(MonitorFunction<T, R> fn) {
         this.monitorFunction = fn;
     }
 
-    private static ForkJoinPool decideOnAPool() {
-        final ForkJoinPool currentPool = ForkJoinTask.getPool();
-        if (currentPool != null)
-            return currentPool;
-        return ForkJoinPool.commonPool();
-    }
-
-    public synchronized Future<R> enqueue(T argument) {
-        if (closed)
-            throw new IllegalStateException("Monitor is closed/closing.");
-
-        MonitorAction newAction = new MonitorAction(argument);
-        tasks.add(newAction);
-        fire();
-        return newAction;
-    }
-
-    private synchronized void fire() {
-        if (!active) {
-            ForkJoinTask<R> head = tasks.poll();
-            if (head != null) {
-                pool.submit(head);
-                active = true;
+    public CompletableFuture<R> enqueue(T argument) {
+        final MonitorAction newAction = new MonitorAction(argument);
+        try {
+            try {
+                executor.execute(newAction);
+            } catch (RejectedExecutionException ex) {
+                throw new IllegalStateException("Monitor is closed/closing.", ex);
             }
+        } catch (IllegalStateException ex) { // Emit log with stack trace.
+            LOG.log(Level.SEVERE, "attempt to enqueue on closed monitor", ex);
+            throw ex;
         }
+        return newAction.getFuture();
+    }
+
+    public CompletableFuture<R> enqueueFuture(CompletableFuture<? extends T> argument) {
+        try {
+            if (executor.isShutdown())
+                throw new IllegalStateException("Monitor is closed/closing.");
+        } catch (IllegalStateException ex) { // Emit log with stack trace.
+            LOG.log(Level.SEVERE, "attempt to enqueue on closed monitor", ex);
+            throw ex;
+        }
+        return argument.thenCompose(this::enqueue);
     }
 
     @Override
     public void close() {
-        final ForkJoinTask<R> sentinel;
-        synchronized (this) {
-            if (closed)
-                return;
-            sentinel = ForkJoinTask.adapt(() -> {
-            }, null);
-            tasks.add(sentinel);
-            fire();
-            closed = true;
-        }
-        sentinel.join();
+        executor.shutdown();
     }
 
     public static interface MonitorFunction<T, R> {
         public R apply(T v) throws Exception;
     }
 
-    private class MonitorAction extends ForkJoinTask<R> {
-        private T argument;
-
-        @Getter(AccessLevel.PUBLIC)
-        @Setter(AccessLevel.PROTECTED)
-        private R rawResult = null;
-
-        public MonitorAction(T argument) {
-            this.argument = argument;
-        }
+    @RequiredArgsConstructor
+    private class MonitorAction implements Runnable {
+        @Getter
+        private final CompletableFuture<R> future = new CompletableFuture<>();
+        @NonNull
+        private final T argument;
 
         @Override
-        protected boolean exec() {
+        public void run() {
             try {
-                setRawResult(monitorFunction.apply(argument));
-                return true;
-            } catch (Error | RuntimeException ex) {
-                throw ex;
-            } catch (Exception ex) {
-                throw new MonitorException(ex);
-            } finally {
-                argument = null;  // Release resources.
-                synchronized (Monitor.this) {
-                    active = false;
-                    fire();
-                }
+                future.complete(monitorFunction.apply(argument));
+            } catch (Exception | Error ex) {
+                future.completeExceptionally(ex);
             }
-        }
-    }
-
-    public static class MonitorException extends RuntimeException {
-        public MonitorException(Throwable cause) {
-            super(cause);
         }
     }
 }

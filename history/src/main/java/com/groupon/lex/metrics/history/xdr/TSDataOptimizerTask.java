@@ -28,7 +28,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.acplt.oncrpc.OncRpcException;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
 /**
  * A task that optimizes a set of files into a single table file.
@@ -203,18 +202,18 @@ public class TSDataOptimizerTask {
             final FileChannel fd = FileUtil.createTempFile(destDir, "monsoon-", ".optimize-tmp");
             try {
                 final DateTime begin;
-                try (ToXdrTables output = new ToXdrTables(fd, compression)) {
+                try (ToXdrTables output = new ToXdrTables()) {
                     while (!files.isEmpty()) {
                         TSData tsdata = files.remove(0);
                         if (fileCreation.isCancelled())
                             throw new IOException("aborted due to canceled execution");
                         output.addAll(tsdata);  // Takes a long time.
                     }
-                    begin = new DateTime(output.getHdrBegin(), DateTimeZone.UTC);
 
                     if (fileCreation.isCancelled())
                         throw new IOException("aborted due to canceled execution");
-                }  // Closing output takes a lot of time.
+                    begin = output.build(fd, compression); // Writing output takes a lot of time.
+                }
 
                 if (fileCreation.isCancelled()) // Recheck after closing output.
                     throw new IOException("aborted due to canceled execution");

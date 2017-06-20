@@ -39,6 +39,9 @@ import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.lib.sequence.ForwardSequence;
 import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import gnu.trove.list.TLongList;
+import gnu.trove.list.array.TLongArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.AccessLevel;
@@ -49,6 +52,7 @@ import org.acplt.oncrpc.XdrAble;
 @Getter(AccessLevel.PRIVATE)
 public final class RTFFileDataTables {
     private final file_data_tables input;
+    @Getter
     private final ObjectSequence<RTFFileDataTablesBlock> blocks;
     @Getter(AccessLevel.PUBLIC)
     private final SegmentReader<ObjectSequence<TimeSeriesCollection>> sequence;
@@ -77,6 +81,11 @@ public final class RTFFileDataTables {
         return ObjectSequence.concat(seq, sorted, distinct);
     }
 
+    public TLongList getAllTimestamps() {
+        return blocks.map(block -> block.getTimestamps(), false, true, false).stream()
+                .collect(TLongArrayList::new, TLongList::add, TLongList::addAll);
+    }
+
     public Set<SimpleGroupPath> getAllPaths() {
         return blocks.stream()
                 .flatMap(block -> block.getAllPaths().stream())
@@ -87,5 +96,17 @@ public final class RTFFileDataTables {
         return blocks.stream()
                 .flatMap(block -> block.getAllNames().stream())
                 .collect(Collectors.toSet());
+    }
+
+    public List<SegmentReader<RTFGroupTable>> getGroupReaders(GroupName group) {
+        return blocks
+                .map(RTFFileDataTablesBlock::getTable, false, true, true)
+                .map(SegmentReader::decodeOrThrow, false, true, true)
+                .stream()
+                .map(pathMap -> pathMap.get(group.getPath()))
+                .filter(groupMap -> groupMap != null)
+                .map(groupMap -> groupMap.get(group))
+                .filter(reader -> reader != null)
+                .collect(Collectors.toList());
     }
 }

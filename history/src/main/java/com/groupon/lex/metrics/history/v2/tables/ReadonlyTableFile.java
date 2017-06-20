@@ -31,12 +31,16 @@
  */
 package com.groupon.lex.metrics.history.v2.tables;
 
+import com.groupon.lex.metrics.GroupName;
+import com.groupon.lex.metrics.MetricName;
+import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.xdr.FromXdr;
 import static com.groupon.lex.metrics.history.v2.xdr.Util.HDR_3_LEN;
 import com.groupon.lex.metrics.history.v2.xdr.file_data_tables;
 import com.groupon.lex.metrics.history.v2.xdr.header_flags;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
+import com.groupon.lex.metrics.history.xdr.ColumnMajorTSData;
 import com.groupon.lex.metrics.history.xdr.Const;
 import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.validateHeaderOrThrow;
@@ -48,17 +52,30 @@ import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelSegmentRead
 import com.groupon.lex.metrics.history.xdr.support.reader.SegmentReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.XdrDecodingFileReader;
 import com.groupon.lex.metrics.lib.GCCloseable;
+import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import gnu.trove.list.TLongList;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.Collection;
+import static java.util.Collections.emptyMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import lombok.Getter;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrAble;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
-public class ReadonlyTableFile extends SequenceTSData {
+public class ReadonlyTableFile extends SequenceTSData implements ColumnMajorTSData {
     private static final short FILE_VERSION = 2;  // Only file version that uses Table format.
     private final SegmentReader<RTFFileDataTables> body;
     private final GCCloseable<FileChannel> fd;
@@ -143,5 +160,81 @@ public class ReadonlyTableFile extends SequenceTSData {
                 .map(fdt -> new RTFFileDataTables(fdt, segmentFactory, sorted, distinct))
                 .peek(RTFFileDataTables::validate)
                 .cache();
+    }
+
+    @Override
+    public Collection<DateTime> getTimestamps() {
+        final TLongList timestamps = body.map(RTFFileDataTables::getAllTimestamps).decodeOrThrow();
+        final List<DateTime> result = new ArrayList<>(timestamps.size());
+        timestamps
+                .forEach(v -> {
+                    result.add(new DateTime(v, DateTimeZone.UTC));
+                    return true;
+                });
+        return result;
+    }
+
+    @Override
+    public Set<GroupName> getGroupNames() {
+        return body.map(RTFFileDataTables::getAllNames).decodeOrThrow();
+    }
+
+    @Override
+    public Collection<DateTime> getGroupTimestamps(GroupName group) {
+        return body.decodeOrThrow().getBlocks().stream()
+                .flatMap(block -> getGroupTimestamps(block, group))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Set<MetricName> getMetricNames(GroupName group) {
+        return body.map(tables -> tables.getGroupReaders(group)).decodeOrThrow().stream()
+                .map(segmentReader -> {
+                    return segmentReader
+                            .map(groupTable -> groupTable.getMetricNames())
+                            .decodeOrThrow();
+                })
+                .collect(HashSet<MetricName>::new, Collection::addAll, Collection::addAll);
+    }
+
+    @Override
+    public Map<DateTime, MetricValue> getMetricValues(GroupName group, MetricName metric) {
+        return body.decodeOrThrow().getBlocks().stream()
+                .flatMap(block -> getMetricValues(block, group, metric))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    private static Stream<Map.Entry<DateTime, MetricValue>> getMetricValues(RTFFileDataTablesBlock block, GroupName group, MetricName metric) {
+        final long[] timestamps = block.getTimestamps();
+        final SegmentReader<RTFGroupTable> groupTable = block.getTable().decodeOrThrow().getOrDefault(group.getPath(), emptyMap()).get(group);
+        if (groupTable == null)
+            return Stream.empty();
+
+        final SegmentReader<RTFMetricTable> metricTable = groupTable.decodeOrThrow().getMetrics().get(metric);
+        if (metricTable == null)
+            return Stream.empty();
+
+        final MetricValue[] metrics = metricTable.decodeOrThrow().getAll(0, timestamps.length);
+        assert (timestamps.length == metrics.length);
+
+        return IntStream.range(0, timestamps.length)
+                .filter(idx -> metrics[idx] != null)
+                .mapToObj(idx -> SimpleMapEntry.create(new DateTime(timestamps[idx], DateTimeZone.UTC), metrics[idx]));
+    }
+
+    private static Stream<DateTime> getGroupTimestamps(RTFFileDataTablesBlock block, GroupName group) {
+        final long[] timestamps = block.getTimestamps();
+        final SegmentReader<RTFGroupTable> groupTable = block.getTable().decodeOrThrow().getOrDefault(group.getPath(), emptyMap()).get(group);
+        if (groupTable == null)
+            return Stream.empty();
+
+        return IntStream.range(0, timestamps.length)
+                .filter(groupTable.decodeOrThrow()::contains)
+                .mapToObj(idx -> new DateTime(timestamps[idx], DateTimeZone.UTC));
+    }
+
+    @Override
+    public ColumnMajorTSData asColumnMajorTSData() {
+        return this;
     }
 }

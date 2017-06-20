@@ -13,12 +13,15 @@ import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrAble;
 
 public class TmpFile<T extends XdrAble> implements Closeable {
+    private static final Logger LOG = Logger.getLogger(TmpFile.class.getName());
     private final FileChannel fd;
     private final Compression compression;
     private Any2<XdrDecodingFileReader, XdrEncodingFileWriter> fileIO;
@@ -107,6 +110,7 @@ public class TmpFile<T extends XdrAble> implements Closeable {
                 }
                 return v;
             } catch (IOException | OncRpcException ex) {
+                LOG.log(Level.WARNING, "decoding error for " + this, ex);
                 throw new DecodingException("cannot read: decoding failed", ex);
             }
         }
