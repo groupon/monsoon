@@ -14,7 +14,6 @@ import com.groupon.lex.metrics.history.xdr.ColumnMajorTSData;
 import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
-import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.iterator.TLongIterator;
 import gnu.trove.list.TLongList;
@@ -29,6 +28,7 @@ import java.util.Collection;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
+import static java.util.Collections.synchronizedSet;
 import static java.util.Collections.unmodifiableSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,6 +36,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.Spliterators;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -65,8 +66,8 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
 
     public static class Builder {
         private final TLongList timestamps = new TLongArrayList();
-        private final Map<GroupName, GroupWriter> writers = new HashMap<>();
-        private final Map<GroupName, Set<DateTime>> timestampsByGroup = new HashMap<>();
+        private final Map<GroupName, GroupWriter> writers = new ConcurrentHashMap<>();
+        private final Map<GroupName, Set<DateTime>> timestampsByGroup = new ConcurrentHashMap<>();
 
         private Builder() {
             /* SKIP */
@@ -79,28 +80,40 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
         public Builder with(Collection<? extends TimeSeriesCollection> tsdata) throws IOException {
             try {
                 for (final TimeSeriesCollection tsc : tsdata) {
-                    for (final TimeSeriesValue tsv : tsc.getTSValues()) {
-                        timestampsByGroup.computeIfAbsent(tsv.getGroup(), (g) -> new HashSet<>())
-                                .add(tsc.getTimestamp());
+                    tsc.getTSValues().parallelStream()
+                            .peek(tsv -> {
+                                timestampsByGroup.computeIfAbsent(tsv.getGroup(), (g) -> synchronizedSet(new HashSet<>()))
+                                        .add(tsc.getTimestamp());
+                            })
+                            .forEach(tsv -> {
+                                final GroupWriter groupWriter = writers.computeIfAbsent(
+                                        tsv.getGroup(),
+                                        (g) -> {
+                                            try {
+                                                return new GroupWriter();
+                                            } catch (IOException ex) {
+                                                throw new RuntimeIOException(ex);
+                                            }
+                                        });
 
-                        GroupWriter groupWriter = writers.get(tsv.getGroup());
-                        if (groupWriter == null) {
-                            groupWriter = new GroupWriter();
-                            writers.put(tsv.getGroup(), groupWriter);
-                        }
+                                try {
+                                    fixBacklog(groupWriter);
 
-                        fixBacklog(groupWriter);
-
-                        assert groupWriter.size() == timestamps.size();
-                        groupWriter.add(tsv.getMetrics());
-                    }
+                                    assert groupWriter.size() == timestamps.size();
+                                    groupWriter.add(tsv.getMetrics());
+                                } catch (OncRpcException ex) {
+                                    throw new RuntimeIOException(new IOException("encoding problem", ex));
+                                } catch (IOException ex) {
+                                    throw new RuntimeIOException(ex);
+                                }
+                            });
 
                     timestamps.add(tsc.getTimestamp().getMillis());
                 }
 
                 return this;
-            } catch (OncRpcException ex) {
-                throw new IOException("encoding problem", ex);
+            } catch (RuntimeIOException ex) {
+                throw ex.getEx();
             }
         }
 
@@ -360,5 +373,11 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
         private final DateTime timestamp;
         @NonNull
         private final Map<MetricName, MetricValue> tsv;
+    }
+
+    @RequiredArgsConstructor
+    @Getter
+    private static class RuntimeIOException extends RuntimeException {
+        private final IOException ex;
     }
 }
