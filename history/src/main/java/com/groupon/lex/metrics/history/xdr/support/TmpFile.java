@@ -22,7 +22,6 @@ import org.acplt.oncrpc.XdrAble;
 
 public class TmpFile<T extends XdrAble> implements Closeable {
     private static final Logger LOG = Logger.getLogger(TmpFile.class.getName());
-    private static final int BUFSIZ = 1024;
     private final FileChannel fd;
     private final Compression compression;
     private Optional<XdrEncodingFileWriter> fileWriter;
@@ -31,7 +30,7 @@ public class TmpFile<T extends XdrAble> implements Closeable {
     private TmpFile(FileChannel fd, Compression compression) throws IOException {
         this.fd = fd;
         this.compression = compression;
-        this.fileWriter = Optional.of(new XdrEncodingFileWriter(compression.wrap(new FileChannelWriter(fd, 0), false), BUFSIZ));
+        this.fileWriter = Optional.of(new XdrEncodingFileWriter(compression.wrap(new FileChannelWriter(fd, 0), false)));
 
         try {
             this.fileWriter.get().beginEncoding();
@@ -94,7 +93,7 @@ public class TmpFile<T extends XdrAble> implements Closeable {
             }
         }
 
-        return new IteratorImpl<>(compression.wrap(new FileChannelReader(fd, 0)), BUFSIZ, valueSupplier, count);
+        return new IteratorImpl<>(compression.wrap(new FileChannelReader(fd, 0)), valueSupplier, count);
     }
 
     private static class IteratorImpl<T extends XdrAble> implements Iterator<T> {
@@ -103,8 +102,8 @@ public class TmpFile<T extends XdrAble> implements Closeable {
         private final int maxCount;
         private int count = 0;
 
-        public IteratorImpl(@NonNull FileReader reader, int bufsiz, Supplier<T> valueSupplier, int maxCount) {
-            this.xdr = new XdrDecodingFileReader(reader, bufsiz);
+        public IteratorImpl(@NonNull FileReader reader, Supplier<T> valueSupplier, int maxCount) {
+            this.xdr = new XdrDecodingFileReader(reader);
             this.valueSupplier = valueSupplier;
             this.maxCount = maxCount;
 
