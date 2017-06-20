@@ -2,21 +2,21 @@ package com.groupon.lex.metrics.history.xdr.support;
 
 import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.support.reader.FileChannelReader;
+import com.groupon.lex.metrics.history.xdr.support.reader.FileReader;
 import com.groupon.lex.metrics.history.xdr.support.reader.XdrDecodingFileReader;
 import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
-import com.groupon.lex.metrics.lib.Any2;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import org.acplt.oncrpc.OncRpcException;
 import org.acplt.oncrpc.XdrAble;
 
@@ -24,13 +24,24 @@ public class TmpFile<T extends XdrAble> implements Closeable {
     private static final Logger LOG = Logger.getLogger(TmpFile.class.getName());
     private final FileChannel fd;
     private final Compression compression;
-    private Any2<XdrDecodingFileReader, XdrEncodingFileWriter> fileIO;
+    private Optional<XdrEncodingFileWriter> fileWriter;
     private int count = 0;
 
     private TmpFile(FileChannel fd, Compression compression) throws IOException {
         this.fd = fd;
         this.compression = compression;
-        this.fileIO = Any2.right(new XdrEncodingFileWriter(compression.wrap(new FileChannelWriter(fd, 0), false), 64 * 1024));
+        this.fileWriter = Optional.of(new XdrEncodingFileWriter(compression.wrap(new FileChannelWriter(fd, 0), false), 64 * 1024));
+
+        try {
+            this.fileWriter.get().beginEncoding();
+        } catch (OncRpcException ex) {
+            try {
+                this.fd.close();
+            } catch (Exception ex1) {
+                ex.addSuppressed(ex1);
+            }
+            throw new IOException("XDR initialization failed", ex);
+        }
     }
 
     public TmpFile(Path dir, Compression compression) throws IOException {
@@ -42,54 +53,62 @@ public class TmpFile<T extends XdrAble> implements Closeable {
     }
 
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         Exception exc = null;  // We capture reader/writer errors, but don't throw them.
         try {
-            AutoCloseable readerWriter = fileIO.mapCombine(x -> x, x -> x);
-            if (readerWriter != null)
-                readerWriter.close();
-        } catch (Exception ex) {
+            if (fileWriter.isPresent()) {
+                fileWriter.get().endEncoding();
+                fileWriter.get().close();
+                fileWriter = Optional.empty();
+            }
+        } catch (OncRpcException | IOException | RuntimeException ex) {
             exc = ex;
         }
 
         try {
             fd.close();
-        } catch (IOException ex) {
+        } catch (IOException | RuntimeException ex) {
             ex.addSuppressed(exc);  // We do add reader/writer exception to the IOException, as they're useful in debugging.
             throw ex;
         }
     }
 
-    public void add(@NonNull T v) throws OncRpcException, IOException {
-        final XdrEncodingFileWriter xdr = fileIO.getRight().orElseThrow(() -> new IllegalStateException("cannot write: we switched to reading"));
-        if (count == 0)
-            xdr.beginEncoding();
+    public synchronized void add(@NonNull T v) throws OncRpcException, IOException {
+        final XdrEncodingFileWriter xdr = fileWriter.orElseThrow(() -> new IllegalStateException("cannot write: we switched to reading"));
         v.xdrEncode(xdr);
         ++count;
     }
 
-    public int size() {
+    public synchronized int size() {
         return count;
     }
 
     public Iterator<T> iterator(@NonNull Supplier<T> valueSupplier) throws IOException, OncRpcException {
-        if (!fileIO.getLeft().isPresent()) {
-            fileIO.getRight().orElseThrow(IllegalStateException::new).endEncoding();
-            fileIO.getRight().orElseThrow(IllegalStateException::new).close();
-            fileIO = Any2.left(new XdrDecodingFileReader(compression.wrap(new FileChannelReader(fd, 0)), 64 * 1024));
+        synchronized (this) {
+            if (fileWriter.isPresent()) {
+                // Flush all data to the file and prevent any future writes.
+                fileWriter.get().endEncoding();
+                fileWriter.get().close();
+                fileWriter = Optional.empty();
+            }
         }
 
-        final XdrDecodingFileReader xdr = fileIO.getLeft().orElseThrow(() -> new IllegalStateException("cannot read: expected reader"));
-        xdr.beginDecoding();
-        return new IteratorImpl(xdr, valueSupplier, count);
+        return new IteratorImpl<>(compression.wrap(new FileChannelReader(fd, 0)), 64 * 1024, valueSupplier, count);
     }
 
-    @RequiredArgsConstructor
-    private class IteratorImpl implements Iterator<T> {
+    private static class IteratorImpl<T extends XdrAble> implements Iterator<T> {
         private final XdrDecodingFileReader xdr;
         private final Supplier<T> valueSupplier;
         private final int maxCount;
         private int count = 0;
+
+        public IteratorImpl(@NonNull FileReader reader, int bufsiz, Supplier<T> valueSupplier, int maxCount) {
+            this.xdr = new XdrDecodingFileReader(reader, bufsiz);
+            this.valueSupplier = valueSupplier;
+            this.maxCount = maxCount;
+
+            this.xdr.beginDecoding();
+        }
 
         @Override
         public boolean hasNext() {
