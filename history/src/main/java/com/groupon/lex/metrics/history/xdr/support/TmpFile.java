@@ -22,6 +22,7 @@ import org.acplt.oncrpc.XdrAble;
 
 public class TmpFile<T extends XdrAble> implements Closeable {
     private static final Logger LOG = Logger.getLogger(TmpFile.class.getName());
+    private static final int BUFSIZ = 1024;
     private final FileChannel fd;
     private final Compression compression;
     private Optional<XdrEncodingFileWriter> fileWriter;
@@ -30,7 +31,7 @@ public class TmpFile<T extends XdrAble> implements Closeable {
     private TmpFile(FileChannel fd, Compression compression) throws IOException {
         this.fd = fd;
         this.compression = compression;
-        this.fileWriter = Optional.of(new XdrEncodingFileWriter(compression.wrap(new FileChannelWriter(fd, 0), false), 64 * 1024));
+        this.fileWriter = Optional.of(new XdrEncodingFileWriter(compression.wrap(new FileChannelWriter(fd, 0), false), BUFSIZ));
 
         try {
             this.fileWriter.get().beginEncoding();
@@ -93,7 +94,7 @@ public class TmpFile<T extends XdrAble> implements Closeable {
             }
         }
 
-        return new IteratorImpl<>(compression.wrap(new FileChannelReader(fd, 0)), 64 * 1024, valueSupplier, count);
+        return new IteratorImpl<>(compression.wrap(new FileChannelReader(fd, 0)), BUFSIZ, valueSupplier, count);
     }
 
     private static class IteratorImpl<T extends XdrAble> implements Iterator<T> {
