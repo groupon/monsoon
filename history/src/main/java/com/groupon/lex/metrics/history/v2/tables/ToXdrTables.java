@@ -125,7 +125,7 @@ public class ToXdrTables implements Closeable {
     }
 
     public DateTime build(FileChannel out, Compression compression) throws IOException {
-        final CompletableFuture<tsfile_header> header;
+        final tsfile_header header;
         final DateTime tsBegin, tsEnd;
 
         try (final Context ctx = new Context(out, HDR_SPACE, compression)) {
@@ -183,14 +183,16 @@ public class ToXdrTables implements Closeable {
                         return result;
                     });
 
-            header = ctx.write(fdt)
-                    .thenApply(fileDataPos -> encodeHeader(fileDataPos, ctx.getFd().getOffset(), true, true, compression, tsBegin, tsEnd));
+            header = deref(ctx.write(fdt)
+                    .thenApply(fileDataPos -> encodeHeader(fileDataPos, ctx.getFd().getOffset(), true, true, compression, tsBegin, tsEnd)));
+        } catch (OncRpcException ex) {
+            throw new IOException("encoding error", ex);
         }
 
         try (XdrEncodingFileWriter xdr = new XdrEncodingFileWriter(new Crc32AppendingFileWriter(new SizeVerifyingWriter(new FileChannelWriter(out, 0), HDR_SPACE), 0), HDR_SPACE)) {
             xdr.beginEncoding();
             writeMimeHeader(xdr);
-            deref(header).xdrEncode(xdr);
+            header.xdrEncode(xdr);
             xdr.endEncoding();
         } catch (OncRpcException ex) {
             throw new IOException("encoding error", ex);
