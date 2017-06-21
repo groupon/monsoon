@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.Getter;
@@ -36,6 +37,8 @@ import org.joda.time.DateTime;
  */
 public class TSDataOptimizerTask {
     private static final Logger LOG = Logger.getLogger(TSDataOptimizerTask.class.getName());
+    private static final AtomicInteger TASK_POOL_IDX = new AtomicInteger();
+    private static final AtomicInteger INSTALL_POOL_IDX = new AtomicInteger();
 
     /**
      * The task pool handles the creation of temporary files containing all
@@ -47,7 +50,12 @@ public class TSDataOptimizerTask {
      * The task itself mainly uses the ForkJoinPool, so this thread spends most
      * of the time waiting for work to complete (or new work to come in).
      */
-    private static final ExecutorService TASK_POOL = Executors.newFixedThreadPool(1);
+    private static final ExecutorService TASK_POOL = Executors.newFixedThreadPool(1, (Runnable r) -> {
+        Thread thr = new Thread(r);
+        thr.setDaemon(true);
+        thr.setName("TSDataOptimizerTask-TaskPool-" + TASK_POOL_IDX.incrementAndGet());
+        return thr;
+    });
 
     /**
      * The install pool handles the file installation part of creating a new
@@ -58,7 +66,12 @@ public class TSDataOptimizerTask {
      * separate thread from the task pool, to allow the task pool to pick up a
      * new file while the old file is being written out.
      */
-    private static final ExecutorService INSTALL_POOL = Executors.newFixedThreadPool(1);
+    private static final ExecutorService INSTALL_POOL = Executors.newFixedThreadPool(1, (Runnable r) -> {
+        Thread thr = new Thread(r);
+        thr.setDaemon(true);
+        thr.setName("TSDataOptimizerTask-InstallPool-" + INSTALL_POOL_IDX.incrementAndGet());
+        return thr;
+    });
 
     /**
      * List of outstanding futures. The list is used during program termination
