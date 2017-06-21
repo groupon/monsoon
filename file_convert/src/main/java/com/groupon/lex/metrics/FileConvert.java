@@ -1,13 +1,19 @@
 package com.groupon.lex.metrics;
 
+import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.DirCollectHistory;
+import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.NonNull;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -86,6 +92,7 @@ public class FileConvert {
         dst.setAppendCompression(compression);
         dst.setOptimizedCompression(optimizedCompression);
         src.getRawCollections().stream()
+                .sorted(Comparator.comparing(FileConvert::getAnyTimestampFromCollection))
                 .forEach(dst::addAll);
 
         // Wait for pending optimization to finish.
@@ -103,5 +110,13 @@ public class FileConvert {
             LOG.log(Level.SEVERE, "Unable to complete copy operation: ", ex);
             System.exit(EX_TEMPFAIL);
         }
+    }
+
+    private static DateTime getAnyTimestampFromCollection(Collection<? extends TimeSeriesCollection> c) {
+        if (c instanceof TSData)
+            return ((TSData) c).getEnd();
+
+        if (c.isEmpty()) return new DateTime(0, DateTimeZone.UTC);
+        return c.iterator().next().getTimestamp();
     }
 }
