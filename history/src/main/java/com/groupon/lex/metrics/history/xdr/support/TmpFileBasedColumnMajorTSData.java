@@ -52,7 +52,7 @@ import org.joda.time.DateTimeZone;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
-    private static final Compression TMP_FILE_COMPRESSION = Compression.GZIP;
+    private static final Compression TMP_FILE_COMPRESSION = Compression.NONE;
     private final TLongList timestamps;
     private final Map<GroupName, Group> groups;
     private final Map<GroupName, Set<DateTime>> timestampsByGroup;
