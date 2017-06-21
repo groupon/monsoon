@@ -29,14 +29,15 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
 import static java.util.Collections.synchronizedSet;
 import static java.util.Collections.unmodifiableSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -130,8 +131,25 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
         public TmpFileBasedColumnMajorTSData build() throws IOException {
             fixBacklog();
 
-            final Map<GroupName, Group> groups = writers.entrySet().stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, groupWriterEntry -> groupWriterEntry.getValue().asReader()));
+            final Map<GroupName, Group> groups;
+            try {
+                groups = writers.entrySet().parallelStream()
+                        .unordered()
+                        .map(groupWriter -> {
+                            try {
+                                return SimpleMapEntry.create(groupWriter.getKey(), groupWriter.getValue().asReader());
+                            } catch (IOException ex) {
+                                throw new RuntimeIOException(ex);
+                            }
+                        })
+                        .collect(
+                                HashMap<GroupName, Group>::new,
+                                (map, entry) -> map.put(entry.getKey(), entry.getValue()),
+                                Map::putAll);
+            } catch (RuntimeIOException ex) {
+                throw ex.getEx();
+            }
+
             return new TmpFileBasedColumnMajorTSData(timestamps, groups, timestampsByGroup);
         }
     }
@@ -253,9 +271,12 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
             }
         }
 
-        public Group asReader() {
-            return new Group(metrics.entrySet().stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().asReader())));
+        public Group asReader() throws IOException {
+            final Map<MetricName, Metric> mapping = new HashMap<>();
+            for (Map.Entry<MetricName, MetricWriter> metricEntry
+                         : metrics.entrySet())
+                mapping.put(metricEntry.getKey(), metricEntry.getValue().asReader());
+            return new Group(mapping);
         }
     }
 
@@ -277,29 +298,57 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
     private static class MetricWriter {
         private final GCCloseable<TmpFile<XdrAbleMetricEntry>> tmpFile;
         private final DictionaryForWrite dictionary = new DictionaryForWrite();
+        private Optional<MetricValue> lastValue = Optional.empty();
+        private int repeatValue = 0;
+        private int writtenCount = 0;
 
         public MetricWriter() throws IOException {
             this.tmpFile = new GCCloseable<>(new TmpFile<>(TMP_FILE_COMPRESSION));
         }
 
-        public void add(@NonNull MetricValue metric) throws IOException {
+        private void addOptMetric(@NonNull Optional<MetricValue> metric, int count) throws IOException {
+            if (count == 0) return;
+            if (repeatValue == 0) lastValue = metric;
+            if (Objects.equals(lastValue, metric)) {
+                repeatValue += count;
+                return;
+            }
+
             try {
-                tmpFile.get().add(new XdrAbleMetricEntry(dictionary, Optional.of(metric)));
+                tmpFile.get().add(new XdrAbleMetricEntry(dictionary, lastValue, repeatValue));
+                writtenCount += repeatValue;
             } catch (OncRpcException ex) {
                 throw new IOException(ex);
             }
+
+            lastValue = metric;
+            repeatValue = count;
+        }
+
+        public void add(@NonNull MetricValue metric) throws IOException {
+            addOptMetric(Optional.of(metric), 1);
         }
 
         public void fixBacklog(int padUntil) throws IOException {
+            if (padUntil > size())
+                addOptMetric(Optional.empty(), padUntil - size());
+        }
+
+        public int size() {
+            return writtenCount + repeatValue;
+        }
+
+        public Metric asReader() throws IOException {
             try {
-                for (int i = tmpFile.get().size(); i < padUntil; ++i)
-                    tmpFile.get().add(new XdrAbleMetricEntry(dictionary, Optional.empty()));
+                if (repeatValue > 0) {
+                    tmpFile.get().add(new XdrAbleMetricEntry(dictionary, lastValue, repeatValue));
+                    writtenCount += repeatValue;
+                    repeatValue = 0;
+                }
             } catch (OncRpcException ex) {
                 throw new IOException(ex);
             }
-        }
 
-        public Metric asReader() {
             return new Metric(tmpFile);
         }
     }
@@ -316,10 +365,10 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
         }
 
         public Iterator<Optional<MetricValue>> iterator() {
-            return new IteratorImpl(tmpFile);
+            return Iterators.concat(new IteratorImpl(tmpFile));
         }
 
-        private static class IteratorImpl implements Iterator<Optional<MetricValue>> {
+        private static class IteratorImpl implements Iterator<Iterator<Optional<MetricValue>>> {
             private final Iterator<XdrAbleMetricEntry> inner;
             private DictionaryDelta dictionary = new DictionaryDelta();
 
@@ -343,7 +392,7 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
             }
 
             @Override
-            public Optional<MetricValue> next() {
+            public Iterator<Optional<MetricValue>> next() {
                 return inner.next()
                         .decode(dictionary, (updatedDictionary) -> dictionary = updatedDictionary);
             }
@@ -354,32 +403,35 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
         private boolean present = false;
         private metric_value metric;
         private dictionary_delta dd;
+        private int repeat;
 
         public XdrAbleMetricEntry() {
             /* SKIP */
         }
 
-        public XdrAbleMetricEntry(@NonNull DictionaryForWrite dictionary, @NonNull Optional<MetricValue> value) {
+        public XdrAbleMetricEntry(@NonNull DictionaryForWrite dictionary, @NonNull Optional<MetricValue> value, int repeat) {
             this.present = value.isPresent();
+            this.repeat = repeat;
             if (value.isPresent()) {
                 this.metric = ToXdr.metricValue(value.get(), dictionary.getStringTable()::getOrCreate);
                 this.dd = dictionary.encode();
+                dictionary.reset();
             }
-            dictionary.reset();
         }
 
-        public Optional<MetricValue> decode(DictionaryDelta inputDictionary, Consumer<DictionaryDelta> updateDictionary) {
-            if (!present) return Optional.empty();
+        public Iterator<Optional<MetricValue>> decode(DictionaryDelta inputDictionary, Consumer<DictionaryDelta> updateDictionary) {
+            if (!present) return repeatingIterator(Optional.empty(), repeat);
 
             final DictionaryDelta dictionary = new DictionaryDelta(dd, inputDictionary);
             final MetricValue result = FromXdr.metricValue(metric, dictionary::getString);
 
             updateDictionary.accept(dictionary);
-            return Optional.of(result);
+            return repeatingIterator(Optional.of(result), repeat);
         }
 
         @Override
         public void xdrEncode(XdrEncodingStream stream) throws OncRpcException, IOException {
+            stream.xdrEncodeInt(repeat);
             stream.xdrEncodeBoolean(present);
             if (present) {
                 dd.xdrEncode(stream);
@@ -389,6 +441,7 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
 
         @Override
         public void xdrDecode(XdrDecodingStream stream) throws OncRpcException, IOException {
+            repeat = stream.xdrDecodeInt();
             present = stream.xdrDecodeBoolean();
             if (!present) {
                 metric = null;
@@ -397,6 +450,10 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
                 dd = new dictionary_delta(stream);
                 metric = new metric_value(stream);
             }
+        }
+
+        private static <T> Iterator<T> repeatingIterator(T elem, int repeat) {
+            return Iterators.limit(Iterators.cycle(elem), repeat);
         }
     }
 
