@@ -257,32 +257,9 @@ public class TSDataFileChain extends SequenceTSData {
 
     @Override
     public ObjectSequence<TimeSeriesCollection> getSequence() {
-        final ReentrantReadWriteLock.ReadLock lock = guard.readLock();
-        lock.lock();
-        try {
-            Stream<SequenceTSData> readSequences = readKeys.stream()
-                    .flatMap(key -> {
-                        try {
-                            return Stream.of(getFile(key));
-                        } catch (IOException ex) {
-                            LOG.log(Level.WARNING, "unable to open {0}, omitting from result", key.getFile());
-                            return Stream.empty();
-                        }
-                    });
-            Stream<RWListFile> appendSequences = appendFile
-                    .map(AppendFile::getTsdata)
-                    .map(Stream::of)
-                    .orElseGet(Stream::empty);
-
-            ObjectSequence<TimeSeriesCollection>[] tsSeq = Stream.concat(readSequences, appendSequences)
-                    .parallel()
-                    .unordered()
-                    .map(SequenceTSData::getSequence)
-                    .toArray(ObjectSequence[]::new);
-            return Util.mergeSequences(tsSeq);
-        } finally {
-            lock.unlock();
-        }
+        return Util.mergeSequences(getRawCollections().stream()
+                .map(SequenceTSData::getSequence)
+                .toArray(ObjectSequence[]::new));
     }
 
     @Override
@@ -604,6 +581,33 @@ public class TSDataFileChain extends SequenceTSData {
             Files.delete(key.getFile());
         } catch (IOException ex) {
             LOG.log(Level.WARNING, "unable to remove file " + key.getFile(), ex);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public Collection<SequenceTSData> getRawCollections() {
+        final ReentrantReadWriteLock.ReadLock lock = guard.readLock();
+        lock.lock();
+        try {
+            Stream<SequenceTSData> readSequences = readKeys.stream()
+                    .flatMap(key -> {
+                        try {
+                            return Stream.of(getFile(key));
+                        } catch (IOException ex) {
+                            LOG.log(Level.WARNING, "unable to open {0}, omitting from result", key.getFile());
+                            return Stream.empty();
+                        }
+                    });
+            Stream<RWListFile> appendSequences = appendFile
+                    .map(AppendFile::getTsdata)
+                    .map(Stream::of)
+                    .orElseGet(Stream::empty);
+
+            return Stream.concat(readSequences, appendSequences)
+                    .parallel()
+                    .unordered()
+                    .collect(Collectors.toList());
         } finally {
             lock.unlock();
         }

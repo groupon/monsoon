@@ -10,9 +10,11 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
+import static java.util.Collections.unmodifiableCollection;
 import java.util.Comparator;
 import static java.util.Objects.requireNonNull;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -102,5 +104,12 @@ public class DirCollectHistory extends AbstractCollectHistory<TSDataFileChain> {
 
     public void optimizeOldFiles() {
         getTSData().optimizeOldFiles();
+    }
+
+    public Collection<? extends Collection<TimeSeriesCollection>> getRawCollections() {
+        // Ensure exposed collections are not modifiable; they are meant for reading only.
+        return getTSData().getRawCollections().stream()
+                .map(collection -> (collection.canAddSingleRecord() ? unmodifiableCollection(collection) : collection))
+                .collect(Collectors.toList());
     }
 }

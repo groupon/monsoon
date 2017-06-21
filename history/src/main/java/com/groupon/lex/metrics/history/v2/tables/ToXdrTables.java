@@ -59,7 +59,9 @@ import static com.groupon.lex.metrics.history.xdr.support.writer.Crc32AppendingF
 import com.groupon.lex.metrics.history.xdr.support.writer.FileChannelWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.SizeVerifyingWriter;
 import com.groupon.lex.metrics.history.xdr.support.writer.XdrEncodingFileWriter;
+import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import gnu.trove.TCollections;
 import gnu.trove.iterator.TLongIterator;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TLongArrayList;
@@ -78,7 +80,6 @@ import static java.util.Collections.emptyList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Map;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -87,6 +88,7 @@ import java.util.function.IntFunction;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -147,36 +149,47 @@ public class ToXdrTables implements Closeable {
                     .map(timestampsPerBlock -> new BlockBuilder(timestampsPerBlock, ctx))
                     .collect(Collectors.toList());
 
-            for (GroupName group : tsdata.getGroupNames()) {
-                for (DateTime timestamp : tsdata.getGroupTimestamps(group)) {
-                    final long ts = timestamp.getMillis();
-                    final int blockIndex = lookupTable.get(ts);
-                    if (blockIndex != lookupTable.getNoEntryValue())
-                        blocks.get(blockIndex).accept(ts, group);
-                }
+            tsdata.getGroupNames().parallelStream()
+                    .peek((group) -> {
+                        tsdata.getGroupTimestamps(group).parallelStream()
+                                .map((timestamp) -> timestamp.getMillis())
+                                .forEach((ts) -> {
+                                    final int blockIndex = lookupTable.get(ts);
+                                    if (blockIndex != lookupTable.getNoEntryValue())
+                                        blocks.get(blockIndex).accept(ts, group);
+                                });
+                    })
+                    .flatMap((group) -> {
+                        return tsdata.getMetricNames(group).parallelStream()
+                                .map(metric -> SimpleMapEntry.create(group, metric));
+                    })
+                    .forEach((groupAndMetric) -> {
+                        final GroupName group = groupAndMetric.getKey();
+                        final MetricName metric = groupAndMetric.getValue();
+                        final TsvMetricBuilder[] tsvMetricBuilders = new TsvMetricBuilder[blocks.size()];
 
-                for (MetricName metric : tsdata.getMetricNames(group)) {
-                    final TsvMetricBuilder[] tsvMetricBuilders = new TsvMetricBuilder[blocks.size()];
+                        tsdata.getMetricValues(group, metric).entrySet().stream()
+                                .parallel()
+                                .forEach((tsValue) -> {
+                                    final long ts = tsValue.getKey().getMillis();
+                                    final int blockIndex = lookupTable.get(ts);
 
-                    for (Map.Entry<DateTime, MetricValue> tsValue
-                                 : tsdata.getMetricValues(group, metric).entrySet()) {
-                        final long ts = tsValue.getKey().getMillis();
-                        final int blockIndex = lookupTable.get(ts);
-                        if (blockIndex == lookupTable.getNoEntryValue())
-                            continue;
+                                    if (blockIndex != lookupTable.getNoEntryValue()) {
+                                        synchronized (tsvMetricBuilders) {
+                                            if (tsvMetricBuilders[blockIndex] == null)
+                                                tsvMetricBuilders[blockIndex] = blocks.get(blockIndex).newMetricBuilder(metric);
+                                        }
 
-                        if (tsvMetricBuilders[blockIndex] == null)
-                            tsvMetricBuilders[blockIndex] = blocks.get(blockIndex).newMetricBuilder(metric);
-                        blocks.get(blockIndex).getTimestampIndex(ts)
-                                .ifPresent(tsIndex -> tsvMetricBuilders[blockIndex].accept(tsIndex, tsValue.getValue()));
-                    }
+                                        blocks.get(blockIndex).getTimestampIndex(ts)
+                                                .ifPresent(tsIndex -> tsvMetricBuilders[blockIndex].accept(tsIndex, tsValue.getValue()));
+                                    }
+                                });
 
-                    for (int i = 0; i < tsvMetricBuilders.length; ++i) {
-                        if (tsvMetricBuilders[i] != null)
-                            blocks.get(i).accept(group, metric, tsvMetricBuilders[i]);
-                    }
-                }
-            }
+                        IntStream.range(0, tsvMetricBuilders.length)
+                                .filter(idx -> tsvMetricBuilders[idx] != null)
+                                .parallel()
+                                .forEach(idx -> blocks.get(idx).accept(group, metric, tsvMetricBuilders[idx]));
+                    });
 
             final CompletableFuture<file_data_tables> fdt = futuresToArray(blocks.stream().map(BlockBuilder::build).collect(Collectors.toList()), file_data_tables_block[]::new)
                     .thenApply(fdtBlocks -> {
@@ -282,7 +295,7 @@ public class ToXdrTables implements Closeable {
             resolved.getBuilder().accept(dictionary, resolved.getPathIndex(), group.getTags(), metric, metricBuilder);
         }
 
-        private ResolvedGroup getGroupBuilderFor(DictionaryForWrite dictionary, GroupName group) {
+        private synchronized ResolvedGroup getGroupBuilderFor(DictionaryForWrite dictionary, GroupName group) {
             final int pathIndex = dictionary.getPathTable().getOrCreate(group.getPath().getPath());
 
             GroupBuilder builder = groupBuilder.get(pathIndex);
@@ -327,7 +340,7 @@ public class ToXdrTables implements Closeable {
             resolved.getBuilder().accept(dictionary, groupIndex, resolved.getTagIndex(), metric, metricBuilder);
         }
 
-        private ResolvedTags getTsvBuilderFor(DictionaryForWrite dictionary, Tags tags) {
+        private synchronized ResolvedTags getTsvBuilderFor(DictionaryForWrite dictionary, Tags tags) {
             final int tagIndex = dictionary.getTagsTable().getOrCreate(tags);
             TagsBuilder builder = tsvBuilder.get(tagIndex);
             if (builder == null) {
@@ -389,7 +402,7 @@ public class ToXdrTables implements Closeable {
 
     private static class TsvBuilder {
         private final boolean[] presence;
-        private final TIntObjectMap<CompletableFuture<tables_metric>> tsvMetricFutures = new TIntObjectHashMap<>();
+        private final TIntObjectMap<CompletableFuture<tables_metric>> tsvMetricFutures = TCollections.synchronizedMap(new TIntObjectHashMap<>());
 
         public TsvBuilder(int timestampsSize) {
             this.presence = new boolean[timestampsSize];

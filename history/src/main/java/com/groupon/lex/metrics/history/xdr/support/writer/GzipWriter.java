@@ -37,6 +37,6 @@ import lombok.NonNull;
 
 public class GzipWriter extends AbstractOutputStreamWriter {
     public GzipWriter(@NonNull FileWriter out) throws IOException {
-        super(new GZIPOutputStream(newAdapter(out), 65536));
+        super(new GZIPOutputStream(newAdapter(out)));
     }
 }
