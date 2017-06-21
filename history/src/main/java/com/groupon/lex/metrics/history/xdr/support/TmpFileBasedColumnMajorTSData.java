@@ -300,6 +300,7 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
         private final DictionaryForWrite dictionary = new DictionaryForWrite();
         private Optional<MetricValue> lastValue = Optional.empty();
         private int repeatValue = 0;
+        private int writtenCount = 0;
 
         public MetricWriter() throws IOException {
             this.tmpFile = new GCCloseable<>(new TmpFile<>(TMP_FILE_COMPRESSION));
@@ -315,6 +316,7 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
 
             try {
                 tmpFile.get().add(new XdrAbleMetricEntry(dictionary, lastValue, repeatValue));
+                writtenCount += repeatValue;
             } catch (OncRpcException ex) {
                 throw new IOException(ex);
             }
@@ -333,13 +335,16 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
         }
 
         public int size() {
-            return tmpFile.get().size() + repeatValue;
+            return writtenCount + repeatValue;
         }
 
         public Metric asReader() throws IOException {
             try {
-                if (repeatValue > 0)
+                if (repeatValue > 0) {
                     tmpFile.get().add(new XdrAbleMetricEntry(dictionary, lastValue, repeatValue));
+                    writtenCount += repeatValue;
+                    repeatValue = 0;
+                }
             } catch (OncRpcException ex) {
                 throw new IOException(ex);
             }
