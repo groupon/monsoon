@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.v2.DictionaryForWrite;
 import com.groupon.lex.metrics.history.v2.xdr.ToXdr;
@@ -48,6 +49,7 @@ import com.groupon.lex.metrics.history.v2.xdr.tables_group;
 import com.groupon.lex.metrics.history.v2.xdr.tables_metric;
 import com.groupon.lex.metrics.history.v2.xdr.tables_tag;
 import com.groupon.lex.metrics.history.v2.xdr.tsfile_header;
+import com.groupon.lex.metrics.history.xdr.ColumnMajorTSData;
 import static com.groupon.lex.metrics.history.xdr.Const.MIME_HEADER_LEN;
 import static com.groupon.lex.metrics.history.xdr.Const.writeMimeHeader;
 import com.groupon.lex.metrics.history.xdr.support.FilePos;
@@ -80,6 +82,7 @@ import static java.util.Collections.emptyList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -112,6 +115,7 @@ public class ToXdrTables implements Closeable {
     private static final int MAX_BLOCK_RECORDS = 10000;
 
     private final TmpFileBasedColumnMajorTSData.Builder tsdataBuilder = TmpFileBasedColumnMajorTSData.builder();
+    private final Collection<ColumnMajorTSData> tsdataDirect = new ArrayList<>();
 
     @Override
     public void close() throws IOException {
@@ -123,17 +127,22 @@ public class ToXdrTables implements Closeable {
     }
 
     public void addAll(Collection<? extends TimeSeriesCollection> tscCollection) throws IOException {
-        tsdataBuilder.with(tscCollection);
+        if (tscCollection instanceof TSData)
+            tsdataDirect.add(((TSData) tscCollection).asColumnMajorTSData());
+        else
+            tsdataBuilder.with(tscCollection);
     }
 
     public DateTime build(FileChannel out, Compression compression) throws IOException {
         final tsfile_header header;
         final DateTime tsBegin, tsEnd;
 
-        try (final Context ctx = new Context(out, HDR_SPACE, compression)) {
-            final TmpFileBasedColumnMajorTSData tsdata = tsdataBuilder.build();
+        tsdataDirect.add(tsdataBuilder.build());
 
-            final List<TLongList> timestamps = partitionTimestamps(tsdata.getTimestamps().stream()
+        try (final Context ctx = new Context(out, HDR_SPACE, compression)) {
+            final List<TLongList> timestamps = partitionTimestamps(tsdataDirect.stream()
+                    .map(ColumnMajorTSData::getTimestamps)
+                    .flatMap(Collection::stream)
                     .mapToLong(DateTime::getMillis)
                     .distinct()
                     .sorted()
@@ -149,27 +158,42 @@ public class ToXdrTables implements Closeable {
                     .map(timestampsPerBlock -> new BlockBuilder(timestampsPerBlock, ctx))
                     .collect(Collectors.toList());
 
-            tsdata.getGroupNames().parallelStream()
+            final Map<GroupName, List<ColumnMajorTSData>> groupNames = tsdataDirect.parallelStream()
+                    .flatMap(tsdata -> {
+                        return tsdata.getGroupNames().stream()
+                                .map(group -> SimpleMapEntry.create(group, tsdata));
+                    })
+                    .collect(Collectors.groupingByConcurrent(Map.Entry::getKey, Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
+
+            groupNames.entrySet().parallelStream()
                     .peek((group) -> {
-                        tsdata.getGroupTimestamps(group).parallelStream()
+                        group.getValue().stream()
+                                .flatMap(tsdata -> tsdata.getGroupTimestamps(group.getKey()).parallelStream())
                                 .map((timestamp) -> timestamp.getMillis())
                                 .forEach((ts) -> {
                                     final int blockIndex = lookupTable.get(ts);
                                     if (blockIndex != lookupTable.getNoEntryValue())
-                                        blocks.get(blockIndex).accept(ts, group);
+                                        blocks.get(blockIndex).accept(ts, group.getKey());
                                 });
                     })
-                    .flatMap((group) -> {
-                        return tsdata.getMetricNames(group).parallelStream()
-                                .map(metric -> SimpleMapEntry.create(group, metric));
+                    .flatMap((groupWithTsdata) -> { // yields: tuple(group, metric, list<tsdata>)
+                        final Map<MetricName, List<ColumnMajorTSData>> metricWithTsdata = groupWithTsdata.getValue().stream()
+                                .flatMap(tsdata -> {
+                                    return tsdata.getMetricNames(groupWithTsdata.getKey()).stream()
+                                            .map(metric -> SimpleMapEntry.create(metric, tsdata));
+                                })
+                                .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
+
+                        return metricWithTsdata.entrySet().parallelStream()
+                                .map(metric -> new GroupMetricWithTsdata(groupWithTsdata.getKey(), metric.getKey(), metric.getValue()));
                     })
                     .forEach((groupAndMetric) -> {
-                        final GroupName group = groupAndMetric.getKey();
-                        final MetricName metric = groupAndMetric.getValue();
+                        final GroupName group = groupAndMetric.getGroup();
+                        final MetricName metric = groupAndMetric.getMetric();
                         final TsvMetricBuilder[] tsvMetricBuilders = new TsvMetricBuilder[blocks.size()];
 
-                        tsdata.getMetricValues(group, metric).entrySet().stream()
-                                .parallel()
+                        groupAndMetric.getTsdata().parallelStream()
+                                .flatMap(tsdata -> tsdata.getMetricValues(group, metric).entrySet().parallelStream())
                                 .forEach((tsValue) -> {
                                     final long ts = tsValue.getKey().getMillis();
                                     final int blockIndex = lookupTable.get(ts);
@@ -572,6 +596,14 @@ public class ToXdrTables implements Closeable {
         public void close() {
             writer.close();
         }
+    }
+
+    @RequiredArgsConstructor
+    @Getter
+    private static class GroupMetricWithTsdata {
+        private final GroupName group;
+        private final MetricName metric;
+        private final List<ColumnMajorTSData> tsdata;
     }
 
     /**
