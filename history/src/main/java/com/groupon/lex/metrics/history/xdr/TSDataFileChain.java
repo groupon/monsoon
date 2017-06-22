@@ -14,6 +14,7 @@ import com.groupon.lex.metrics.lib.GCCloseable;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.lib.sequence.ObjectSequence;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
@@ -374,15 +375,18 @@ public class TSDataFileChain extends SequenceTSData {
         final List<Key> keys = new ArrayList<>(files.keySet());  // Keys for removal later; we don't want to reference the complete map, as it also holds each TSData and holding on would prevent the GC from retiring them early.
         LOG.log(Level.INFO, "kicking off optimization of {0}", keys.stream().map(Key::getFile).collect(Collectors.toList()));
 
-        CompletableFuture<Void> task = new TSDataOptimizerTask(dir_)
-                .withCompression(optimizedCompression)
-                .addAll(files.values())
+        optimize(files.values(), new ArrayList<>(files.keySet()));
+    }
+
+    private CompletableFuture<Void> optimize(Collection<TSData> tsdata, Collection<Key> erase) {
+        final CompletableFuture<Void> task = new TSDataOptimizerTask(dir_, tsdata)
+                .withCompression(appendCompression)
                 .run()
                 .thenAccept((newFile) -> {
                     final ReentrantReadWriteLock.WriteLock lock = guard.writeLock();
                     lock.lock();
                     try {
-                        keys.forEach(file -> {
+                        erase.forEach(file -> {
                             if (readKeys.remove(file)) {
                                 try {
                                     Files.delete(file.getFile());
@@ -405,11 +409,12 @@ public class TSDataFileChain extends SequenceTSData {
         task
                 .whenComplete((result, exc) -> {
                     if (exc != null)
-                        LOG.log(Level.WARNING, "unable to optimize " + keys.stream().map(Key::getFile).collect(Collectors.toList()), exc);
+                        LOG.log(Level.WARNING, "unable to optimize " + erase.stream().collect(Collectors.toList()), exc);
                     synchronized (this) {
                         pendingTasks.remove(task);
                     }
                 });
+        return task;
     }
 
     /**
@@ -616,5 +621,59 @@ public class TSDataFileChain extends SequenceTSData {
     @Override
     public Optional<GCCloseable<FileChannel>> getFileChannel() {
         return Optional.empty();
+    }
+
+    public BatchAdd batchAdd() {
+        return new BatchAdd();
+    }
+
+    public class BatchAdd implements Closeable {
+        private final List<TSData> tsdList = new ArrayList<>();
+        private long tsdBytes = 0;
+        private int tsdRecords = 0;
+        private final Collection<CompletableFuture<Void>> outstanding = new ArrayList<>();
+
+        public void add(Collection<? extends TimeSeriesCollection> tsd) {
+            if (tsd instanceof TSData)
+                add((TSData) tsd);
+            else
+                TSDataFileChain.this.addAll(tsd);
+        }
+
+        public void add(TSData tsd) {
+            tsdBytes += tsd.getFileSize();
+            tsdRecords += tsd.size();
+            tsdList.add(tsd);
+
+            if (tsdBytes >= max_filesize_ || tsdRecords >= max_filerecords_) {
+                outstanding.add(optimize(tsdList, emptyList()));
+                tsdList.clear();
+                tsdBytes = 0;
+                tsdRecords = 0;
+            }
+        }
+
+        public void awaitCompletion() throws IOException {
+            try {
+                CompletableFuture.allOf(outstanding.toArray(new CompletableFuture[]{}))
+                        .get();
+            } catch (InterruptedException ex) {
+                /* SKIP */
+            } catch (ExecutionException ex) {
+                // Unpack the cause of the execution exception.
+                try {
+                    throw ex.getCause();
+                } catch (Error | RuntimeException | IOException ex1) {
+                    throw ex1;
+                } catch (Throwable ex1) {
+                    throw new IOException("unable to complete optimization", ex1);
+                }
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            tsdList.forEach(TSDataFileChain.this::addAll);
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.groupon.lex.metrics;
 import com.groupon.lex.metrics.history.TSData;
 import com.groupon.lex.metrics.history.v2.Compression;
 import com.groupon.lex.metrics.history.xdr.DirCollectHistory;
+import com.groupon.lex.metrics.history.xdr.TSDataFileChain;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.file.FileSystems;
@@ -91,9 +92,12 @@ public class FileConvert {
         final DirCollectHistory dst = new DirCollectHistory(dstdir_path_);
         dst.setAppendCompression(compression);
         dst.setOptimizedCompression(optimizedCompression);
-        src.getRawCollections().stream()
-                .sorted(Comparator.comparing(FileConvert::getAnyTimestampFromCollection))
-                .forEach(dst::addAll);
+
+        try (final TSDataFileChain.BatchAdd dstBatch = dst.bachAdd()) {
+            src.getRawCollections().stream()
+                    .sorted(Comparator.comparing(FileConvert::getAnyTimestampFromCollection))
+                    .forEach(dstBatch::add);
+        }
 
         // Wait for pending optimization to finish.
         src.waitPendingTasks();

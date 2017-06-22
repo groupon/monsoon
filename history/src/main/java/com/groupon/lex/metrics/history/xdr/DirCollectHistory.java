@@ -6,6 +6,7 @@
 package com.groupon.lex.metrics.history.xdr;
 
 import com.groupon.lex.metrics.history.AbstractCollectHistory;
+import com.groupon.lex.metrics.history.xdr.TSDataFileChain.BatchAdd;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -111,5 +112,9 @@ public class DirCollectHistory extends AbstractCollectHistory<TSDataFileChain> {
         return getTSData().getRawCollections().stream()
                 .map(collection -> (collection.canAddSingleRecord() ? unmodifiableCollection(collection) : collection))
                 .collect(Collectors.toList());
+    }
+
+    public BatchAdd bachAdd() {
+        return getTSData().batchAdd();
     }
 }
