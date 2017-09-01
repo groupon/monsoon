@@ -3,6 +3,7 @@ package com.groupon.lex.metrics.timeseries.expression;
 import com.groupon.lex.metrics.ConfigSupport;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
+import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import static com.groupon.lex.metrics.timeseries.expression.Priorities.BRACKETS;
 import java.util.Collection;
 import java.util.Collections;
@@ -20,6 +21,11 @@ public class IdentifierMetricSelector implements TimeSeriesMetricExpression {
 
     @Override
     public Collection<TimeSeriesMetricExpression> getChildren() { return Collections.EMPTY_LIST; }
+
+    @Override
+    public TimeSeriesMetricFilter getNameFilter() {
+        return new TimeSeriesMetricFilter();
+    }
 
     @Override
     public TimeSeriesMetricDeltaSet apply(Context<?> ctx) {

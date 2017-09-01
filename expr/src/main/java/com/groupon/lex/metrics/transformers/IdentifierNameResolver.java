@@ -32,10 +32,12 @@
 package com.groupon.lex.metrics.transformers;
 
 import com.groupon.lex.metrics.Path;
+import com.groupon.lex.metrics.PathMatcher;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Arrays;
 import java.util.Collections;
+import static java.util.Collections.singletonList;
 import java.util.List;
 import java.util.Objects;
 import static java.util.Objects.requireNonNull;
@@ -49,6 +51,7 @@ import java.util.function.Function;
 public class IdentifierNameResolver implements NameResolver {
     public static interface SubSelect extends Function<Path, Path> {
         public StringBuilder configString();
+        public PathMatcher.IdentifierMatch widenToPathMatcher();
     }
 
     public static class SubSelectIndex implements SubSelect {
@@ -75,6 +78,11 @@ public class IdentifierNameResolver implements NameResolver {
                     .append('[')
                     .append(idx_)
                     .append(']');
+        }
+
+        @Override
+        public PathMatcher.IdentifierMatch widenToPathMatcher() {
+            return new PathMatcher.WildcardMatch();
         }
     }
 
@@ -107,6 +115,11 @@ public class IdentifierNameResolver implements NameResolver {
                     .append(e_.map(Object::toString).orElse(""))
                     .append(']');
         }
+
+        @Override
+        public PathMatcher.IdentifierMatch widenToPathMatcher() {
+            return new PathMatcher.DoubleWildcardMatch();
+        }
     }
 
     private final String identifier_;
@@ -134,6 +147,14 @@ public class IdentifierNameResolver implements NameResolver {
                 .append(identifier_)
                 .append(sub_select_.map(SubSelect::configString).orElseGet(StringBuilder::new))
                 .append("}");
+    }
+
+    @Override
+    public List<PathMatcher.IdentifierMatch> asLiteral() {
+        final PathMatcher.IdentifierMatch wildcard = sub_select_
+                .map(SubSelect::widenToPathMatcher)
+                .orElseGet(PathMatcher.DoubleWildcardMatch::new);
+        return singletonList(wildcard);
     }
 
     private static int idx_to_abs_(int idx, List<?> list) {

@@ -32,12 +32,14 @@
 package com.groupon.lex.metrics.transformers;
 
 import com.groupon.lex.metrics.Path;
+import com.groupon.lex.metrics.PathMatcher;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -66,6 +68,13 @@ public class LiteralNameResolver implements NameResolver {
     @Override
     public StringBuilder configString() {
         return group_name_.configString();
+    }
+
+    @Override
+    public List<PathMatcher.IdentifierMatch> asLiteral() {
+        return group_name_.getPath().stream()
+                .map(PathMatcher.LiteralNameMatch::new)
+                .collect(Collectors.toList());
     }
 
     @Override

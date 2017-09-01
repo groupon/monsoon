@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.expression;
 
+import com.groupon.lex.metrics.PathMatcher;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
 import com.groupon.lex.metrics.timeseries.expression.Context;
@@ -50,6 +51,11 @@ public class LiteralGroupExpression implements GroupExpression {
 
     public NameResolver getName() {
         return name_;
+    }
+
+    @Override
+    public PathMatcher getPathMatcher() {
+        return name_.getPathMatcher();
     }
 
     @Override

@@ -141,9 +141,8 @@ public class PathMatcher {
 
         @Override
         public boolean isLiteral() {
-            return successor_
-                    .map(IdentifierMatch::isLiteral)
-                    .orElse(true);
+            if (successor_.isPresent()) return successor_.get().isLiteral();
+            return true;
         }
 
         @Override
@@ -388,7 +387,7 @@ public class PathMatcher {
     }
 
     public PathMatcher(List<IdentifierMatch> matchers) {
-        List<IdentifierMatch> reversed_matchers = new ArrayList<IdentifierMatch>(matchers);  // Create a copy, since we don't want to mangle the input argument.
+        List<IdentifierMatch> reversed_matchers = new ArrayList<>(matchers);  // Create a copy, since we don't want to mangle the input argument.
         Collections.reverse(reversed_matchers);
 
         IdentifierMatch match_head = reversed_matchers.remove(0);

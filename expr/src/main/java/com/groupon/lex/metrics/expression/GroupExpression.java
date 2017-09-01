@@ -31,6 +31,7 @@
  */
 package com.groupon.lex.metrics.expression;
 
+import com.groupon.lex.metrics.PathMatcher;
 import com.groupon.lex.metrics.timeseries.PrintableExpression;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
 import com.groupon.lex.metrics.timeseries.expression.Context;
@@ -47,4 +48,6 @@ public interface GroupExpression extends PrintableExpression {
     public default int getPriority() {
         return BRACKETS;
     }
+
+    public PathMatcher getPathMatcher();
 }
