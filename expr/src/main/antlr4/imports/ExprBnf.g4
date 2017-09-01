@@ -40,6 +40,7 @@ import MonsoonPrimitivesParser;
     import com.groupon.lex.metrics.expression.LiteralGroupExpression;
     import com.groupon.lex.metrics.lib.Any2;
     import com.groupon.lex.metrics.lib.TriFunction;
+    import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
     import com.groupon.lex.metrics.timeseries.TagAggregationClause;
     import com.groupon.lex.metrics.timeseries.TagMatchingClause;
     import com.groupon.lex.metrics.timeseries.expression.AvgExpression;
