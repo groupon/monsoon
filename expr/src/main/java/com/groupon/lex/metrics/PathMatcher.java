@@ -52,6 +52,7 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.Value;
 import org.antlr.v4.runtime.BaseErrorListener;
@@ -91,6 +92,14 @@ public class PathMatcher {
         }
 
         public StringBuilder populateExpression(StringBuilder buf);
+
+        public default boolean isLiteral() {
+            return false;
+        }
+
+        public default Optional<Stream<String>> asLiteralComponents() {
+            return Optional.empty();
+        }
     }
 
     public static class LiteralNameMatch implements IdentifierMatch {
@@ -128,6 +137,22 @@ public class PathMatcher {
             return successor_
                     .map((succ) -> succ.populateExpression(buf.append('.')))
                     .orElse(buf);
+        }
+
+        @Override
+        public boolean isLiteral() {
+            return successor_
+                    .map(IdentifierMatch::isLiteral)
+                    .orElse(true);
+        }
+
+        @Override
+        public Optional<Stream<String>> asLiteralComponents() {
+            if (!successor_.isPresent()) return Optional.of(Stream.of(literal_));
+
+            return successor_
+                    .flatMap(IdentifierMatch::asLiteralComponents)
+                    .map(tailStream -> Stream.concat(Stream.of(literal_), tailStream));
         }
 
         @Override
@@ -389,6 +414,16 @@ public class PathMatcher {
 
     public boolean match(List<String> grp_path) {
         return match_cache_.getUnchecked(grp_path).isMatched();
+    }
+
+    public boolean isLiteral() {
+        return matcher_.isLiteral();
+    }
+
+    public Optional<SimpleGroupPath> asLiteral() {
+        return matcher_.asLiteralComponents()
+                .map(stream -> stream.toArray(String[]::new))
+                .map(SimpleGroupPath::valueOf);
     }
 
     public StringBuilder configString() {
