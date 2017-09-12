@@ -68,6 +68,7 @@
         <module>collectors</module>
         <module>processors</module>
         <module>exporter</module>
+        <module>extra</module>
     </modules>
 
     <distributionManagement>

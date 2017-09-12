@@ -9,6 +9,7 @@ import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
+import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Collection;
@@ -114,7 +115,7 @@ public interface CollectHistory {
     /**
      * Return a History Context for evaluating expressions.
      */
-    public default Stream<Context> getContext(Duration stepsize, ExpressionLookBack lookback) {
+    public default Stream<Context> getContext(Duration stepsize, ExpressionLookBack lookback, TimeSeriesMetricFilter filter) {
         return HistoryContext.stream(BufferedIterator.stream(ForkJoinPool.commonPool(), stream(stepsize)), lookback);
     }
 
@@ -122,7 +123,7 @@ public interface CollectHistory {
      * Return a History Context for evaluating expressions, starting at the
      * 'begin' timestamp (inclusive).
      */
-    public default Stream<Context> getContext(DateTime begin, Duration stepsize, ExpressionLookBack lookback) {
+    public default Stream<Context> getContext(DateTime begin, Duration stepsize, ExpressionLookBack lookback, TimeSeriesMetricFilter filter) {
         return HistoryContext.stream(BufferedIterator.stream(ForkJoinPool.commonPool(), stream(begin.minus(lookback.hintDuration()), stepsize)), lookback)
                 .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin));
     }
@@ -131,7 +132,7 @@ public interface CollectHistory {
      * Return a History Context for evaluating expressions, between the 'begin'
      * timestamp (inclusive) and the 'end' timestamp (inclusive).
      */
-    public default Stream<Context> getContext(DateTime begin, DateTime end, Duration stepsize, ExpressionLookBack lookback) {
+    public default Stream<Context> getContext(DateTime begin, DateTime end, Duration stepsize, ExpressionLookBack lookback, TimeSeriesMetricFilter filter) {
         return HistoryContext.stream(BufferedIterator.stream(ForkJoinPool.commonPool(), stream(begin.minus(lookback.hintDuration()), end, stepsize)), lookback)
                 .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin));
     }
@@ -140,8 +141,13 @@ public interface CollectHistory {
      * Evaluate expression over time.
      */
     public default Stream<Collection<NamedEvaluation>> evaluate(Map<String, ? extends TimeSeriesMetricExpression> expression, Duration stepsize) {
-        final ExpressionLookBack lookback = ExpressionLookBack.EMPTY.andThen(expression.values().stream().map(TimeSeriesMetricExpression::getLookBack));
-        return new ApplyExpressions(expression).apply(getContext(stepsize, lookback));
+        final TimeSeriesMetricFilter filter = expression.values().stream()
+                .map(TimeSeriesMetricExpression::getNameFilter)
+                .reduce(TimeSeriesMetricFilter::with)
+                .orElse(TimeSeriesMetricFilter.ALL_GROUPS);
+        final ExpressionLookBack lookback = ExpressionLookBack.EMPTY
+                .andThen(expression.values().stream().map(TimeSeriesMetricExpression::getLookBack));
+        return new ApplyExpressions(expression).apply(getContext(stepsize, lookback, filter));
     }
 
     /**
@@ -149,8 +155,13 @@ public interface CollectHistory {
      * (inclusive).
      */
     public default Stream<Collection<NamedEvaluation>> evaluate(Map<String, ? extends TimeSeriesMetricExpression> expression, DateTime begin, Duration stepsize) {
-        final ExpressionLookBack lookback = ExpressionLookBack.EMPTY.andThen(expression.values().stream().map(TimeSeriesMetricExpression::getLookBack));
-        return new ApplyExpressions(expression).apply(getContext(begin, stepsize, lookback));
+        final TimeSeriesMetricFilter filter = expression.values().stream()
+                .map(TimeSeriesMetricExpression::getNameFilter)
+                .reduce(TimeSeriesMetricFilter::with)
+                .orElse(TimeSeriesMetricFilter.ALL_GROUPS);
+        final ExpressionLookBack lookback = ExpressionLookBack.EMPTY
+                .andThen(expression.values().stream().map(TimeSeriesMetricExpression::getLookBack));
+        return new ApplyExpressions(expression).apply(getContext(begin, stepsize, lookback, filter));
     }
 
     /**
@@ -158,8 +169,13 @@ public interface CollectHistory {
      * and the 'end' timestamp (inclusive).
      */
     public default Stream<Collection<NamedEvaluation>> evaluate(Map<String, ? extends TimeSeriesMetricExpression> expression, DateTime begin, DateTime end, Duration stepsize) {
-        final ExpressionLookBack lookback = ExpressionLookBack.EMPTY.andThen(expression.values().stream().map(TimeSeriesMetricExpression::getLookBack));
-        return new ApplyExpressions(expression).apply(getContext(begin, end, stepsize, lookback));
+        final TimeSeriesMetricFilter filter = expression.values().stream()
+                .map(TimeSeriesMetricExpression::getNameFilter)
+                .reduce(TimeSeriesMetricFilter::with)
+                .orElse(TimeSeriesMetricFilter.ALL_GROUPS);
+        final ExpressionLookBack lookback = ExpressionLookBack.EMPTY
+                .andThen(expression.values().stream().map(TimeSeriesMetricExpression::getLookBack));
+        return new ApplyExpressions(expression).apply(getContext(begin, end, stepsize, lookback, filter));
     }
 
     @RequiredArgsConstructor

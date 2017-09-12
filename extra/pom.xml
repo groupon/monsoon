@@ -1,0 +1,42 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.github.groupon.monsoon</groupId>
+        <artifactId>monsoon-basepom</artifactId>
+        <version>2.3-SNAPSHOT</version>
+    </parent>
+    <artifactId>monsoon-extra</artifactId>
+    <packaging>pom</packaging>
+    <name>Mon-soon extra modules</name>
+    <url>https://github.groupondev.com/lex/monsoon</url>
+    <description>Collectors of the mon-soon project.</description>
+
+    <scm>
+        <connection>scm:git:github:lex/monsoon.git</connection>
+        <developerConnection>scm:git:github:lex/monsoon.git</developerConnection>
+        <url>https://github.groupondev.com/lex/monsoon</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.build.targetJdk>1.8</project.build.targetJdk>
+    </properties>
+
+    <modules>
+        <module>influx</module>
+    </modules>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.github.groupon.monsoon</groupId>
+            <artifactId>monsoon-collector-base</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.groupon.monsoon</groupId>
+            <artifactId>monsoon-impl-intf</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+    </dependencies>
+</project>

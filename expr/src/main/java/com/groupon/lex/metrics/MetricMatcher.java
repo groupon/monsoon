@@ -31,32 +31,31 @@
  */
 package com.groupon.lex.metrics;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.Map.Entry;
-import java.util.Objects;
-import static java.util.Objects.requireNonNull;
-import java.util.Set;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 
 /**
  *
  * @author ariane
  */
+@RequiredArgsConstructor
+@EqualsAndHashCode
+@Getter
 public class MetricMatcher {
     private static final Logger LOG = Logger.getLogger(MetricMatcher.class.getName());
-    private final PathMatcher groups_;
-    private final PathMatcher metric_;
-    private final LoadingCache<Set<MetricName>, Collection<MetricName>> metric_match_cache_;
+    @NonNull
+    private final PathMatcher groups;
+    @NonNull
+    private final PathMatcher metric;
 
     @Value
     public static final class MatchedName {
@@ -72,20 +71,12 @@ public class MetricMatcher {
         }
     }
 
-    public MetricMatcher(PathMatcher groups, PathMatcher metric) {
-        groups_ = requireNonNull(groups);
-        metric_ = requireNonNull(metric);
-        metric_match_cache_ = CacheBuilder.newBuilder()
-                .softValues()
-                .build(CacheLoader.from((Set<MetricName> names) -> names.stream().filter(this::match).collect(Collectors.toList())));
-    }
-
     public boolean match(SimpleGroupPath grp) {
-        return groups_.match(grp.getPath());
+        return groups.match(grp.getPath());
     }
 
-    public boolean match(MetricName metric) {
-        return metric_.match(metric.getPath());
+    public boolean match(MetricName m) {
+        return metric.match(m.getPath());
     }
 
     /**
@@ -93,20 +84,13 @@ public class MetricMatcher {
      */
     public Stream<Entry<MatchedName, MetricValue>> filter(Context t) {
         return t.getTSData().getCurrentCollection().get(this::match, x -> true).stream()
-                .flatMap(tsv -> {
-                    return metric_match_cache_.getUnchecked(new HashSet<>(tsv.getMetrics().keySet())).stream()
-                            .map(metric_name -> {
-                                return SimpleMapEntry.create(
-                                        new MatchedName(tsv, metric_name),
-                                        tsv.findMetric(metric_name).orElseThrow(() -> new IllegalStateException("resolved metric name was not present")));
-                            });
-                });
+                .flatMap(this::filterMetricsInTsv);
     }
 
     public StringBuilder configString() {
-        return groups_.configString()
+        return groups.configString()
                 .append(' ')
-                .append(metric_.configString());
+                .append(metric.configString());
     }
 
     @Override
@@ -114,29 +98,9 @@ public class MetricMatcher {
         return "MetricMatcher{" + configString().toString() + "}";
     }
 
-    @Override
-    public int hashCode() {
-        int hash = 3;
-        hash = 29 * hash + Objects.hashCode(this.groups_);
-        hash = 29 * hash + Objects.hashCode(this.metric_);
-        return hash;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final MetricMatcher other = (MetricMatcher) obj;
-        if (!Objects.equals(this.groups_, other.groups_)) {
-            return false;
-        }
-        if (!Objects.equals(this.metric_, other.metric_)) {
-            return false;
-        }
-        return true;
+    private Stream<Entry<MatchedName, MetricValue>> filterMetricsInTsv(TimeSeriesValue tsv) {
+        return tsv.getMetrics().entrySet().stream()
+                .filter(entry -> match(entry.getKey()))
+                .map(metricEntry -> SimpleMapEntry.create(new MatchedName(tsv, metricEntry.getKey()), metricEntry.getValue()));
     }
 }

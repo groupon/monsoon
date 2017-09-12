@@ -12,12 +12,14 @@ import lombok.Getter;
 import lombok.ToString;
 
 /**
- * Represents a group of metrics that are required for an expression to function.
+ * Represents a group of metrics that are required for an expression to
+ * function.
  */
 @Getter
 @EqualsAndHashCode
 @ToString
 public class TimeSeriesMetricFilter {
+    public static final TimeSeriesMetricFilter ALL_GROUPS = new TimeSeriesMetricFilter().withGroup(new PathMatcher(new PathMatcher.DoubleWildcardMatch()));
     private final Set<PathMatcher> groups;
     private final Set<MetricMatcher> metrics;
 
