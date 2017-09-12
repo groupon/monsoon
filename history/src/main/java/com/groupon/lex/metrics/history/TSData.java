@@ -247,7 +247,7 @@ public interface TSData extends Collection<TimeSeriesCollection>, CollectHistory
         final Logger LOG = Logger.getLogger(TSData.class.getName());
 
         final SequenceTSData result = TSDataVersionDispatch.open(file);
-        LOG.log(Level.INFO, "opened v{0}.{1}: {2} ({3}-{4}, {5} scrapes)", new Object[]{result.getMajor(), result.getMinor(), file, result.getBegin(), result.getEnd(), result.getMajor() >= 3 ? result.size() : "#???"});
+        LOG.log(Level.INFO, "opened v{0}.{1}: {2} ({3}-{4}, {5} scrapes)", new Object[]{result.getMajor(), result.getMinor(), file, result.getBegin(), result.getEnd(), result.getMajor() >= 2 ? result.size() : "#???"});
         return result;
     }
 
