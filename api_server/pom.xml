@@ -73,6 +73,10 @@
                 <filtering>false</filtering>
             </resource>
             <resource>
+                <directory>target/npm-src</directory>
+                <filtering>false</filtering>
+            </resource>
+            <resource>
                 <directory>target/npm</directory>
                 <filtering>false</filtering>
             </resource>
@@ -112,8 +116,7 @@
                 <version>2.7</version>
                 <executions>
                     <execution>
-                        <id>copy-resources</id>
-                        <!-- here the phase you need -->
+                        <id>copy-npm-package-json</id>
                         <phase>generate-sources</phase>
                         <goals>
                             <goal>copy-resources</goal>
@@ -124,11 +127,32 @@
                                 <resource>
                                     <directory>src/main/frontend</directory>
                                     <filtering>false</filtering>
+                                    <includes>
+                                        <include>package.json</include>
+                                        <include>**/*.ts</include>
+                                        <include>**/*.json</include>
+                                        <include>**/*.js.map</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>copy-npm-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>target/npm-src/www</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>src/main/frontend/src</directory>
+                                    <filtering>false</filtering>
                                     <excludes>
-                                        <exclude>node_modules/**</exclude>
-                                        <exclude>typings/**</exclude>
-                                        <exclude>app/*.js</exclude>
-                                        <exclude>app/*.js.map</exclude>
+                                        <exclude>**/*.ts</exclude>
+                                        <exclude>**/*.json</exclude>
+                                        <exclude>**/*.js.map</exclude>
                                     </excludes>
                                 </resource>
                             </resources>
@@ -155,14 +179,17 @@
                         </goals>
                     </execution>
                     <execution>
-                        <id>exec-npm-tsc</id>
+                        <id>exec-npm-build</id>
                         <phase>generate-sources</phase>
                         <configuration>
                             <executable>npm</executable>
                             <workingDirectory>target/npm/www</workingDirectory>
                             <arguments>
-                                <argument>run-script</argument>
-                                <argument>tsc</argument>
+                                <argument>run</argument>
+                                <argument>build</argument>
+                                <argument>--</argument>
+                                <argument>--outDir</argument>
+                                <argument>app</argument>
                             </arguments>
                         </configuration>
                         <goals>
