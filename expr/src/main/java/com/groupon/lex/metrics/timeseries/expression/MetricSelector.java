@@ -31,10 +31,12 @@
  */
 package com.groupon.lex.metrics.timeseries.expression;
 
+import com.groupon.lex.metrics.MetricMatcher;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.expression.GroupExpression;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
+import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import static com.groupon.lex.metrics.timeseries.expression.Priorities.BRACKETS;
 import com.groupon.lex.metrics.transformers.LiteralNameResolver;
 import com.groupon.lex.metrics.transformers.NameResolver;
@@ -62,6 +64,12 @@ public class MetricSelector implements TimeSeriesMetricExpression {
     public NameResolver getMetric() { return metric_; }
     @Override
     public Collection<TimeSeriesMetricExpression> getChildren() { return Collections.EMPTY_LIST; }
+
+    @Override
+    public TimeSeriesMetricFilter getNameFilter() {
+        return new TimeSeriesMetricFilter()
+                .withMetric(new MetricMatcher(group_.getPathMatcher(), metric_.getPathMatcher()));
+    }
 
     @Override
     public TimeSeriesMetricDeltaSet apply(Context ctx) {

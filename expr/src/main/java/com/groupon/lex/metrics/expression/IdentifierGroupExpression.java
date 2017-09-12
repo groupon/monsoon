@@ -32,6 +32,7 @@
 package com.groupon.lex.metrics.expression;
 
 import com.groupon.lex.metrics.ConfigSupport;
+import com.groupon.lex.metrics.PathMatcher;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValueSet;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Objects;
@@ -51,6 +52,11 @@ public class IdentifierGroupExpression implements GroupExpression {
     public TimeSeriesValueSet getTSDelta(Context<?> ctx) {
         return ctx.getGroupFromIdentifier(identifier_)
                 .orElse(TimeSeriesValueSet.EMPTY);
+    }
+
+    @Override
+    public PathMatcher getPathMatcher() {
+        return new PathMatcher(new PathMatcher.DoubleWildcardMatch());
     }
 
     @Override

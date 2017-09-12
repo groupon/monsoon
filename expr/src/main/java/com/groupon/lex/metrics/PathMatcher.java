@@ -34,9 +34,16 @@ package com.groupon.lex.metrics;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.groupon.lex.metrics.timeseries.parser.PathMatcherGrammar;
+import com.groupon.lex.metrics.timeseries.parser.PathMatcherLexer;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import static java.util.Collections.EMPTY_LIST;
+import static java.util.Collections.unmodifiableList;
 import java.util.List;
 import java.util.Objects;
 import static java.util.Objects.requireNonNull;
@@ -45,7 +52,13 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
+import lombok.Getter;
 import lombok.Value;
+import org.antlr.v4.runtime.BaseErrorListener;
+import org.antlr.v4.runtime.BufferedTokenStream;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.Recognizer;
 
 /**
  *
@@ -79,6 +92,14 @@ public class PathMatcher {
         }
 
         public StringBuilder populateExpression(StringBuilder buf);
+
+        public default boolean isLiteral() {
+            return false;
+        }
+
+        public default Optional<Stream<String>> asLiteralComponents() {
+            return Optional.empty();
+        }
     }
 
     public static class LiteralNameMatch implements IdentifierMatch {
@@ -116,6 +137,21 @@ public class PathMatcher {
             return successor_
                     .map((succ) -> succ.populateExpression(buf.append('.')))
                     .orElse(buf);
+        }
+
+        @Override
+        public boolean isLiteral() {
+            if (successor_.isPresent()) return successor_.get().isLiteral();
+            return true;
+        }
+
+        @Override
+        public Optional<Stream<String>> asLiteralComponents() {
+            if (!successor_.isPresent()) return Optional.of(Stream.of(literal_));
+
+            return successor_
+                    .flatMap(IdentifierMatch::asLiteralComponents)
+                    .map(tailStream -> Stream.concat(Stream.of(literal_), tailStream));
         }
 
         @Override
@@ -351,7 +387,7 @@ public class PathMatcher {
     }
 
     public PathMatcher(List<IdentifierMatch> matchers) {
-        List<IdentifierMatch> reversed_matchers = new ArrayList<IdentifierMatch>(matchers);  // Create a copy, since we don't want to mangle the input argument.
+        List<IdentifierMatch> reversed_matchers = new ArrayList<>(matchers);  // Create a copy, since we don't want to mangle the input argument.
         Collections.reverse(reversed_matchers);
 
         IdentifierMatch match_head = reversed_matchers.remove(0);
@@ -379,6 +415,16 @@ public class PathMatcher {
         return match_cache_.getUnchecked(grp_path).isMatched();
     }
 
+    public boolean isLiteral() {
+        return matcher_.isLiteral();
+    }
+
+    public Optional<SimpleGroupPath> asLiteral() {
+        return matcher_.asLiteralComponents()
+                .map(stream -> stream.toArray(String[]::new))
+                .map(SimpleGroupPath::valueOf);
+    }
+
     public StringBuilder configString() {
         return matcher_.populateExpression(new StringBuilder());
     }
@@ -386,6 +432,79 @@ public class PathMatcher {
     @Override
     public String toString() {
         return "PathMatcher:" + configString().toString();
+    }
+
+    /**
+     * Read path matcher from string.
+     *
+     * @param str A string containing a path expression.
+     * @return A PathMatcher corresponding to the parsed input
+     * from the string.
+     * @throws
+     * com.groupon.lex.metrics.PathMatcher.ParseException
+     * on invalid path expression.
+     */
+    public static PathMatcher valueOf(String str) throws ParseException {
+        try {
+            return valueOf(new StringReader(str));
+        } catch (IOException ex) {
+            throw new IllegalStateException("StringReader IO error?", ex);
+        }
+    }
+
+    /**
+     * Read path matcher from reader.
+     *
+     * @param reader A reader supplying the input of a path expression.
+     * @return A PathMatcher corresponding to the parsed input
+     * from the reader.
+     * @throws IOException on IO errors from the reader.
+     * @throws
+     * com.groupon.lex.metrics.PathMatcher.ParseException
+     * on invalid path expression.
+     */
+    public static PathMatcher valueOf(Reader reader) throws IOException, ParseException {
+        class DescriptiveErrorListener extends BaseErrorListener {
+            public List<String> errors = new ArrayList<>();
+
+            @Override
+            public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
+                                    int line, int charPositionInLine,
+                                    String msg, org.antlr.v4.runtime.RecognitionException e) {
+                LOG.log(Level.INFO, "Parse error: {0}:{1} -> {2}", new Object[]{line, charPositionInLine, msg});
+                errors.add(String.format("%d:%d: %s", line, charPositionInLine, msg));
+            }
+        }
+
+        final DescriptiveErrorListener error_listener = new DescriptiveErrorListener();
+
+        final PathMatcherLexer lexer = new PathMatcherLexer(CharStreams.fromReader(reader));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(error_listener);
+
+        final PathMatcherGrammar parser = new PathMatcherGrammar(new BufferedTokenStream(lexer));
+        parser.removeErrorListeners();
+        parser.addErrorListener(error_listener);
+
+        final PathMatcherGrammar.ExprContext expr;
+        try {
+            expr = parser.expr();
+        } catch (Exception ex) {
+            LOG.log(Level.SEVERE, "parser yielded exceptional return", ex);
+            if (!error_listener.errors.isEmpty())
+                throw new ParseException(error_listener.errors, ex);
+            else
+                throw ex;
+        }
+
+        if (!error_listener.errors.isEmpty()) {
+            if (expr.exception != null)
+                throw new ParseException(error_listener.errors, expr.exception);
+            throw new ParseException(error_listener.errors);
+        } else if (expr.exception != null) {
+            throw new ParseException(expr.exception);
+        }
+        return expr.s;
     }
 
     @Override
@@ -408,5 +527,41 @@ public class PathMatcher {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Exception indicating an invalid expression. The parse errors are recorded
+     * as messages and can be retrieved using getParseErrors().
+     */
+    public static class ParseException extends Exception {
+        @Getter
+        private final List<String> parseErrors;
+
+        public ParseException(List<String> parseErrors) {
+            super();
+            this.parseErrors = unmodifiableList(parseErrors);
+        }
+
+        public ParseException(List<String> parseErrors, Throwable cause) {
+            super(cause);
+            this.parseErrors = unmodifiableList(parseErrors);
+        }
+
+        public ParseException(List<String> parseErrors, String message, Throwable cause) {
+            super(message, cause);
+            this.parseErrors = unmodifiableList(parseErrors);
+        }
+
+        public ParseException() {
+            this(EMPTY_LIST);
+        }
+
+        public ParseException(Throwable cause) {
+            this(EMPTY_LIST, cause);
+        }
+
+        public ParseException(String message, Throwable cause) {
+            this(EMPTY_LIST, message, cause);
+        }
     }
 }

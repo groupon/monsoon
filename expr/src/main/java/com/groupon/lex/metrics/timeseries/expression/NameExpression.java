@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.Path;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
+import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import static com.groupon.lex.metrics.timeseries.expression.Priorities.BRACKETS;
 import com.groupon.lex.metrics.transformers.NameResolver;
 import java.util.Collection;
@@ -95,6 +96,16 @@ public class NameExpression implements TimeSeriesMetricExpression {
     @Override
     public Collection<TimeSeriesMetricExpression> getChildren() {
         return EMPTY_LIST;
+    }
+
+    @Override
+    public TimeSeriesMetricFilter getNameFilter() {
+        /*
+         * Return an empty filter:
+         * - in the case identifiers are referenced, the identifier match will populate the filter.
+         * - in the case of a literal name, the group/metric is not required to do the transformation.
+         */
+        return new TimeSeriesMetricFilter();
     }
 
     @Override

@@ -89,6 +89,18 @@ public abstract class TimeSeriesMetricAggregate<T> implements TimeSeriesMetricEx
         return exprs_;
     }
 
+    private TimeSeriesMetricFilter getMatchersFilter() {
+        return matchers_.stream()
+                .reduce(new TimeSeriesMetricFilter(), TimeSeriesMetricFilter::withMetric, TimeSeriesMetricFilter::with);
+    }
+
+    @Override
+    public TimeSeriesMetricFilter getNameFilter() {
+        return getChildren().stream()
+                .map(child -> child.getNameFilter())
+                .reduce(getMatchersFilter(), TimeSeriesMetricFilter::with);
+    }
+
     @Override
     public final ExpressionLookBack getLookBack() {
         final ChainableExpressionLookBack base = tDelta

@@ -32,8 +32,10 @@
 package com.groupon.lex.metrics.transformers;
 
 import com.groupon.lex.metrics.Path;
+import com.groupon.lex.metrics.PathMatcher;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import static com.groupon.lex.metrics.timeseries.expression.Util.pairwiseMap;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -61,6 +63,22 @@ public interface NameResolver extends Function<Context<?>, Optional<Path>> {
      * @return A string describing this statement.
      */
     public StringBuilder configString();
+
+    /**
+     * Retrieves the literal name, if possible.
+     * If the evaluation requires bound names, this function will return an empty optional.
+     * @return A list of strings representing the literal name, if possible to resolve without context.
+     */
+    public List<PathMatcher.IdentifierMatch> asLiteral();
+
+    /**
+     * Retrieves a path matcher that captures all names matched by this name resolver.
+     * The path matcher may capture more names than needed.
+     * @return A PathMatcher which indicates a match for everything matched by this name resolver.
+     */
+    public default PathMatcher getPathMatcher() {
+        return new PathMatcher(asLiteral());
+    }
 
     /**
      * Combine two group name resolvers into a single group name resolver.
@@ -102,6 +120,14 @@ public interface NameResolver extends Function<Context<?>, Optional<Path>> {
             return a_.configString()
                     .append('.')
                     .append(b_.configString());
+        }
+
+        @Override
+        public List<PathMatcher.IdentifierMatch> asLiteral() {
+            List<PathMatcher.IdentifierMatch> identifiers = new ArrayList<>();
+            identifiers.addAll(a_.asLiteral());
+            identifiers.addAll(b_.asLiteral());
+            return identifiers;
         }
 
         @Override

@@ -121,6 +121,16 @@ public interface TimeSeriesMetricExpression extends Function<Context<?>, TimeSer
     }
 
     /**
+     * @return A filter that describes all groups and metrics that are required
+     * to properly evaluate the expression.
+     */
+    public default TimeSeriesMetricFilter getNameFilter() {
+        return getChildren().stream()
+                .map(child -> child.getNameFilter())
+                .reduce(new TimeSeriesMetricFilter(), TimeSeriesMetricFilter::with);
+    }
+
+    /**
      * Read expression from string.
      *
      * @param str A string containing an expression.
