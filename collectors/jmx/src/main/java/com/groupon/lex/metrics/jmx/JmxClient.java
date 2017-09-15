@@ -50,6 +50,7 @@ import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
 import javax.security.auth.Subject;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NonNull;
 
@@ -65,6 +66,7 @@ public class JmxClient implements AutoCloseable {
     private static final Logger LOG = Logger.getLogger(JmxClient.class.getName());
     @Getter
     private final Optional<JMXServiceURL> jmxUrl;
+    @Getter(AccessLevel.PACKAGE) // For debug purposes only.
     private CompletableFuture<GCCloseable<JMXConnector>> conn_;  // conn_ == null -> connection needs recovery
     private final Collection<ConnectionDecorator> recovery_callbacks_ = new ArrayList<>();
 
