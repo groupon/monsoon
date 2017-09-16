@@ -249,6 +249,29 @@ public class JmxClient_remoteTest {
     }
 
     @Test
+    public void connect_and_server_restarts_after_we_detect_connection_death() throws Exception {
+        jmx_server.start();
+        try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
+            jmx_client.getConnection(threadpool).get().get().getMBeanServerConnection().getMBeanCount();  // Force connection to come up.
+
+            /* Restart JMX server. */
+            jmx_server.stop();
+            try {
+                /* Attempt to get data from JMX server while it is down. */
+                jmx_client.getConnection(threadpool).get();
+            } catch (ExecutionException ex) {
+                /* expected */
+            }
+            /* Complete restart of JMX server. */
+            jmx_server.start();
+
+            MBeanServerConnection connection = jmx_client.getConnection(threadpool).get().get().getMBeanServerConnection();
+            assertNotNull(connection);
+            connection.getMBeanCount();
+        }
+    }
+
+    @Test
     public void opt_connection() throws Exception {
         jmx_server.start();
         try (JmxClient jmx_client = new JmxClient(jmx_server.url)) {
