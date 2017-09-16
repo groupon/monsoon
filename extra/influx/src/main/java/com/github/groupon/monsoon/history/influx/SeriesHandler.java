@@ -29,6 +29,7 @@ import static com.github.groupon.monsoon.history.influx.InfluxUtil.TIME_COLUMN;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.MultimapBuilder;
 import com.groupon.lex.metrics.GroupName;
+import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
@@ -41,7 +42,9 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import gnu.trove.map.hash.THashMap;
 import java.time.Instant;
 import java.util.Collection;
+import static java.util.Collections.unmodifiableMap;
 import static java.util.Collections.unmodifiableSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.Map;
@@ -76,6 +79,7 @@ public class SeriesHandler {
 
     public void addSeries(QueryResult.Series series) {
         final GroupName group = seriesToGroupName(series);
+        final Optional<Histogram.Range> range = rangeFromSeries(series);
         final int timeColumnIdx = InfluxUtil.getColumnIndexFromSeries(series, TIME_COLUMN).orElseThrow(() -> new IllegalStateException("missing time column"));
 
         series.getValues().forEach(row -> {
@@ -90,7 +94,7 @@ public class SeriesHandler {
                 final int columnIdx = columnIter.nextIndex();
                 final String columnName = columnIter.next();
                 if (columnIdx != timeColumnIdx)
-                    valueMap.getMetrics().put(valueKeyToMetricName(columnName), seriesValueToMetricValue(rowIter.next()));
+                    valueMap.addMetric(valueKeyToMetricName(columnName), range, seriesValueToMetricValue(rowIter.next()));
             }
 
             datums.put(timestamp, valueMap);
@@ -109,13 +113,9 @@ public class SeriesHandler {
         return c.stream()
                 .collect(Collectors.groupingBy(
                         IntermediateTSV::getGroup,
-                        Collectors.reducing((IntermediateTSV x, IntermediateTSV y) -> {
-                            assert Objects.equals(x.getGroup(), y.getGroup());
-
-                            x.getMetrics().putAll(y.getMetrics());
-                            return x;
-                        })))
+                        Collectors.reducing(IntermediateTSV::withMerged)))
                 .values().stream()
+                .filter(Optional::isPresent)
                 .map(Optional::get)
                 .map(IntermediateTSV::build);
     }
@@ -123,9 +123,20 @@ public class SeriesHandler {
     private static GroupName seriesToGroupName(QueryResult.Series series) {
         final SimpleGroupPath groupPath = pathStrToGroupPath(series.getName());
         final Tags tags = Tags.valueOf(series.getTags().entrySet().stream()
+                .filter(tagEntry -> !Objects.equals(tagEntry.getKey(), InfluxUtil.MONSOON_RANGE_TAG))
                 .filter(tagEntry -> tagEntry.getValue() != null)
                 .map(tagEntry -> SimpleMapEntry.create(tagEntry.getKey(), tagValueToMetricValue(tagEntry.getValue()))));
         return GroupName.valueOf(groupPath, tags);
+    }
+
+    private static Optional<Histogram.Range> rangeFromSeries(QueryResult.Series series) {
+        return series.getTags().entrySet().stream()
+                .filter(tagEntry -> Objects.equals(tagEntry.getKey(), InfluxUtil.MONSOON_RANGE_TAG))
+                .map(Map.Entry::getValue)
+                .filter(Objects::nonNull)
+                .map(rangeStr -> rangeStr.split(Pattern.quote(".."), 2))
+                .map(parts -> new Histogram.Range(Double.parseDouble(parts[0]), Double.parseDouble(parts[1])))
+                .findAny();
     }
 
     private static SimpleGroupPath pathStrToGroupPath(String str) {
@@ -167,13 +178,49 @@ public class SeriesHandler {
     }
 
     @RequiredArgsConstructor
-    @Getter
     private static class IntermediateTSV {
+        @Getter
         private final GroupName group;
-        private final Map<MetricName, MetricValue> metrics = new THashMap<>();
+        private final Map<MetricName, MetricValue> metrics = new HashMap<>();
+        private final Multimap<MetricName, Histogram.RangeWithCount> histograms = MultimapBuilder
+                .hashKeys()
+                .arrayListValues()
+                .build();
 
         public TimeSeriesValue build() {
-            return new ImmutableTimeSeriesValue(group, metrics);
+            final Map<MetricName, MetricValue> collected = new THashMap<>(metrics);
+            histograms.asMap().entrySet().stream()
+                    .forEach(histogramMetric -> {
+                        final MetricValue histogram = MetricValue.fromHistValue(new Histogram(histogramMetric.getValue().stream()));
+                        collected.put(histogramMetric.getKey(), histogram);
+                    });
+            return new ImmutableTimeSeriesValue(group, unmodifiableMap(collected));
+        }
+
+        public void addMetric(MetricName name, MetricValue value) {
+            metrics.put(name, value);
+        }
+
+        public void addMetric(MetricName name, Histogram.Range range, MetricValue value) {
+            final double count = value.value()
+                    .orElseThrow(() -> new IllegalArgumentException("expected floating point value for range value"))
+                    .doubleValue();
+            histograms.put(name, new Histogram.RangeWithCount(range, count));
+        }
+
+        public void addMetric(MetricName name, Optional<Histogram.Range> range, MetricValue value) {
+            if (range.isPresent())
+                addMetric(name, range.get(), value);
+            else
+                addMetric(name, value);
+        }
+
+        public IntermediateTSV withMerged(IntermediateTSV other) {
+            assert Objects.equals(group, other.group);
+
+            metrics.putAll(other.metrics);
+            histograms.putAll(other.histograms);
+            return this;
         }
     }
 }
