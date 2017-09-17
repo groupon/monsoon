@@ -28,6 +28,7 @@ package com.github.groupon.monsoon.history.influx;
 import static com.github.groupon.monsoon.history.influx.InfluxUtil.TIME_COLUMN;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.SetMultimap;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricName;
@@ -39,10 +40,8 @@ import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
-import gnu.trove.map.hash.THashMap;
 import java.time.Instant;
 import java.util.Collection;
-import static java.util.Collections.unmodifiableMap;
 import static java.util.Collections.unmodifiableSet;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -182,26 +181,27 @@ public class SeriesHandler {
         @Getter
         private final GroupName group;
         private final Map<MetricName, MetricValue> metrics = new HashMap<>();
-        private final Multimap<MetricName, Histogram.RangeWithCount> histograms = MultimapBuilder
+        private final SetMultimap<MetricName, Histogram.RangeWithCount> histograms = MultimapBuilder
                 .hashKeys()
-                .arrayListValues()
+                .hashSetValues() // Handle duplicate series correctly.
                 .build();
 
         public TimeSeriesValue build() {
-            final Map<MetricName, MetricValue> collected = new THashMap<>(metrics);
-            histograms.asMap().entrySet().stream()
-                    .forEach(histogramMetric -> {
+            final Stream<Map.Entry<MetricName, MetricValue>> metricsStream = metrics.entrySet().stream()
+                    .filter(metricEntry -> !histograms.containsKey(metricEntry.getKey()));
+            final Stream<Map.Entry<MetricName, MetricValue>> histogramsStream = histograms.asMap().entrySet().stream()
+                    .map(histogramMetric -> {
                         final MetricValue histogram = MetricValue.fromHistValue(new Histogram(histogramMetric.getValue().stream()));
-                        collected.put(histogramMetric.getKey(), histogram);
+                        return SimpleMapEntry.create(histogramMetric.getKey(), histogram);
                     });
-            return new ImmutableTimeSeriesValue(group, unmodifiableMap(collected));
+            return new ImmutableTimeSeriesValue(group, Stream.concat(metricsStream, histogramsStream), Map.Entry::getKey, Map.Entry::getValue);
         }
 
-        public void addMetric(MetricName name, MetricValue value) {
+        private void addMetric(MetricName name, MetricValue value) {
             metrics.put(name, value);
         }
 
-        public void addMetric(MetricName name, Histogram.Range range, MetricValue value) {
+        private void addMetric(MetricName name, Histogram.Range range, MetricValue value) {
             final double count = value.value()
                     .orElseThrow(() -> new IllegalArgumentException("expected floating point value for range value"))
                     .doubleValue();
