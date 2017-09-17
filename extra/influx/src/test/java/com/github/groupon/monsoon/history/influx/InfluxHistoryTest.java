@@ -28,11 +28,13 @@ package com.github.groupon.monsoon.history.influx;
 import com.groupon.lex.metrics.MetricMatcher;
 import com.groupon.lex.metrics.PathMatcher;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import static java.util.Collections.singletonMap;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +52,7 @@ import org.influxdb.dto.Query;
 import org.influxdb.dto.QueryResult;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Duration;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import org.junit.Before;
@@ -232,6 +235,22 @@ public class InfluxHistoryTest {
         verifyNoMoreInteractions(influxDB);
     }
 
+    @Test
+    public void evaluateWithBeginAndEnd() throws Exception {
+        Mockito
+                .when(influxDB.query(Mockito.any(), Mockito.any()))
+                .thenAnswer(keyedQueriesAnswer(EVAL_WITH_BEGIN_AND_END_QUERIES));
+
+        history.evaluate(singletonMap("foobar", TimeSeriesMetricExpression.valueOf("rate[5m](runtime NumGC)")), DateTime.parse("2017-09-17T10:00:00.000Z"), DateTime.parse("2017-09-17T14:00:00.000Z"), Duration.millis(1)).collect(Collectors.toList());
+
+        // The end query was called once.
+        verify(influxDB, times(EVAL_WITH_BEGIN_AND_END_QUERIES.size())).query(
+                Mockito.argThat(Matchers.hasProperty("database", Matchers.equalTo(DATABASE))),
+                Mockito.eq(TimeUnit.MILLISECONDS)
+        );
+        verifyNoMoreInteractions(influxDB);
+    }
+
     private static final List<KeyedQuery> STREAM_REVERSE_QUERIES = unmodifiableList(Arrays.asList(
             new KeyedQuery("select * from /.*/ order by time desc limit 1", "InfluxHistory_getEnd", false),
             new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T15:24:10.000Z' and time <= '2017-09-17T16:24:10.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamReverse_1", true),
@@ -284,6 +303,14 @@ public class InfluxHistoryTest {
             new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T11:59:59.999Z' and time <= '2017-09-17T12:59:59.999Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamWithBeginAndEnd_3", true),
             new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T12:59:59.999Z' and time <= '2017-09-17T13:59:59.999Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamWithBeginAndEnd_4", true),
             new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T13:59:59.999Z' and time <= '2017-09-17T14:00:00.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamWithBeginAndEnd_5", true)
+    ));
+
+    private static final List<KeyedQuery> EVAL_WITH_BEGIN_AND_END_QUERIES = unmodifiableList(Arrays.asList(
+            new KeyedQuery("SELECT \"NumGC\"::field FROM \"runtime\" WHERE time > '2017-09-17T09:49:59.999Z' and time <= '2017-09-17T10:49:59.999Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_evalWithBeginAndEnd_1", true),
+            new KeyedQuery("SELECT \"NumGC\"::field FROM \"runtime\" WHERE time > '2017-09-17T10:49:59.999Z' and time <= '2017-09-17T11:49:59.999Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_evalWithBeginAndEnd_2", true),
+            new KeyedQuery("SELECT \"NumGC\"::field FROM \"runtime\" WHERE time > '2017-09-17T11:49:59.999Z' and time <= '2017-09-17T12:49:59.999Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_evalWithBeginAndEnd_3", true),
+            new KeyedQuery("SELECT \"NumGC\"::field FROM \"runtime\" WHERE time > '2017-09-17T12:49:59.999Z' and time <= '2017-09-17T13:49:59.999Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_evalWithBeginAndEnd_4", true),
+            new KeyedQuery("SELECT \"NumGC\"::field FROM \"runtime\" WHERE time > '2017-09-17T13:49:59.999Z' and time <= '2017-09-17T14:05:00.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_evalWithBeginAndEnd_5", true)
     ));
 
     private static Answer<QueryResult> keyedQueriesAnswer(Collection<KeyedQuery> queries) {

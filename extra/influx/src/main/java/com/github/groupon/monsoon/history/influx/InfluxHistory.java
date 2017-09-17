@@ -34,7 +34,6 @@ import com.groupon.lex.metrics.history.HistoryContext;
 import static com.groupon.lex.metrics.history.HistoryContext.LOOK_BACK;
 import static com.groupon.lex.metrics.history.HistoryContext.LOOK_FORWARD;
 import com.groupon.lex.metrics.history.IntervalIterator;
-import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -50,7 +49,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Spliterators;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -199,18 +197,18 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
 
     @Override
     public Stream<Context> getContext(Duration stepsize, ExpressionLookBack lookback, TimeSeriesMetricFilter filter) {
-        return HistoryContext.stream(BufferedIterator.stream(ForkJoinPool.commonPool(), stream(stepsize, filter)), lookback);
+        return HistoryContext.stream(stream(stepsize, filter), lookback);
     }
 
     @Override
     public Stream<Context> getContext(DateTime begin, Duration stepsize, ExpressionLookBack lookback, TimeSeriesMetricFilter filter) {
-        return HistoryContext.stream(BufferedIterator.stream(ForkJoinPool.commonPool(), stream(begin.minus(lookback.hintDuration()), stepsize, filter)), lookback)
+        return HistoryContext.stream(stream(begin.minus(lookback.hintDuration()), stepsize, filter), lookback)
                 .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin));
     }
 
     @Override
     public Stream<Context> getContext(DateTime begin, DateTime end, Duration stepsize, ExpressionLookBack lookback, TimeSeriesMetricFilter filter) {
-        return HistoryContext.stream(BufferedIterator.stream(ForkJoinPool.commonPool(), stream(begin.minus(lookback.hintDuration()), end, stepsize, filter)), lookback)
+        return HistoryContext.stream(stream(begin.minus(lookback.hintDuration()), end, stepsize, filter), lookback)
                 .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin));
     }
 
