@@ -192,6 +192,8 @@
                         <exclude>com/groupon/monsoon/remote/history/EncDec$IterSuccessResponseImpl.class</exclude>
                         <exclude>com/groupon/monsoon/remote/history/EncDec$IterErrorResponse.class</exclude>
 
+                        <exclude>com/github/groupon/monsoon/history/influx/SeriesHandler$TimestampedGroup.class</exclude>
+
                         <!-- Plain enums -->
                         <exclude>com/groupon/lex/metrics/timeseries/AlertState.class</exclude>
                         <exclude>com/groupon/lex/metrics/config/Scope$Valid.class</exclude>
