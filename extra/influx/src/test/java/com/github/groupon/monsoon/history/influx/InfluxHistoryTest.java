@@ -27,6 +27,7 @@ package com.github.groupon.monsoon.history.influx;
 
 import com.groupon.lex.metrics.MetricMatcher;
 import com.groupon.lex.metrics.PathMatcher;
+import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
@@ -44,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.Value;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
@@ -241,7 +243,8 @@ public class InfluxHistoryTest {
                 .when(influxDB.query(Mockito.any(), Mockito.any()))
                 .thenAnswer(keyedQueriesAnswer(EVAL_WITH_BEGIN_AND_END_QUERIES));
 
-        history.evaluate(singletonMap("foobar", TimeSeriesMetricExpression.valueOf("rate[5m](runtime NumGC)")), DateTime.parse("2017-09-17T10:00:00.000Z"), DateTime.parse("2017-09-17T14:00:00.000Z"), Duration.millis(1)).collect(Collectors.toList());
+        List<Collection<CollectHistory.NamedEvaluation>> expected = mockHistoryFromData(computeData(EVAL_WITH_BEGIN_AND_END_QUERIES)).evaluate(singletonMap("foobar", TimeSeriesMetricExpression.valueOf("rate[5m](runtime NumGC)")), DateTime.parse("2017-09-17T10:00:00.000Z"), DateTime.parse("2017-09-17T14:00:00.000Z"), Duration.millis(1)).collect(Collectors.toList());
+        assertEquals(expected, history.evaluate(singletonMap("foobar", TimeSeriesMetricExpression.valueOf("rate[5m](runtime NumGC)")), DateTime.parse("2017-09-17T10:00:00.000Z"), DateTime.parse("2017-09-17T14:00:00.000Z"), Duration.millis(1)).collect(Collectors.toList()));
 
         // The end query was called once.
         verify(influxDB, times(EVAL_WITH_BEGIN_AND_END_QUERIES.size())).query(
@@ -330,7 +333,7 @@ public class InfluxHistoryTest {
         };
     }
 
-    private static Matcher<Iterable<? extends TimeSeriesCollection>> computeDataMatcher(Collection<KeyedQuery> queries, boolean reverse) {
+    private static Stream<TimeSeriesCollection> computeData(Collection<KeyedQuery> queries) {
         final SeriesHandler seriesHandler = new SeriesHandler();
         queries.stream()
                 .filter(KeyedQuery::isDataFragment)
@@ -351,7 +354,11 @@ public class InfluxHistoryTest {
                 .flatMap(s -> s.stream())
                 .forEach(seriesHandler::addSeries);
 
-        final List<Matcher<? super TimeSeriesCollection>> result = seriesHandler.build()
+        return seriesHandler.build();
+    }
+
+    private static Matcher<Iterable<? extends TimeSeriesCollection>> computeDataMatcher(Collection<KeyedQuery> queries, boolean reverse) {
+        final List<Matcher<? super TimeSeriesCollection>> result = computeData(queries)
                 .map(Matchers::equalTo)
                 .collect(Collectors.toList());
         if (reverse) Collections.reverse(result);
@@ -363,5 +370,36 @@ public class InfluxHistoryTest {
         private final String query;
         private final String baseFileName;
         private final boolean dataFragment;
+    }
+
+    private static CollectHistory mockHistoryFromData(Stream<TimeSeriesCollection> tsdataStream) {
+        final List<TimeSeriesCollection> tsdata = tsdataStream.collect(Collectors.toList());
+
+        return new CollectHistory() {
+            @Override
+            public Stream<TimeSeriesCollection> stream() {
+                return tsdata.stream();
+            }
+
+            @Override
+            public DateTime getEnd() {
+                return tsdata.get(tsdata.size() - 1).getTimestamp();
+            }
+
+            @Override
+            public long getFileSize() {
+                return 0;
+            }
+
+            @Override
+            public boolean add(TimeSeriesCollection c) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean addAll(Collection c) {
+                throw new UnsupportedOperationException();
+            }
+        };
     }
 }
