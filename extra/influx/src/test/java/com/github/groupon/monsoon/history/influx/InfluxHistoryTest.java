@@ -215,6 +215,23 @@ public class InfluxHistoryTest {
         verifyNoMoreInteractions(influxDB);
     }
 
+    @Test
+    public void streamWithBeginAndEnd() throws Exception {
+        Mockito
+                .when(influxDB.query(Mockito.any(), Mockito.any()))
+                .thenAnswer(keyedQueriesAnswer(STREAM_WITH_BEGIN_AND_END_QUERIES));
+
+        assertThat(history.stream(DateTime.parse("2017-09-17T10:00:00.000Z"), DateTime.parse("2017-09-17T14:00:00.000Z")).collect(Collectors.toList()),
+                computeDataMatcher(STREAM_WITH_BEGIN_AND_END_QUERIES, false));
+
+        // The end query was called once.
+        verify(influxDB, times(STREAM_WITH_BEGIN_AND_END_QUERIES.size())).query(
+                Mockito.argThat(Matchers.hasProperty("database", Matchers.equalTo(DATABASE))),
+                Mockito.eq(TimeUnit.MILLISECONDS)
+        );
+        verifyNoMoreInteractions(influxDB);
+    }
+
     private static final List<KeyedQuery> STREAM_REVERSE_QUERIES = unmodifiableList(Arrays.asList(
             new KeyedQuery("select * from /.*/ order by time desc limit 1", "InfluxHistory_getEnd", false),
             new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T15:24:10.000Z' and time <= '2017-09-17T16:24:10.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamReverse_1", true),
@@ -259,6 +276,14 @@ public class InfluxHistoryTest {
     private static final List<KeyedQuery> STREAM_WITH_BEGIN_QUERIES = unmodifiableList(Arrays.asList(
             new KeyedQuery("select * from /.*/ order by time desc limit 1", "InfluxHistory_getEnd", false),
             new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T15:59:59.999Z' and time <= '2017-09-17T16:24:10.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamWithBegin_1", true)
+    ));
+
+    private static final List<KeyedQuery> STREAM_WITH_BEGIN_AND_END_QUERIES = unmodifiableList(Arrays.asList(
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T09:59:59.999Z' and time <= '2017-09-17T10:59:59.999Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamWithBeginAndEnd_1", true),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T10:59:59.999Z' and time <= '2017-09-17T11:59:59.999Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamWithBeginAndEnd_2", true),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T11:59:59.999Z' and time <= '2017-09-17T12:59:59.999Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamWithBeginAndEnd_3", true),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T12:59:59.999Z' and time <= '2017-09-17T13:59:59.999Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamWithBeginAndEnd_4", true),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T13:59:59.999Z' and time <= '2017-09-17T14:00:00.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamWithBeginAndEnd_5", true)
     ));
 
     private static Answer<QueryResult> keyedQueriesAnswer(Collection<KeyedQuery> queries) {
