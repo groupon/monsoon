@@ -25,9 +25,16 @@
  */
 package com.github.groupon.monsoon.history.influx;
 
+import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricMatcher;
+import com.groupon.lex.metrics.MetricName;
+import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.PathMatcher;
+import com.groupon.lex.metrics.SimpleGroupPath;
+import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.CollectHistory;
+import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
@@ -35,6 +42,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
@@ -50,6 +58,8 @@ import lombok.Value;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
 import org.influxdb.InfluxDB;
+import org.influxdb.dto.BatchPoints;
+import org.influxdb.dto.Point;
 import org.influxdb.dto.Query;
 import org.influxdb.dto.QueryResult;
 import org.joda.time.DateTime;
@@ -57,6 +67,7 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -251,6 +262,31 @@ public class InfluxHistoryTest {
                 Mockito.argThat(Matchers.hasProperty("database", Matchers.equalTo(DATABASE))),
                 Mockito.eq(TimeUnit.MILLISECONDS)
         );
+        verifyNoMoreInteractions(influxDB);
+    }
+
+    @Test
+    public void add() throws Exception {
+        final GroupName group = GroupName.valueOf(SimpleGroupPath.valueOf("foo", "bar"), Tags.valueOf(singletonMap("x", MetricValue.fromIntValue(17))));
+        final ImmutableTimeSeriesValue tsv0 = new ImmutableTimeSeriesValue(group, singletonMap(MetricName.valueOf("met", "ric"), MetricValue.fromStrValue("value")));
+        final TimeSeriesCollection tsdata = new SimpleTimeSeriesCollection(DateTime.parse("2017-09-17T10:00:00.000Z"), singleton(tsv0));
+
+        boolean historyAddResult = history.add(tsdata);
+
+        assertTrue(historyAddResult);
+
+        verify(influxDB, times(1)).write(Mockito.<BatchPoints>argThat(
+                Matchers.hasProperty(
+                        "points",
+                        Matchers.contains(
+                                Point.measurement("foo.bar")
+                                .tag("x", "17")
+                                .time(DateTime.parse("2017-09-17T10:00:00.000Z").getMillis(), TimeUnit.MILLISECONDS)
+                                .addField("met.ric", "value")
+                                .build()
+                        )
+                )
+        ));
         verifyNoMoreInteractions(influxDB);
     }
 
