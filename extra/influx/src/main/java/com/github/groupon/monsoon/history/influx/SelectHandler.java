@@ -28,10 +28,13 @@ package com.github.groupon.monsoon.history.influx;
 import com.groupon.lex.metrics.MetricMatcher;
 import com.groupon.lex.metrics.PathMatcher;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
+import java.util.ArrayList;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -39,6 +42,8 @@ import lombok.NonNull;
 import org.joda.time.DateTime;
 
 public class SelectHandler {
+    private static final Logger LOG = Logger.getLogger(SelectHandler.class.getName());
+
     private final List<String> selectStmts;
 
     public SelectHandler(@NonNull TimeSeriesMetricFilter filter) {
@@ -70,6 +75,7 @@ public class SelectHandler {
                 .map(Supplier::get)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
+                .peek(str -> LOG.log(Level.FINE, "{0} => {1}", new Object[]{matcher, str}))
                 .findFirst()
                 .orElseThrow(RuntimeException::new);
     }
@@ -84,33 +90,61 @@ public class SelectHandler {
 
     private static class RegexVisitor implements PathMatcher.Visitor {
         private static final Pattern SUSPECT_PATTERN_CHARACTERS = Pattern.compile(Pattern.quote("^") + "|" + Pattern.quote("$"));
-        private final StringBuilder pattern = new StringBuilder();
+        private final List<String> pattern = new ArrayList<>();
 
         @Override
         public void accept(PathMatcher.LiteralNameMatch match) {
-            pattern.append(Pattern.quote(match.getLiteral()));
+            final String escaped = match.getLiteral()
+                    .replace("\\", "\\\\")
+                    .replace(".", "\\.")
+                    .replace("?", "\\?")
+                    .replace("+", "\\+")
+                    .replace("*", "\\*")
+                    .replace("(", "\\(")
+                    .replace(")", "\\)")
+                    .replace("[", "\\[")
+                    .replace("]", "\\]")
+                    .replace("{", "\\{")
+                    .replace("}", "\\}");
+            pattern.add(escaped);
         }
 
         @Override
         public void accept(PathMatcher.RegexMatch match) {
+            String pre = "";
+            String post = "";
+            String baseRegex = match.getRegex();
+
+            if (baseRegex.startsWith("^")) {
+                baseRegex = baseRegex.substring(1);
+            } else {
+                pre = ".*";
+            }
+
+            if (baseRegex.endsWith("$")) {
+                baseRegex = baseRegex.substring(0, baseRegex.length() - 1);
+            } else {
+                post = ".*";
+            }
+
             if (SUSPECT_PATTERN_CHARACTERS.matcher(match.getRegex()).find())
-                pattern.append(".*");
+                pattern.add(".*");
             else
-                pattern.append(match.getRegex());
+                pattern.add(pre + baseRegex + post);
         }
 
         @Override
         public void accept(PathMatcher.WildcardMatch match) {
-            pattern.append(".*");
+            pattern.add(".*");
         }
 
         @Override
         public void accept(PathMatcher.DoubleWildcardMatch match) {
-            pattern.append(".*");
+            pattern.add(".*");
         }
 
         public String toRegex() {
-            return "^" + pattern.toString() + "$";
+            return "^" + String.join("\\.", pattern) + "$";
         }
     }
 }
