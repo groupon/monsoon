@@ -27,19 +27,32 @@ package com.github.groupon.monsoon.history.influx;
 
 import static com.github.groupon.monsoon.history.influx.JsonUtil.createOrderingExceptation;
 import com.groupon.lex.metrics.GroupName;
+import com.groupon.lex.metrics.Histogram;
+import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
+import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
+import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.hamcrest.Matchers;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import static org.junit.Assert.assertThat;
 import org.junit.Test;
 
 public class SeriesHandlerTest {
     private static final GroupName GROUP = GroupName.valueOf(SimpleGroupPath.valueOf("run", "time"), Tags.valueOf(singletonMap("hostname", MetricValue.fromStrValue("dragoon"))));
+
+    private static final Histogram EXPECTED_HISTOGRAM = new Histogram(
+            new Histogram.RangeWithCount(0, 1, 0.5),
+            new Histogram.RangeWithCount(1, 2, 2),
+            new Histogram.RangeWithCount(2, 3, 6),
+            new Histogram.RangeWithCount(3, 4, 12));
 
     @Test
     public void noSeries() throws Exception {
@@ -83,5 +96,30 @@ public class SeriesHandlerTest {
 
         assertThat(handlerResult, createOrderingExceptation(handlerResult));
         assertThat(handlerResult, qrwe.getExpectation());
+    }
+
+    @Test
+    public void histogram() throws Exception {
+        final JsonQueryResult jqr = new JsonQueryResult("Histogram_queryResult");
+
+        SeriesHandler handler = new SeriesHandler();
+        jqr.getQueryResult()
+                .getResults()
+                .stream()
+                .flatMap(result -> result.getSeries().stream())
+                .forEach(handler::addSeries);
+        final List<TimeSeriesCollection> handlerResult = handler.build().collect(Collectors.toList());
+
+        System.err.println(handlerResult.get(0).getTSValues());
+        assertThat(handlerResult,
+                Matchers.contains(
+                        new SimpleTimeSeriesCollection(
+                                new DateTime(0, DateTimeZone.UTC),
+                                singleton(
+                                        new ImmutableTimeSeriesValue(
+                                                GROUP,
+                                                singletonMap(
+                                                        MetricName.valueOf("foobar"),
+                                                        MetricValue.fromHistValue(EXPECTED_HISTOGRAM)))))));
     }
 }

@@ -1,0 +1,76 @@
+{
+    "results": [
+        {
+            "series": [
+                {
+                    "name": "run.time",
+                    "tags": {
+                        "hostname": "dragoon",
+                        "__monsoon_range__": "0..1"
+                    },
+                    "columns": [
+                        "time",
+                        "foobar"
+                    ],
+                    "values": [
+                        [
+                            0,
+                            0.5
+                        ]
+                    ]
+                },
+                {
+                    "name": "run.time",
+                    "tags": {
+                        "hostname": "dragoon",
+                        "__monsoon_range__": "1..2"
+                    },
+                    "columns": [
+                        "time",
+                        "foobar"
+                    ],
+                    "values": [
+                        [
+                            0,
+                            2
+                        ]
+                    ]
+                },
+                {
+                    "name": "run.time",
+                    "tags": {
+                        "hostname": "dragoon",
+                        "__monsoon_range__": "2..3"
+                    },
+                    "columns": [
+                        "time",
+                        "foobar"
+                    ],
+                    "values": [
+                        [
+                            0,
+                            6
+                        ]
+                    ]
+                },
+                {
+                    "name": "run.time",
+                    "tags": {
+                        "hostname": "dragoon",
+                        "__monsoon_range__": "3..4"
+                    },
+                    "columns": [
+                        "time",
+                        "foobar"
+                    ],
+                    "values": [
+                        [
+                            0,
+                            12
+                        ]
+                    ]
+                }
+            ]
+        }
+    ]
+}

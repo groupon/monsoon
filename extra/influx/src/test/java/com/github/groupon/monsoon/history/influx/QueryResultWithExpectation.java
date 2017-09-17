@@ -33,7 +33,6 @@ import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -46,19 +45,15 @@ import lombok.Data;
 import lombok.Getter;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
-import org.influxdb.dto.QueryResult;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
 @Getter
-public class QueryResultWithExpectation {
+public class QueryResultWithExpectation extends JsonQueryResult {
     private final Matcher<Iterable<? extends TimeSeriesCollection>> expectation;
-    private final QueryResult queryResult;
 
     public QueryResultWithExpectation(String baseFileName, GroupName group) throws IOException {
-        this.queryResult = JsonUtil.loadJson(baseFileName + ".json", QueryResult.class);
-        if (this.queryResult.getResults() != null)
-            Collections.shuffle(this.queryResult.getResults());
+        super(baseFileName);
         this.expectation = JsonUtil.loadJson(baseFileName + "__expect.json", Expected.class).build(group);
     }
 
