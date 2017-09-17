@@ -52,7 +52,6 @@ import java.util.Optional;
 import java.util.Spliterators;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -110,8 +109,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
                 .flatMap(r -> r.getSeries().stream())
                 .map(s -> getColumnFromSeries(s, "diskBytes"))
                 .filter(Optional::isPresent)
-                .map(Optional::get)
-                .flatMap(Function.identity())
+                .flatMap(Optional::get)
                 .map(Number.class::cast)
                 .mapToLong(Number::longValue)
                 .findAny()
