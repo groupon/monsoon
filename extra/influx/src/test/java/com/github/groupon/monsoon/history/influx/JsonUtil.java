@@ -41,11 +41,11 @@ import org.hamcrest.Matchers;
  * @author ariane
  */
 public class JsonUtil {
-    private static Gson gson = new Gson();
+    private static final Gson GSON = new Gson();
 
     public static <T> T loadJson(String fileName, Class<T> clazz) throws IOException {
         try (Reader fileStream = new InputStreamReader(JsonUtil.class.getResourceAsStream(fileName), StandardCharsets.UTF_8)) {
-            return gson.fromJson(fileStream, clazz);
+            return GSON.fromJson(fileStream, clazz);
         }
     }
 

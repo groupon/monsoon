@@ -28,15 +28,12 @@ package com.github.groupon.monsoon.history.influx;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
-import com.groupon.lex.metrics.SimpleGroupPath;
-import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import static java.util.Collections.singletonMap;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -58,20 +55,19 @@ public class QueryResultWithExpectation {
     private final Matcher<Iterable<? extends TimeSeriesCollection>> expectation;
     private final QueryResult queryResult;
 
-    public QueryResultWithExpectation(String baseFileName) throws IOException {
+    public QueryResultWithExpectation(String baseFileName, GroupName group) throws IOException {
         this.queryResult = JsonUtil.loadJson(baseFileName + ".json", QueryResult.class);
         if (this.queryResult.getResults() != null)
             Collections.shuffle(this.queryResult.getResults());
-        this.expectation = JsonUtil.loadJson(baseFileName + "__expect.json", Expected.class).build();
+        this.expectation = JsonUtil.loadJson(baseFileName + "__expect.json", Expected.class).build(group);
     }
 
     @Data
     private static class Expected {
-        private static final GroupName GROUP = GroupName.valueOf(SimpleGroupPath.valueOf("run", "time"), Tags.valueOf(singletonMap("hostname", MetricValue.fromStrValue("dragoon"))));
         private List<String> columns;
         private List<List<Object>> values;
 
-        public Matcher<Iterable<? extends TimeSeriesCollection>> build() {
+        public Matcher<Iterable<? extends TimeSeriesCollection>> build(GroupName group) {
             final int timeColumn = columns.indexOf("time");
             final List<TimeSeriesCollection> result = new ArrayList<>(values.size());
 
@@ -89,7 +85,7 @@ public class QueryResultWithExpectation {
                     valueMap.put(MetricName.valueOf(column.split(Pattern.quote("."))), MetricValue.fromNumberValue(field));
                 }
 
-                result.add(new SimpleTimeSeriesCollection(new DateTime(timestamp, DateTimeZone.UTC), Stream.of(new ImmutableTimeSeriesValue(GROUP, valueMap))));
+                result.add(new SimpleTimeSeriesCollection(new DateTime(timestamp, DateTimeZone.UTC), Stream.of(new ImmutableTimeSeriesValue(group, valueMap))));
             }
             return Matchers.containsInAnyOrder(result.stream()
                     .map(Matchers::equalTo)

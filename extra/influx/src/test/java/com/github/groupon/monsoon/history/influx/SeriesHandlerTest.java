@@ -26,7 +26,12 @@
 package com.github.groupon.monsoon.history.influx;
 
 import static com.github.groupon.monsoon.history.influx.JsonUtil.createOrderingExceptation;
+import com.groupon.lex.metrics.GroupName;
+import com.groupon.lex.metrics.MetricValue;
+import com.groupon.lex.metrics.SimpleGroupPath;
+import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
+import static java.util.Collections.singletonMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.hamcrest.Matchers;
@@ -34,6 +39,8 @@ import static org.junit.Assert.assertThat;
 import org.junit.Test;
 
 public class SeriesHandlerTest {
+    private static final GroupName GROUP = GroupName.valueOf(SimpleGroupPath.valueOf("run", "time"), Tags.valueOf(singletonMap("hostname", MetricValue.fromStrValue("dragoon"))));
+
     @Test
     public void noSeries() throws Exception {
         SeriesHandler handler = new SeriesHandler();
@@ -43,7 +50,7 @@ public class SeriesHandlerTest {
 
     @Test
     public void loadAllocFreesQueryResult() throws Exception {
-        final QueryResultWithExpectation qrwe = new QueryResultWithExpectation("AllocFrees_internal_queryResult");
+        final QueryResultWithExpectation qrwe = new QueryResultWithExpectation("AllocFrees_internal_queryResult", GROUP);
 
         SeriesHandler handler = new SeriesHandler();
         qrwe.getQueryResult()
@@ -59,7 +66,7 @@ public class SeriesHandlerTest {
 
     @Test
     public void collisionResolution() throws Exception {
-        final QueryResultWithExpectation qrwe = new QueryResultWithExpectation("AllocFrees_internal_queryResult");
+        final QueryResultWithExpectation qrwe = new QueryResultWithExpectation("AllocFrees_internal_queryResult", GROUP);
 
         SeriesHandler handler = new SeriesHandler();
         qrwe.getQueryResult()
