@@ -156,7 +156,7 @@ public class SeriesHandlerTest {
     }
 
     @Test
-    public void trueFalse() throws Exception {
+    public void trueFalseOrStringValue() throws Exception {
         final JsonQueryResult jqr = new JsonQueryResult("TrueFalse");
 
         SeriesHandler handler = new SeriesHandler();
