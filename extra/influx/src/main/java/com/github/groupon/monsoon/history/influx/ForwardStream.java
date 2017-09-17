@@ -113,7 +113,7 @@ public class ForwardStream implements Spliterator<TimeSeriesCollection> {
         if (pending == null) pending = new ArrayDeque<>();
         if (!pending.isEmpty()) return;
 
-        while (!begin.isAfter(end)) {
+        while (begin.isBefore(end)) {
             DateTime searchEnd = begin.plus(MIN_INTERVAL);
             if (searchEnd.isAfter(end)) searchEnd = end;
 
@@ -123,7 +123,7 @@ public class ForwardStream implements Spliterator<TimeSeriesCollection> {
             begin = searchEnd;
             if (!pending.isEmpty()) return;
 
-            final Query betterBeginQuery = new Query(String.format("select * from /.*/ where time > %s and time <= %s order by time asc limit 1", begin.toString(), end.toString()), selector.getDatabase());
+            final Query betterBeginQuery = new Query(String.format("select * from /.*/ where time > '%s' and time <= '%s' order by time asc limit 1", begin.toString(), end.toString()), selector.getDatabase());
             final QueryResult betterBeginQResult = selector.getInfluxDB().query(betterBeginQuery, TimeUnit.MILLISECONDS);
             throwOnResultError(betterBeginQResult);
             begin = extractTimestamps(betterBeginQResult)
