@@ -26,8 +26,9 @@
 package com.github.groupon.monsoon.history.influx;
 
 import static com.github.groupon.monsoon.history.influx.InfluxUtil.TIME_COLUMN;
-import com.google.common.collect.Multimap;
+import static com.google.common.collect.Iterators.peekingIterator;
 import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.PeekingIterator;
 import com.google.common.collect.SetMultimap;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Histogram;
@@ -41,39 +42,40 @@ import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import java.time.Instant;
-import java.util.Collection;
-import static java.util.Collections.unmodifiableSet;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
+import java.util.SortedMap;
+import java.util.Spliterator;
+import java.util.Spliterators;
+import java.util.TreeMap;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import lombok.Getter;
+import java.util.stream.StreamSupport;
+import lombok.EqualsAndHashCode;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.influxdb.dto.QueryResult;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 /**
  * Handles an ordered list of series and exposes them as TimeSeriesCollections.
  */
 public class SeriesHandler {
-    private final Multimap<DateTime, IntermediateTSV> datums = MultimapBuilder
-            .treeKeys()
-            .arrayListValues()
-            .build();
-
-    public Set<DateTime> keySet() {
-        return unmodifiableSet(datums.keySet());
-    }
+    private final SortedMap<TimestampedGroup, IntermediateTSV> datums = new TreeMap<>();
 
     public Stream<TimeSeriesCollection> build() {
-        return datums.asMap().entrySet().stream()
-                .map(timestampedTsc -> buildTsc(timestampedTsc.getKey(), timestampedTsc.getValue()));
+        return StreamSupport.stream(
+                Spliterators.spliteratorUnknownSize(
+                        new DatumsIterator(datums.entrySet().iterator()),
+                        DatumsIterator.SPLITERATOR_CHARACTERISTICS),
+                false);
     }
 
     public void addSeries(QueryResult.Series series) {
@@ -85,7 +87,7 @@ public class SeriesHandler {
             assert series.getColumns().size() == row.size();
 
             final DateTime timestamp = new DateTime((Instant) row.get(timeColumnIdx));
-            final IntermediateTSV valueMap = new IntermediateTSV(group);
+            final IntermediateTSV valueMap = new IntermediateTSV();
 
             final ListIterator<String> columnIter = series.getColumns().listIterator();
             final Iterator<Object> rowIter = row.iterator();
@@ -96,27 +98,45 @@ public class SeriesHandler {
                     valueMap.addMetric(valueKeyToMetricName(columnName), range, seriesValueToMetricValue(rowIter.next()));
             }
 
-            datums.put(timestamp, valueMap);
+            datums.merge(new TimestampedGroup(timestamp, group), valueMap, IntermediateTSV::withMerged);
         });
     }
 
     public void merge(SeriesHandler other) {
-        datums.putAll(other.datums);
+        other.datums.forEach((k, v) -> datums.merge(k, v, IntermediateTSV::withMerged));
     }
 
-    private static TimeSeriesCollection buildTsc(DateTime timestamp, Collection<IntermediateTSV> c) {
-        return new SimpleTimeSeriesCollection(timestamp, mergedTimeseriesValues(c));
-    }
+    private static class DatumsIterator implements Iterator<TimeSeriesCollection> {
+        public static final int SPLITERATOR_CHARACTERISTICS = Spliterator.DISTINCT | Spliterator.IMMUTABLE | Spliterator.NONNULL | Spliterator.ORDERED | Spliterator.SORTED;
+        private final PeekingIterator<Map.Entry<TimestampedGroup, IntermediateTSV>> iter;
 
-    private static Stream<TimeSeriesValue> mergedTimeseriesValues(Collection<IntermediateTSV> c) {
-        return c.stream()
-                .collect(Collectors.groupingBy(
-                        IntermediateTSV::getGroup,
-                        Collectors.reducing(IntermediateTSV::withMerged)))
-                .values().stream()
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .map(IntermediateTSV::build);
+        public DatumsIterator(Iterator<Map.Entry<TimestampedGroup, IntermediateTSV>> iter) {
+            this.iter = peekingIterator(iter);
+        }
+
+        @Override
+        public boolean hasNext() {
+            return iter.hasNext();
+        }
+
+        @Override
+        public TimeSeriesCollection next() {
+            final List<TimeSeriesValue> collections = new ArrayList<>();
+            final DateTime timestamp;
+            {
+                final Map.Entry<TimestampedGroup, IntermediateTSV> head = iter.next(); // Handles throwing of NoSuchElementException for us.
+                collections.add(buildTsvFromIterElem(head));
+                timestamp = head.getKey().getTimestamp();
+            }
+            while (iter.hasNext() && Objects.equals(iter.peek().getKey().getTimestamp(), timestamp))
+                collections.add(buildTsvFromIterElem(iter.next()));
+
+            return new SimpleTimeSeriesCollection(timestamp, collections);
+        }
+
+        private static TimeSeriesValue buildTsvFromIterElem(Map.Entry<TimestampedGroup, IntermediateTSV> iterElem) {
+            return iterElem.getValue().build(iterElem.getKey().getGroup());
+        }
     }
 
     private static GroupName seriesToGroupName(QueryResult.Series series) {
@@ -178,15 +198,13 @@ public class SeriesHandler {
 
     @RequiredArgsConstructor
     private static class IntermediateTSV {
-        @Getter
-        private final GroupName group;
         private final Map<MetricName, MetricValue> metrics = new HashMap<>();
         private final SetMultimap<MetricName, Histogram.RangeWithCount> histograms = MultimapBuilder
                 .hashKeys()
                 .hashSetValues() // Handle duplicate series correctly.
                 .build();
 
-        public TimeSeriesValue build() {
+        public TimeSeriesValue build(GroupName group) {
             final Stream<Map.Entry<MetricName, MetricValue>> metricsStream = metrics.entrySet().stream()
                     .filter(metricEntry -> !histograms.containsKey(metricEntry.getKey()));
             final Stream<Map.Entry<MetricName, MetricValue>> histogramsStream = histograms.asMap().entrySet().stream()
@@ -216,11 +234,36 @@ public class SeriesHandler {
         }
 
         public IntermediateTSV withMerged(IntermediateTSV other) {
-            assert Objects.equals(group, other.group);
-
             metrics.putAll(other.metrics);
             histograms.putAll(other.histograms);
             return this;
+        }
+    }
+
+    @EqualsAndHashCode
+    private static class TimestampedGroup implements Comparable<TimestampedGroup> {
+        private final long timestamp;
+        private final GroupName group;
+
+        public TimestampedGroup(@NonNull DateTime timestamp, @NonNull GroupName group) {
+            this.timestamp = timestamp.getMillis();
+            this.group = group;
+        }
+
+        public DateTime getTimestamp() {
+            return new DateTime(timestamp, DateTimeZone.UTC);
+        }
+
+        public GroupName getGroup() {
+            return group;
+        }
+
+        @Override
+        public int compareTo(TimestampedGroup o) {
+            int cmp = Long.compare(timestamp, o.timestamp);
+            if (cmp == 0)
+                cmp = group.compareTo(o.group);
+            return cmp;
         }
     }
 }
