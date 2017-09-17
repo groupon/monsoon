@@ -1,0 +1,19 @@
+{
+    "results": [
+        {
+            "series": [
+                {
+                    "name": "bad_metric",
+                    "columns": [
+                        "foobar"
+                    ],
+                    "values": [
+                        [
+                            0.5
+                        ]
+                    ]
+                }
+            ]
+        }
+    ]
+}

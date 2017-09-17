@@ -154,6 +154,7 @@ public class SeriesHandler {
     }
 
     private static Optional<Histogram.Range> rangeFromSeries(QueryResult.Series series) {
+        if (series.getTags() == null) return Optional.empty();
         return series.getTags().entrySet().stream()
                 .filter(tagEntry -> Objects.equals(tagEntry.getKey(), InfluxUtil.MONSOON_RANGE_TAG))
                 .map(Map.Entry::getValue)

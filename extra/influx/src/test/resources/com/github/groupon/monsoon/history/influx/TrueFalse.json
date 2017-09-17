@@ -1,0 +1,47 @@
+{
+    "results": [
+        {
+            "series": [
+                {
+                    "name": "string",
+                    "columns": [
+                        "time",
+                        "foobar"
+                    ],
+                    "values": [
+                        [
+                            0,
+                            "a string"
+                        ]
+                    ]
+                },
+                {
+                    "name": "true",
+                    "columns": [
+                        "time",
+                        "foobar"
+                    ],
+                    "values": [
+                        [
+                            0,
+                            true
+                        ]
+                    ]
+                },
+                {
+                    "name": "false",
+                    "columns": [
+                        "time",
+                        "foobar"
+                    ],
+                    "values": [
+                        [
+                            0,
+                            false
+                        ]
+                    ]
+                }
+            ]
+        }
+    ]
+}

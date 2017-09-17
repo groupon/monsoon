@@ -78,6 +78,26 @@ public class SeriesHandlerTest {
     }
 
     @Test
+    public void seriesHandlerMergesProperly() throws Exception {
+        final QueryResultWithExpectation qrwe = new QueryResultWithExpectation("AllocFrees_internal_queryResult", GROUP);
+
+        SeriesHandler handler = new SeriesHandler();
+        qrwe.getQueryResult()
+                .getResults()
+                .stream()
+                .map(result -> {
+                    SeriesHandler tmp = new SeriesHandler();
+                    result.getSeries().forEach(tmp::addSeries);
+                    return tmp;
+                })
+                .forEach(handler::merge);
+        final List<TimeSeriesCollection> handlerResult = handler.build().collect(Collectors.toList());
+
+        assertThat(handlerResult, createOrderingExceptation(handlerResult));
+        assertThat(handlerResult, qrwe.getExpectation());
+    }
+
+    @Test
     public void collisionResolution() throws Exception {
         final QueryResultWithExpectation qrwe = new QueryResultWithExpectation("AllocFrees_internal_queryResult", GROUP);
 
@@ -110,7 +130,6 @@ public class SeriesHandlerTest {
                 .forEach(handler::addSeries);
         final List<TimeSeriesCollection> handlerResult = handler.build().collect(Collectors.toList());
 
-        System.err.println(handlerResult.get(0).getTSValues());
         assertThat(handlerResult,
                 Matchers.contains(
                         new SimpleTimeSeriesCollection(
@@ -121,5 +140,41 @@ public class SeriesHandlerTest {
                                                 singletonMap(
                                                         MetricName.valueOf("foobar"),
                                                         MetricValue.fromHistValue(EXPECTED_HISTOGRAM)))))));
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void missingTime() throws Exception {
+        final JsonQueryResult jqr = new JsonQueryResult("MissingTime");
+
+        SeriesHandler handler = new SeriesHandler();
+        jqr.getQueryResult()
+                .getResults()
+                .stream()
+                .flatMap(result -> result.getSeries().stream())
+                .forEach(handler::addSeries);
+        final List<TimeSeriesCollection> handlerResult = handler.build().collect(Collectors.toList());
+    }
+
+    @Test
+    public void trueFalse() throws Exception {
+        final JsonQueryResult jqr = new JsonQueryResult("TrueFalse");
+
+        SeriesHandler handler = new SeriesHandler();
+        jqr.getQueryResult()
+                .getResults()
+                .stream()
+                .flatMap(result -> result.getSeries().stream())
+                .forEach(handler::addSeries);
+        final List<TimeSeriesCollection> handlerResult = handler.build().collect(Collectors.toList());
+
+        assertThat(handlerResult,
+                Matchers.contains(Matchers.allOf(
+                        Matchers.hasProperty("timestamp", Matchers.equalTo(new DateTime(0, DateTimeZone.UTC))),
+                        Matchers.hasProperty("TSValues", Matchers.containsInAnyOrder(
+                                new ImmutableTimeSeriesValue(GroupName.valueOf("string"), singletonMap(MetricName.valueOf("foobar"), MetricValue.fromStrValue("a string"))),
+                                new ImmutableTimeSeriesValue(GroupName.valueOf("true"), singletonMap(MetricName.valueOf("foobar"), MetricValue.TRUE)),
+                                new ImmutableTimeSeriesValue(GroupName.valueOf("false"), singletonMap(MetricName.valueOf("foobar"), MetricValue.FALSE))
+                        ))
+                )));
     }
 }
