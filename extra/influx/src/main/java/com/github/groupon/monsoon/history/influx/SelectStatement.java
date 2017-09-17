@@ -29,6 +29,8 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
 import lombok.NonNull;
 import org.influxdb.InfluxDB;
@@ -41,6 +43,8 @@ import org.joda.time.DateTime;
  * @author ariane
  */
 public class SelectStatement extends InfluxUtil {
+    private static final Logger LOG = Logger.getLogger(SelectStatement.class.getName());
+
     private final SelectHandler selectHandler;
 
     public SelectStatement(@NonNull InfluxDB influxDB, @NonNull String database, @NonNull TimeSeriesMetricFilter filter) {
@@ -50,14 +54,15 @@ public class SelectStatement extends InfluxUtil {
 
     public Stream<TimeSeriesCollection> execute(DateTime begin, DateTime end) {
         return selectHandler.queriesForInterval(begin, end)
+                .peek(query -> LOG.log(Level.INFO, "{0}", query))
                 .map(queryStr -> new Query(queryStr, getDatabase()))
                 .map(query -> getInfluxDB().query(query, TimeUnit.MILLISECONDS))
                 .peek(InfluxUtil::throwOnResultError)
                 .map(QueryResult::getResults)
                 .flatMap(Collection::stream)
                 .filter(result -> !result.hasError())
-                .map(QueryResult.Result::getSeries)
-                .flatMap(Collection::stream)
+                .filter(r -> r.getSeries() != null)
+                .flatMap(r -> r.getSeries().stream())
                 .collect(SeriesHandler::new, SeriesHandler::addSeries, SeriesHandler::merge)
                 .build();
     }

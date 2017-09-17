@@ -25,10 +25,21 @@
  */
 package com.github.groupon.monsoon.history.influx;
 
+import java.util.Arrays;
+import java.util.Collection;
+import static java.util.Collections.unmodifiableList;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import lombok.Value;
 import org.hamcrest.Matchers;
 import org.influxdb.InfluxDB;
+import org.influxdb.dto.Query;
+import org.influxdb.dto.QueryResult;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import static org.junit.Assert.assertEquals;
@@ -41,10 +52,13 @@ import org.mockito.Mockito;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.stubbing.Answer;
 
 @RunWith(MockitoJUnitRunner.class)
 public class InfluxHistoryTest {
+    private static final Logger LOG = Logger.getLogger(InfluxHistoryTest.class.getName());
     private static final String DATABASE = "database";
 
     @Mock
@@ -118,5 +132,64 @@ public class InfluxHistoryTest {
                 Mockito.eq(TimeUnit.MILLISECONDS)
         );
         verifyNoMoreInteractions(influxDB);
+    }
+
+    @Test
+    public void streamReverse() throws Exception {
+        Mockito
+                .when(influxDB.query(Mockito.any(), Mockito.any()))
+                .thenAnswer(keyedQueriesAnswer(STREAM_REVERSE_QUERIES));
+
+        try {
+            history.streamReversed().collect(Collectors.toList());
+        } catch (Exception | AssertionError ex) {
+            Logger.getLogger(getClass().getName()).log(Level.SEVERE, "error streaming", ex);
+            throw ex;
+        }
+
+        // The end query was called once.
+        verify(influxDB, times(STREAM_REVERSE_QUERIES.size())).query(
+                Mockito.argThat(Matchers.hasProperty("database", Matchers.equalTo(DATABASE))),
+                Mockito.eq(TimeUnit.MILLISECONDS)
+        );
+        verifyNoMoreInteractions(influxDB);
+    }
+
+    private static final List<KeyedQuery> STREAM_REVERSE_QUERIES = unmodifiableList(Arrays.asList(
+            new KeyedQuery("select * from /.*/ order by time desc limit 1", "InfluxHistory_getEnd"),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T15:24:10.000Z' and time <= '2017-09-17T16:24:10.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamReverse_1"),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T14:24:10.000Z' and time <= '2017-09-17T15:24:10.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamReverse_2"),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T13:24:10.000Z' and time <= '2017-09-17T14:24:10.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamReverse_3"),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T12:24:10.000Z' and time <= '2017-09-17T13:24:10.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamReverse_4"),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T11:24:10.000Z' and time <= '2017-09-17T12:24:10.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamReverse_5"),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T10:24:10.000Z' and time <= '2017-09-17T11:24:10.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamReverse_6"),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-17T09:24:10.000Z' and time <= '2017-09-17T10:24:10.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamReverse_7"),
+            new KeyedQuery("select * from /.*/ where time <= '2017-09-17T09:24:10.000Z' order by time desc limit 1", "InfluxHistory_streamReverse_skipQuery"),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-12T17:39:30.000Z' and time <= '2017-09-12T18:39:30.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamReverse_8_afterSkipQuery"),
+            new KeyedQuery("SELECT *::field FROM /^.*$/ WHERE time > '2017-09-12T16:39:30.000Z' and time <= '2017-09-12T17:39:30.000Z' GROUP BY * ORDER BY time ASC", "InfluxHistory_streamReverse_9_afterSkipQuery"),
+            new KeyedQuery("select * from /.*/ where time <= '2017-09-12T16:39:30.000Z' order by time desc limit 1", "InfluxHistory_streamReverse_TheEnd")
+    ));
+
+    private static Answer<QueryResult> keyedQueriesAnswer(Collection<KeyedQuery> queries) {
+        final Map<String, String> mapping = queries.stream().collect(Collectors.toMap(KeyedQuery::getQuery, KeyedQuery::getBaseFileName));
+
+        return new Answer<QueryResult>() {
+            @Override
+            public QueryResult answer(InvocationOnMock invocation) throws Throwable {
+                final String q = invocation.getArgumentAt(0, Query.class).getCommand();
+                final String file = mapping.get(q);
+                if (file != null) {
+                    LOG.log(Level.INFO, "mapping to \"{1}\" from query: {0}", new Object[]{q, file});
+                    return new JsonQueryResult(file).getQueryResult();
+                }
+                throw new AssertionError("unexpected query: " + q);
+            }
+        };
+    }
+
+    @Value
+    private static class KeyedQuery {
+        private final String query;
+        private final String baseFileName;
     }
 }

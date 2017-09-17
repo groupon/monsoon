@@ -55,7 +55,7 @@ public class SelectHandler {
     }
 
     public Stream<String> queriesForInterval(@NonNull DateTime begin, @NonNull DateTime end) {
-        final String querySuffix = " WHERE time > " + begin.toString() + " and time <= " + end.toString() + " GROUP BY * ORDER BY time ASC";
+        final String querySuffix = " WHERE time > '" + begin.toString() + "' and time <= '" + end.toString() + "' GROUP BY * ORDER BY time ASC";
         return selectStmts.stream().map(select -> select + querySuffix);
     }
 

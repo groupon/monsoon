@@ -69,6 +69,8 @@ import org.joda.time.Duration;
 public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoCloseable {
     public InfluxHistory(InfluxDB influxDB, String database) {
         super(influxDB, database);
+        if (!influxDB.databaseExists(database))
+            throw new IllegalArgumentException("database does not exist");
     }
 
     @Override
@@ -106,6 +108,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
         throwOnResultError(result);
         return result.getResults().stream()
                 .filter(r -> !r.hasError())
+                .filter(r -> r.getSeries() != null)
                 .flatMap(r -> r.getSeries().stream())
                 .map(s -> getColumnFromSeries(s, "diskBytes"))
                 .filter(Optional::isPresent)

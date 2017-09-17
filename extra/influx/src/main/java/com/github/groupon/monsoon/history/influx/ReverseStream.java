@@ -91,7 +91,7 @@ public class ReverseStream implements Iterator<TimeSeriesCollection> {
              * We don't have any data to emit.
              * Start a search for the next end-timestamp that will return data.
              */
-            final Query searchEndQuery = new Query(String.format("select * from /.*/ where time <= %s order by time desc limit 1", end.toString()), selector.getDatabase());
+            final Query searchEndQuery = new Query(String.format("select * from /.*/ where time <= '%s' order by time desc limit 1", end.toString()), selector.getDatabase());
             final QueryResult searchEndQueryResult = selector.getInfluxDB().query(searchEndQuery, TimeUnit.MILLISECONDS);
             throwOnResultError(searchEndQueryResult);
             final Optional<DateTime> optNewEnd = extractTimestamps(searchEndQueryResult).max(Comparator.naturalOrder());

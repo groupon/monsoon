@@ -63,11 +63,11 @@ public class SelectHandlerTest {
                     "/^double wildcard\\..*$/",
                     "/^regex\\..*a+.*$/",
                     "/^suspect regex\\..*$/")
-            .map(s -> String.format("SELECT *::field FROM %s WHERE time > " + BEGIN_STR + " and time <= " + END_STR + " GROUP BY * ORDER BY time ASC", s))
+            .map(s -> String.format("SELECT *::field FROM %s WHERE time > '" + BEGIN_STR + "' and time <= '" + END_STR + "' GROUP BY * ORDER BY time ASC", s))
             .toArray(String[]::new);
 
     private static final String[] FIELD_FILTER_EXPECT = {
-        "SELECT \"()\"::field FROM /^.*foo.*$/ WHERE time > " + BEGIN_STR + " and time <= " + END_STR + " GROUP BY * ORDER BY time ASC"
+        "SELECT \"()\"::field FROM /^.*foo.*$/ WHERE time > '" + BEGIN_STR + "' and time <= '" + END_STR + "' GROUP BY * ORDER BY time ASC"
     };
 
     @Test

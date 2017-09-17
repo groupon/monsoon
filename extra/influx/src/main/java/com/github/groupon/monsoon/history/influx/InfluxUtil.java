@@ -53,8 +53,6 @@ public class InfluxUtil {
     protected InfluxUtil(@NonNull InfluxDB influxDB, @NonNull String database) {
         this.influxDB = influxDB;
         this.database = database;
-        if (!influxDB.databaseExists(database))
-            throw new IllegalArgumentException("database does not exist");
     }
 
     protected static void throwOnResultError(QueryResult result) {
@@ -65,6 +63,7 @@ public class InfluxUtil {
     protected static Stream<DateTime> extractTimestamps(QueryResult result) {
         return result.getResults().stream()
                 .filter(resultEntry -> !resultEntry.hasError())
+                .filter(resultEntry -> resultEntry.getSeries() != null)
                 .flatMap(resultEntry -> resultEntry.getSeries().stream())
                 .map(series -> getColumnFromSeries(series, TIME_COLUMN))
                 .filter(Optional::isPresent)

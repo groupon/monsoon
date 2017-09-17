@@ -94,7 +94,7 @@ public class SeriesHandler {
                 final Object field = rowIter.next();
                 final int columnIdx = columnIter.nextIndex();
                 final String columnName = columnIter.next();
-                if (columnIdx != timeColumnIdx)
+                if (columnIdx != timeColumnIdx && field != null)
                     valueMap.addMetric(valueKeyToMetricName(columnName), range, seriesValueToMetricValue(field));
             }
 
