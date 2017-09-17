@@ -29,15 +29,10 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.time.Instant;
 import java.util.Iterator;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.NonNull;
 import org.influxdb.InfluxDB;
-import org.influxdb.dto.Query;
 import org.influxdb.dto.QueryResult;
 import org.joda.time.DateTime;
 
@@ -51,12 +46,6 @@ public class InfluxUtil {
      * Name of the column holding the timestamp.
      */
     public static final String TIME_COLUMN = "time";
-
-    public static final Function<String, String> MEASUREMENT_ESCAPE = s -> {
-        return '"' + s.
-                replace("\\", "\\\\").
-                replace("\"", "\\\"") + '"';
-    };
 
     private final InfluxDB influxDB;
     private final String database;
@@ -95,32 +84,6 @@ public class InfluxUtil {
                     return series.getValues().stream()
                             .map(row -> row.get(idx));
                 });
-    }
-
-    protected Set<String> getTagKeys(String measurement) {
-        final Query q = new Query("SHOW TAG KEYS FROM " + MEASUREMENT_ESCAPE.apply(measurement), database);
-        final QueryResult qResult = influxDB.query(q, TimeUnit.MILLISECONDS);
-        throwOnResultError(qResult);
-
-        return qResult.getResults().stream()
-                .filter(resultEntry -> !resultEntry.hasError())
-                .flatMap(resultEntry -> resultEntry.getSeries().stream())
-                .map(series -> getColumnFromSeries(series, "tagKey"))
-                .map(String.class::cast)
-                .collect(Collectors.toSet());
-    }
-
-    protected Set<String> getFieldKeys(String measurement) {
-        final Query q = new Query("SHOW FIELD KEYS FROM " + MEASUREMENT_ESCAPE.apply(measurement), database);
-        final QueryResult qResult = influxDB.query(q, TimeUnit.MILLISECONDS);
-        throwOnResultError(qResult);
-
-        return qResult.getResults().stream()
-                .filter(resultEntry -> !resultEntry.hasError())
-                .flatMap(resultEntry -> resultEntry.getSeries().stream())
-                .map(series -> getColumnFromSeries(series, "fieldKey"))
-                .map(String.class::cast)
-                .collect(Collectors.toSet());
     }
 
     /**
