@@ -41,7 +41,6 @@ import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -86,16 +85,17 @@ public class SeriesHandler {
         series.getValues().forEach(row -> {
             assert series.getColumns().size() == row.size();
 
-            final DateTime timestamp = new DateTime((Instant) row.get(timeColumnIdx));
+            final DateTime timestamp = new DateTime(((Number) row.get(timeColumnIdx)).longValue());
             final IntermediateTSV valueMap = new IntermediateTSV();
 
             final ListIterator<String> columnIter = series.getColumns().listIterator();
             final Iterator<Object> rowIter = row.iterator();
             while (rowIter.hasNext()) {
+                final Object field = rowIter.next();
                 final int columnIdx = columnIter.nextIndex();
                 final String columnName = columnIter.next();
                 if (columnIdx != timeColumnIdx)
-                    valueMap.addMetric(valueKeyToMetricName(columnName), range, seriesValueToMetricValue(rowIter.next()));
+                    valueMap.addMetric(valueKeyToMetricName(columnName), range, seriesValueToMetricValue(field));
             }
 
             datums.merge(new TimestampedGroup(timestamp, group), valueMap, IntermediateTSV::withMerged);
@@ -141,10 +141,15 @@ public class SeriesHandler {
 
     private static GroupName seriesToGroupName(QueryResult.Series series) {
         final SimpleGroupPath groupPath = pathStrToGroupPath(series.getName());
-        final Tags tags = Tags.valueOf(series.getTags().entrySet().stream()
-                .filter(tagEntry -> !Objects.equals(tagEntry.getKey(), InfluxUtil.MONSOON_RANGE_TAG))
-                .filter(tagEntry -> tagEntry.getValue() != null)
-                .map(tagEntry -> SimpleMapEntry.create(tagEntry.getKey(), tagValueToMetricValue(tagEntry.getValue()))));
+        final Tags tags;
+        if (series.getTags() == null) {
+            tags = Tags.EMPTY;
+        } else {
+            tags = Tags.valueOf(series.getTags().entrySet().stream()
+                    .filter(tagEntry -> !Objects.equals(tagEntry.getKey(), InfluxUtil.MONSOON_RANGE_TAG))
+                    .filter(tagEntry -> tagEntry.getValue() != null)
+                    .map(tagEntry -> SimpleMapEntry.create(tagEntry.getKey(), tagValueToMetricValue(tagEntry.getValue()))));
+        }
         return GroupName.valueOf(groupPath, tags);
     }
 
