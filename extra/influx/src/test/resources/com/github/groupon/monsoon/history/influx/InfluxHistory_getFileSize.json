@@ -1,0 +1,21 @@
+{
+    "results": [
+        {
+            "series": [
+                {
+                    "name": "shard",
+                    "columns": [
+                        "time",
+                        "diskBytes"
+                    ],
+                    "values": [
+                        [
+                            0,
+                            12185178
+                        ]
+                    ]
+                }
+            ]
+        }
+    ]
+}

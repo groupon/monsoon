@@ -111,7 +111,18 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
 
     @Override
     public long getFileSize() {
-        return 0l;
+        final QueryResult result = getInfluxDB().query(new Query(String.format("select sum(\"diskBytes\") as \"diskBytes\" from (select last(\"diskBytes\"::field) as \"diskBytes\" from \"shard\" where \"database\"::tag = '%s' group by * limit 1)", getDatabase().replace("'", "\\'")), "_internal"), TimeUnit.MILLISECONDS);
+        throwOnResultError(result);
+        return result.getResults().stream()
+                .filter(r -> !r.hasError())
+                .flatMap(r -> r.getSeries().stream())
+                .map(s -> getColumnFromSeries(s, "diskBytes"))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .map(Number.class::cast)
+                .mapToLong(Number::longValue)
+                .findAny()
+                .orElse(0);
     }
 
     @Override

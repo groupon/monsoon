@@ -31,6 +31,7 @@ import org.hamcrest.Matchers;
 import org.influxdb.InfluxDB;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import org.junit.Before;
 import org.junit.Test;
@@ -97,6 +98,22 @@ public class InfluxHistoryTest {
                         Matchers.allOf(
                                 Matchers.hasProperty("command", Matchers.equalToIgnoringCase("select * from /.*/ order by time asc limit 1")),
                                 Matchers.hasProperty("database", Matchers.equalTo(DATABASE)))),
+                Mockito.eq(TimeUnit.MILLISECONDS)
+        );
+        verifyNoMoreInteractions(influxDB);
+    }
+
+    public void getFileSize() throws Exception {
+        Mockito.when(influxDB.query(Mockito.any(), Mockito.any()))
+                .thenReturn(new JsonQueryResult("InfluxHistory_getFileSize").getQueryResult());
+
+        assertEquals(12185178L, history.getFileSize());
+
+        verify(influxDB, times(1)).query(
+                Mockito.argThat(
+                        Matchers.allOf(
+                                Matchers.hasProperty("command", Matchers.equalToIgnoringCase("select sum(\"diskBytes\") as \"diskBytes\" from (select last(\"diskBytes\"::field) as \"diskBytes\" from \"shard\" where \"database\"::tag = '" + DATABASE + "' group by * limit 1)")),
+                                Matchers.hasProperty("database", Matchers.equalTo("_internal")))),
                 Mockito.eq(TimeUnit.MILLISECONDS)
         );
         verifyNoMoreInteractions(influxDB);
