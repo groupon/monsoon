@@ -42,6 +42,7 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Collection;
+import static java.util.Collections.singleton;
 import static java.util.Collections.unmodifiableMap;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -51,6 +52,7 @@ import java.util.Optional;
 import java.util.Spliterators;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -77,17 +79,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
 
     @Override
     public boolean add(@NonNull TimeSeriesCollection tsdata) {
-        final DateTime timestamp = tsdata.getTimestamp();
-        final BatchPoints batchPoints = BatchPoints
-                .database(getDatabase())
-                .build();
-
-        tsdata.getTSValues().stream()
-                .flatMap(tsv -> timeSeriesValueToPoint(tsv, timestamp))
-                .forEach(batchPoints::point);
-        final boolean changed = !batchPoints.getPoints().isEmpty();
-        getInfluxDB().write(batchPoints);
-        return changed;
+        return addAll(singleton(tsdata));
     }
 
     @Override
@@ -119,6 +111,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
                 .map(s -> getColumnFromSeries(s, "diskBytes"))
                 .filter(Optional::isPresent)
                 .map(Optional::get)
+                .flatMap(Function.identity())
                 .map(Number.class::cast)
                 .mapToLong(Number::longValue)
                 .findAny()

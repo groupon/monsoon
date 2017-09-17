@@ -103,6 +103,7 @@ public class InfluxHistoryTest {
         verifyNoMoreInteractions(influxDB);
     }
 
+    @Test
     public void getFileSize() throws Exception {
         Mockito.when(influxDB.query(Mockito.any(), Mockito.any()))
                 .thenReturn(new JsonQueryResult("InfluxHistory_getFileSize").getQueryResult());
