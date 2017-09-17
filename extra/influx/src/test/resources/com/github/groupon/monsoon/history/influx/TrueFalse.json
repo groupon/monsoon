@@ -4,6 +4,9 @@
             "series": [
                 {
                     "name": "string",
+                    "tags": {
+                        "nullTag": null
+                    },
                     "columns": [
                         "time",
                         "foobar"
