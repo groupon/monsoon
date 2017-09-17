@@ -26,7 +26,6 @@
 package com.github.groupon.monsoon.history.influx;
 
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
-import java.time.Instant;
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -35,6 +34,7 @@ import lombok.NonNull;
 import org.influxdb.InfluxDB;
 import org.influxdb.dto.QueryResult;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 @Getter
 public class InfluxUtil {
@@ -69,8 +69,8 @@ public class InfluxUtil {
                 .map(series -> getColumnFromSeries(series, TIME_COLUMN))
                 .filter(Optional::isPresent)
                 .flatMap(Optional::get)
-                .map(Instant.class::cast)
-                .map(DateTime::new);
+                .map(Number.class::cast)
+                .map(number -> new DateTime(number.longValue(), DateTimeZone.UTC));
     }
 
     protected static Optional<Integer> getColumnIndexFromSeries(QueryResult.Series series, String columnName) {
