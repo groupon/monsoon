@@ -13,6 +13,7 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollectionPair;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricDeltaSet;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricExpression;
+import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.ArrayList;
@@ -74,7 +75,7 @@ public class CollectHistoryTest {
 
     @Test
     public void getContextTest() {
-        List<TimeSeriesCollection> entries = history.getContext(Duration.ZERO, ExpressionLookBack.EMPTY)
+        List<TimeSeriesCollection> entries = history.getContext(Duration.ZERO, ExpressionLookBack.EMPTY, TimeSeriesMetricFilter.ALL_GROUPS)
                 .map(Context::getTSData)
                 .map(TimeSeriesCollectionPair::getCurrentCollection)
                 .collect(Collectors.toList());
@@ -84,7 +85,7 @@ public class CollectHistoryTest {
 
     @Test
     public void getContextWithSkipTest() {
-        List<TimeSeriesCollection> entries = history.getContext(Duration.standardMinutes(5), ExpressionLookBack.EMPTY)
+        List<TimeSeriesCollection> entries = history.getContext(Duration.standardMinutes(5), ExpressionLookBack.EMPTY, TimeSeriesMetricFilter.ALL_GROUPS)
                 .map(Context::getTSData)
                 .map(TimeSeriesCollectionPair::getCurrentCollection)
                 .collect(Collectors.toList());

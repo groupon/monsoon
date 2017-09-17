@@ -46,14 +46,16 @@ import static java.util.Collections.EMPTY_LIST;
 import static java.util.Collections.unmodifiableList;
 import java.util.List;
 import java.util.Objects;
-import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.BufferedTokenStream;
@@ -100,58 +102,61 @@ public class PathMatcher {
         public default Optional<Stream<String>> asLiteralComponents() {
             return Optional.empty();
         }
+
+        public Optional<IdentifierMatch> getSuccessor();
+
+        public void doVisit(Visitor v);
     }
 
+    @RequiredArgsConstructor
+    @EqualsAndHashCode
+    @Getter
     public static class LiteralNameMatch implements IdentifierMatch {
-        private final String literal_;
-        private final Optional<IdentifierMatch> successor_;
+        @NonNull
+        private final String literal;
+        @NonNull
+        private final Optional<IdentifierMatch> successor;
 
         public LiteralNameMatch(String literal) {
             this(literal, Optional.empty());
-        }
-
-        public LiteralNameMatch(String literal, Optional<IdentifierMatch> successor) {
-            literal_ = Objects.requireNonNull(literal);
-            successor_ = Objects.requireNonNull(successor);
         }
 
         @Override
         public boolean match(List<String> path, SkipBacktrack skipper) {
             if (path.isEmpty())
                 return false;
-            if (!literal_.equals(path.get(0)))
+            if (!literal.equals(path.get(0)))
                 return false;
-            return successor_
+            return successor
                     .map((succ) -> succ.match(path.subList(1, path.size()), skipper))
                     .orElse(path.size() == 1);
         }
 
         @Override
         public LiteralNameMatch rebindWithSuccessor(Optional<IdentifierMatch> successor) {
-            return new LiteralNameMatch(literal_, successor);
+            return new LiteralNameMatch(literal, successor);
         }
 
         @Override
         public StringBuilder populateExpression(StringBuilder buf) {
-            buf.append(ConfigSupport.maybeQuoteIdentifier(literal_));
-            return successor_
+            buf.append(ConfigSupport.maybeQuoteIdentifier(literal));
+            return successor
                     .map((succ) -> succ.populateExpression(buf.append('.')))
                     .orElse(buf);
         }
 
         @Override
         public boolean isLiteral() {
-            if (successor_.isPresent()) return successor_.get().isLiteral();
-            return true;
+            return !successor.isPresent() || successor.get().isLiteral();
         }
 
         @Override
         public Optional<Stream<String>> asLiteralComponents() {
-            if (!successor_.isPresent()) return Optional.of(Stream.of(literal_));
+            if (!successor.isPresent()) return Optional.of(Stream.of(literal));
 
-            return successor_
+            return successor
                     .flatMap(IdentifierMatch::asLiteralComponents)
-                    .map(tailStream -> Stream.concat(Stream.of(literal_), tailStream));
+                    .map(tailStream -> Stream.concat(Stream.of(literal), tailStream));
         }
 
         @Override
@@ -160,48 +165,27 @@ public class PathMatcher {
         }
 
         @Override
-        public int hashCode() {
-            int hash = 5;
-            hash = 97 * hash + Objects.hashCode(this.literal_);
-            hash = 97 * hash + Objects.hashCode(this.successor_);
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final LiteralNameMatch other = (LiteralNameMatch) obj;
-            if (!Objects.equals(this.literal_, other.literal_)) {
-                return false;
-            }
-            if (!Objects.equals(this.successor_, other.successor_)) {
-                return false;
-            }
-            return true;
+        public void doVisit(Visitor v) {
+            v.accept(this);
         }
     }
 
+    @RequiredArgsConstructor
+    @EqualsAndHashCode
+    @Getter
     public static class WildcardMatch implements IdentifierMatch {
-        private final Optional<IdentifierMatch> successor_;
+        @NonNull
+        private final Optional<IdentifierMatch> successor;
 
         public WildcardMatch() {
             this(Optional.empty());
-        }
-
-        public WildcardMatch(Optional<IdentifierMatch> successor) {
-            successor_ = Objects.requireNonNull(successor);
         }
 
         @Override
         public boolean match(List<String> path, SkipBacktrack skipper) {
             if (path.isEmpty())
                 return false;
-            return successor_
+            return successor
                     .map((succ) -> succ.match(path.subList(1, path.size()), skipper))
                     .orElse(path.size() == 1);
         }
@@ -214,7 +198,7 @@ public class PathMatcher {
         @Override
         public StringBuilder populateExpression(StringBuilder buf) {
             buf.append('*');
-            return successor_
+            return successor
                     .map((succ) -> succ.populateExpression(buf.append('.')))
                     .orElse(buf);
         }
@@ -225,37 +209,20 @@ public class PathMatcher {
         }
 
         @Override
-        public int hashCode() {
-            int hash = 7;
-            hash = 83 * hash + Objects.hashCode(this.successor_);
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final WildcardMatch other = (WildcardMatch) obj;
-            if (!Objects.equals(this.successor_, other.successor_)) {
-                return false;
-            }
-            return true;
+        public void doVisit(Visitor v) {
+            v.accept(this);
         }
     }
 
+    @RequiredArgsConstructor
+    @EqualsAndHashCode
+    @Getter
     public static class DoubleWildcardMatch implements IdentifierMatch {
-        private final Optional<IdentifierMatch> successor_;
+        @NonNull
+        private final Optional<IdentifierMatch> successor;
 
         public DoubleWildcardMatch() {
             this(Optional.empty());
-        }
-
-        public DoubleWildcardMatch(Optional<IdentifierMatch> successor) {
-            successor_ = Objects.requireNonNull(successor);
         }
 
         @Override
@@ -263,10 +230,10 @@ public class PathMatcher {
             skipper.skip = true;
 
             SkipBacktrack my_skipper = new SkipBacktrack();
-            if (!successor_.isPresent())
+            if (!successor.isPresent())
                 return true;
             for (int i = 0; i < path.size(); ++i) {
-                if (successor_.get().match(path.subList(i, path.size()), my_skipper))
+                if (successor.get().match(path.subList(i, path.size()), my_skipper))
                     return true;
                 if (my_skipper.skip)
                     return false;  // Nested expression has done all the backtracking it needs.
@@ -282,7 +249,7 @@ public class PathMatcher {
         @Override
         public StringBuilder populateExpression(StringBuilder buf) {
             buf.append("**");
-            return successor_
+            return successor
                     .map((succ) -> succ.populateExpression(buf.append('.')))
                     .orElse(buf);
         }
@@ -293,63 +260,49 @@ public class PathMatcher {
         }
 
         @Override
-        public int hashCode() {
-            int hash = 7;
-            hash = 97 * hash + Objects.hashCode(this.successor_);
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final DoubleWildcardMatch other = (DoubleWildcardMatch) obj;
-            if (!Objects.equals(this.successor_, other.successor_)) {
-                return false;
-            }
-            return true;
+        public void doVisit(Visitor v) {
+            v.accept(this);
         }
     }
 
+    @EqualsAndHashCode(exclude = {"match"})
     public static class RegexMatch implements IdentifierMatch {
-        private final String regex_;
-        private final Predicate<String> match_;
-        private final Optional<IdentifierMatch> successor_;
+        @Getter
+        private final String regex;
+        private final Predicate<String> match;
+        @Getter
+        private final Optional<IdentifierMatch> successor;
 
         public RegexMatch(String regex) {
             this(regex, Optional.empty());
         }
 
-        public RegexMatch(String regex, Optional<IdentifierMatch> successor) {
-            regex_ = requireNonNull(regex);
-            match_ = Pattern.compile(regex).asPredicate();
-            successor_ = Objects.requireNonNull(successor);
+        public RegexMatch(@NonNull String regex, @NonNull Optional<IdentifierMatch> successor) {
+            this.regex = regex;
+            this.match = Pattern.compile(regex).asPredicate();
+            this.successor = successor;
         }
 
         @Override
         public boolean match(List<String> path, SkipBacktrack skipper) {
             if (path.isEmpty())
                 return false;
-            if (!match_.test(path.get(0)))
+            if (!match.test(path.get(0)))
                 return false;
-            return successor_
+            return successor
                     .map((succ) -> succ.match(path.subList(1, path.size()), skipper))
                     .orElse(path.size() == 1);
         }
 
         @Override
         public RegexMatch rebindWithSuccessor(Optional<IdentifierMatch> successor) {
-            return new RegexMatch(regex_, successor);
+            return new RegexMatch(regex, successor);
         }
 
         @Override
         public StringBuilder populateExpression(StringBuilder buf) {
-            buf.append(ConfigSupport.regex(regex_));
-            return successor_
+            buf.append(ConfigSupport.regex(regex));
+            return successor
                     .map((succ) -> succ.populateExpression(buf.append('.')))
                     .orElse(buf);
         }
@@ -360,29 +313,8 @@ public class PathMatcher {
         }
 
         @Override
-        public int hashCode() {
-            int hash = 5;
-            hash = 97 * hash + Objects.hashCode(this.regex_);
-            hash = 97 * hash + Objects.hashCode(this.successor_);
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final RegexMatch other = (RegexMatch) obj;
-            if (!Objects.equals(this.regex_, other.regex_)) {
-                return false;
-            }
-            if (!Objects.equals(this.successor_, other.successor_)) {
-                return false;
-            }
-            return true;
+        public void doVisit(Visitor v) {
+            v.accept(this);
         }
     }
 
@@ -423,6 +355,13 @@ public class PathMatcher {
         return matcher_.asLiteralComponents()
                 .map(stream -> stream.toArray(String[]::new))
                 .map(SimpleGroupPath::valueOf);
+    }
+
+    public <VisitorType extends Visitor> Optional<VisitorType> visitNonLiteral(VisitorType v) {
+        if (isLiteral()) return Optional.empty();
+        for (IdentifierMatch matchHead = matcher_; matchHead != null; matchHead = matchHead.getSuccessor().orElse(null))
+            matchHead.doVisit(v);
+        return Optional.of(v);
     }
 
     public StringBuilder configString() {
@@ -563,5 +502,12 @@ public class PathMatcher {
         public ParseException(String message, Throwable cause) {
             this(EMPTY_LIST, message, cause);
         }
+    }
+
+    public static interface Visitor {
+        public void accept(LiteralNameMatch match);
+        public void accept(RegexMatch match);
+        public void accept(WildcardMatch match);
+        public void accept(DoubleWildcardMatch match);
     }
 }
