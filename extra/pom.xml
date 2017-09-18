@@ -25,6 +25,7 @@
 
     <modules>
         <module>influx</module>
+        <module>influx-copy</module>
     </modules>
 
     <dependencies>
