@@ -50,12 +50,15 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Spliterators;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.influxdb.InfluxDB;
+import org.influxdb.InfluxDBException;
 import org.influxdb.dto.BatchPoints;
 import org.influxdb.dto.Point;
 import org.influxdb.dto.Query;
@@ -65,6 +68,8 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 
 public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoCloseable {
+    private static final Logger LOG = Logger.getLogger(InfluxHistory.class.getName());
+
     public InfluxHistory(InfluxDB influxDB, String database) {
         super(influxDB, database);
         if (!influxDB.databaseExists(database))
@@ -96,7 +101,12 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
                 .forEach(batchPoints::point);
 
         final boolean changed = !batchPoints.getPoints().isEmpty();
-        getInfluxDB().write(batchPoints);
+        try {
+            getInfluxDB().write(batchPoints);
+        } catch (InfluxDBException ex) {
+            LOG.log(Level.WARNING, "unable to write points", ex);
+            throw ex;
+        }
         return changed;
     }
 
@@ -273,7 +283,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
         private final Map<Histogram.Range, Point.Builder> histogramValue = new HashMap<>();
 
         public void addMetric(MetricName name, MetricValue value) {
-            if (!value.isPresent()) return;
+            if (!value.isPresent() || value.isInfiniteOrNaN()) return;
             final String nameStr = String.join(".", name.getPath());
 
             assert value.getBoolValue() != null
