@@ -19,7 +19,6 @@ import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.ParserProperties;
 import java.nio.file.Path;
 import java.util.Iterator;
-import java.util.concurrent.ForkJoinPool;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -28,13 +27,13 @@ class Exporter {
     public static final int EX_USAGE = 64;  // From sysexits.h
     public static final int EX_TEMPFAIL = 75;  // From sysexits.h
 
-    @Option(name="-h", usage="print usage instructions")
+    @Option(name = "-h", usage = "print usage instructions")
     private boolean help = false;
 
-    @Option(name="-P", usage="Pretty printing of JSON")
+    @Option(name = "-P", usage = "Pretty printing of JSON")
     private boolean prettyPrint = false;
 
-    @Argument(metaVar="/history/dir", usage="path: which dir contains history files", index=0)
+    @Argument(metaVar = "/history/dir", usage = "path: which dir contains history files", index = 0)
     private String dir;
 
     @Getter
@@ -84,7 +83,7 @@ class Exporter {
 
         out.beginArray();
         try {
-            final Iterator<TimeSeriesCollection> tsdata_iter = BufferedIterator.stream(ForkJoinPool.commonPool(), src.stream()).iterator();
+            final Iterator<TimeSeriesCollection> tsdata_iter = BufferedIterator.stream(src.stream()).iterator();
             while (tsdata_iter.hasNext()) {
                 final TimeSeriesCollection tsdata = tsdata_iter.next();
                 Json.toJson(gson, out, tsdata);
