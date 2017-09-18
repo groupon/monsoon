@@ -4,7 +4,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.concurrent.ForkJoinPool;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -18,19 +17,19 @@ import org.junit.Test;
 public class BufferedIteratorTest {
     @Test(timeout = 8000)
     public void empty_iterator_test() {
-        Iterator<?> iterator = BufferedIterator.iterator(ForkJoinPool.commonPool(), Stream.empty().iterator());
+        Iterator<?> iterator = BufferedIterator.iterator(Stream.empty().iterator());
 
         assertFalse(iterator.hasNext());
     }
 
     @Test(expected = NoSuchElementException.class, timeout = 8000)
     public void empty_iterator_next_test() {
-        BufferedIterator.iterator(ForkJoinPool.commonPool(), Stream.empty().iterator()).next();
+        BufferedIterator.iterator(Stream.empty().iterator()).next();
     }
 
     @Test(timeout = 8000)
     public void nonempty_iterator_test() {
-        Iterator<?> iterator = BufferedIterator.iterator(ForkJoinPool.commonPool(), Stream.of("foobar").iterator());
+        Iterator<?> iterator = BufferedIterator.iterator(Stream.of("foobar").iterator());
 
         assertTrue(iterator.hasNext());
         assertEquals("foobar", iterator.next());
@@ -39,7 +38,7 @@ public class BufferedIteratorTest {
 
     @Test(timeout = 8000)
     public void iteration() {
-        List<Integer> visited = BufferedIterator.stream(ForkJoinPool.commonPool(), Stream.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20))
+        List<Integer> visited = BufferedIterator.stream(Stream.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20))
                 .collect(Collectors.toList());
 
         assertEquals(Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20), visited);
@@ -47,7 +46,7 @@ public class BufferedIteratorTest {
 
     @Test(timeout = 80000)
     public void blocking_iteration() {
-        Stream<Integer> stream = BufferedIterator.stream(ForkJoinPool.commonPool(), Stream.generate(new Supplier<Integer>() {
+        Stream<Integer> stream = BufferedIterator.stream(Stream.generate(new Supplier<Integer>() {
             private int i = 0;
 
             @Override

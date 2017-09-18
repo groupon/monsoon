@@ -11,9 +11,14 @@ import static java.util.Spliterator.IMMUTABLE;
 import static java.util.Spliterator.NONNULL;
 import static java.util.Spliterator.ORDERED;
 import java.util.Spliterators;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
@@ -24,7 +29,18 @@ import lombok.SneakyThrows;
 
 public final class BufferedIterator<T> {
     private static final Logger LOG = Logger.getLogger(BufferedIterator.class.getName());
-    private final ForkJoinPool work_queue_;
+    private static final AtomicInteger THR_IDX = new AtomicInteger();
+    private static final Executor DFL_WORK_QUEUE = Executors.newCachedThreadPool(new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+            final Thread thr = new Thread(r);
+            thr.setDaemon(true);
+            thr.setName("BufferedIterator-thread-" + THR_IDX.getAndIncrement());
+            return thr;
+        }
+    });
+
+    private final Executor work_queue_;
     private final Iterator<? extends T> iter_;
     private final List<T> queue_;
     private Exception exception = null;
@@ -33,8 +49,9 @@ public final class BufferedIterator<T> {
     private boolean running_ = false;
     private Runnable wakeup_ = null;
 
-    public BufferedIterator(ForkJoinPool work_queue, Iterator<? extends T> iter, int queue_size) {
-        if (queue_size <= 0) throw new IllegalArgumentException("queue size must be at least 1");
+    public BufferedIterator(Executor work_queue, Iterator<? extends T> iter, int queue_size) {
+        if (queue_size <= 0)
+            throw new IllegalArgumentException("queue size must be at least 1");
         work_queue_ = requireNonNull(work_queue);
         iter_ = requireNonNull(iter);
         queue_size_ = queue_size;
@@ -45,64 +62,58 @@ public final class BufferedIterator<T> {
     }
 
     public BufferedIterator(Iterator<? extends T> iter, int queue_size) {
-        this(ForkJoinPool.commonPool(), iter, queue_size);
+        this(DFL_WORK_QUEUE, iter, queue_size);
     }
 
-    public BufferedIterator(ForkJoinPool work_queue, Iterator<? extends T> iter) {
+    public BufferedIterator(Executor work_queue, Iterator<? extends T> iter) {
         this(work_queue, iter, 16);
     }
 
     public BufferedIterator(Iterator<? extends T> iter) {
-        this(ForkJoinPool.commonPool(), iter);
+        this(DFL_WORK_QUEUE, iter);
     }
 
-    /** Adapt the IterQueue as a blocking iterator. */
-    public Iterator<T> asIterator() {
+    /**
+     * Adapt the IterQueue as a blocking iterator.
+     */
+    private Iterator<T> asIterator() {
         return new BlockingIterator();
     }
 
-    /** Adapt the IterQueue as a blocking stream. */
-    public Stream<T> asStream() {
-        final Spliterator<T> spliter = Spliterators.spliteratorUnknownSize(asIterator(), NONNULL | IMMUTABLE | ORDERED);
-        return StreamSupport.stream(spliter, false);
-    }
-
-    public static <T> Iterator<T> iterator(ForkJoinPool work_queue, Iterator<? extends T> iter, int queue_size) {
+    public static <T> Iterator<T> iterator(Executor work_queue, Iterator<? extends T> iter, int queue_size) {
         return new BufferedIterator<>(work_queue, iter, queue_size).asIterator();
     }
-    public static <T> Iterator<T> iterator(ForkJoinPool work_queue, Iterator<? extends T> iter) {
+
+    public static <T> Iterator<T> iterator(Executor work_queue, Iterator<? extends T> iter) {
         return new BufferedIterator<>(work_queue, iter).asIterator();
     }
+
     public static <T> Iterator<T> iterator(Iterator<? extends T> iter, int queue_size) {
         return new BufferedIterator<>(iter, queue_size).asIterator();
     }
+
     public static <T> Iterator<T> iterator(Iterator<? extends T> iter) {
         return new BufferedIterator<>(iter).asIterator();
     }
 
-    public static <T> Stream<T> stream(ForkJoinPool work_queue, Iterator<? extends T> iter, int queue_size) {
-        return new BufferedIterator<>(work_queue, iter, queue_size).asStream();
+    public static <T> Stream<T> stream(Executor work_queue, Stream<? extends T> stream, int queue_size) {
+        Supplier<Spliterator<T>> spliterSupplier = () -> Spliterators.spliteratorUnknownSize(new BufferedIterator<>(work_queue, stream.iterator(), queue_size).asIterator(), NONNULL | IMMUTABLE | ORDERED);
+        return StreamSupport.stream(spliterSupplier, NONNULL | IMMUTABLE | ORDERED, false);
     }
-    public static <T> Stream<T> stream(ForkJoinPool work_queue, Iterator<? extends T> iter) {
-        return new BufferedIterator<>(work_queue, iter).asStream();
+
+    public static <T> Stream<T> stream(Executor work_queue, Stream<? extends T> stream) {
+        Supplier<Spliterator<T>> spliterSupplier = () -> Spliterators.spliteratorUnknownSize(new BufferedIterator<>(work_queue, stream.iterator()).asIterator(), NONNULL | IMMUTABLE | ORDERED);
+        return StreamSupport.stream(spliterSupplier, NONNULL | IMMUTABLE | ORDERED, false);
     }
-    public static <T> Stream<T> stream(ForkJoinPool work_queue, Stream<? extends T> stream, int queue_size) {
-        return stream(work_queue, stream.iterator(), queue_size);
-    }
-    public static <T> Stream<T> stream(ForkJoinPool work_queue, Stream<? extends T> stream) {
-        return stream(work_queue, stream.iterator());
-    }
-    public static <T> Stream<T> stream(Iterator<? extends T> iter, int queue_size) {
-        return new BufferedIterator<>(iter, queue_size).asStream();
-    }
-    public static <T> Stream<T> stream(Iterator<? extends T> iter) {
-        return new BufferedIterator<>(iter).asStream();
-    }
+
     public static <T> Stream<T> stream(Stream<? extends T> stream, int queue_size) {
-        return stream(stream.iterator(), queue_size);
+        Supplier<Spliterator<T>> spliterSupplier = () -> Spliterators.spliteratorUnknownSize(new BufferedIterator<>(stream.iterator(), queue_size).asIterator(), NONNULL | IMMUTABLE | ORDERED);
+        return StreamSupport.stream(spliterSupplier, NONNULL | IMMUTABLE | ORDERED, false);
     }
+
     public static <T> Stream<T> stream(Stream<? extends T> stream) {
-        return stream(stream.iterator());
+        Supplier<Spliterator<T>> spliterSupplier = () -> Spliterators.spliteratorUnknownSize(new BufferedIterator<>(stream.iterator()).asIterator(), NONNULL | IMMUTABLE | ORDERED);
+        return StreamSupport.stream(spliterSupplier, NONNULL | IMMUTABLE | ORDERED, false);
     }
 
     public synchronized boolean atEnd() {
@@ -114,7 +125,7 @@ public final class BufferedIterator<T> {
     }
 
     public void waitAvail() throws InterruptedException {
-        synchronized(this) {
+        synchronized (this) {
             if (nextAvail() || atEnd()) return;
         }
 
@@ -124,11 +135,12 @@ public final class BufferedIterator<T> {
     }
 
     public void waitAvail(long tv, TimeUnit tu) throws InterruptedException {
-        synchronized(this) {
+        synchronized (this) {
             if (nextAvail() || atEnd()) return;
         }
 
-        final Delay w = new Delay(() -> {}, tv, tu);
+        final Delay w = new Delay(() -> {
+        }, tv, tu);
         setWakeup(w::deliverWakeup);
         try {
             ForkJoinPool.managedBlock(w);
@@ -153,7 +165,7 @@ public final class BufferedIterator<T> {
     public void setWakeup(Runnable wakeup) {
         requireNonNull(wakeup);
         boolean run_immediately_ = false;
-        synchronized(this) {
+        synchronized (this) {
             if (!queue_.isEmpty() || at_end_) {
                 run_immediately_ = true;
                 wakeup_ = null;
@@ -161,13 +173,13 @@ public final class BufferedIterator<T> {
                 wakeup_ = wakeup;
             }
         }
-        if (run_immediately_) work_queue_.submit(wakeup);
+        if (run_immediately_) work_queue_.execute(wakeup);
     }
 
     public void setWakeup(Runnable wakeup, long tv, TimeUnit tu) {
         final Delay delay = new Delay(wakeup, tv, tu);
         setWakeup(delay::deliverWakeup);
-        work_queue_.submit(delay);
+        work_queue_.execute(delay);
     }
 
     private synchronized void fire_() {
@@ -177,7 +189,7 @@ public final class BufferedIterator<T> {
 
         if (!running_) {
             running_ = true;
-            work_queue_.submit(this::add_next_iter_);
+            work_queue_.execute(this::add_next_iter_);
         }
     }
 
@@ -190,34 +202,34 @@ public final class BufferedIterator<T> {
                 if (iter_.hasNext()) {
                     final T next = iter_.next();
                     final Optional<Runnable> wakeup;
-                    synchronized(this) {
+                    synchronized (this) {
                         queue_.add(next);
                         wakeup = Optional.ofNullable(wakeup_);
                         wakeup_ = null;
                     }
-                    wakeup.ifPresent(this.work_queue_::submit);
+                    wakeup.ifPresent(this.work_queue_::execute);
                 } else {
                     final Optional<Runnable> wakeup;
-                    synchronized(this) {
+                    synchronized (this) {
                         at_end_ = true;
                         stop_loop = true;
                         wakeup = Optional.ofNullable(wakeup_);
                         wakeup_ = null;
                     }
-                    wakeup.ifPresent(this.work_queue_::submit);
+                    wakeup.ifPresent(this.work_queue_::execute);
                 }
 
                 if (System.currentTimeMillis() >= deadline)
                     stop_loop = true;
             }
 
-            synchronized(this) {
+            synchronized (this) {
                 running_ = false;
                 fire_();
             }
         } catch (Exception e) {
             final Optional<Runnable> wakeup;
-            synchronized(this) {
+            synchronized (this) {
                 running_ = false;
                 exception = e;
                 wakeup = Optional.ofNullable(wakeup_);
@@ -231,21 +243,22 @@ public final class BufferedIterator<T> {
         @Override
         public boolean hasNext() {
             wait_();
-            assert(BufferedIterator.this.nextAvail() || BufferedIterator.this.atEnd());
+            assert (BufferedIterator.this.nextAvail() || BufferedIterator.this.atEnd());
             return !BufferedIterator.this.atEnd();
         }
 
         @Override
         public T next() {
             wait_();
-            if (BufferedIterator.this.atEnd()) throw new NoSuchElementException();
-            assert(BufferedIterator.this.nextAvail());
+            if (BufferedIterator.this.atEnd())
+                throw new NoSuchElementException();
+            assert (BufferedIterator.this.nextAvail());
             return BufferedIterator.this.next();
         }
 
         /**
-         * Wait for a new element to become available.
-         * May be interrupted, in which case it will return before the wakeup arrives.
+         * Wait for a new element to become available. May be interrupted, in
+         * which case it will return before the wakeup arrives.
          */
         private void wait_() {
             final WakeupListener w = new WakeupListener(() -> BufferedIterator.this.nextAvail() || BufferedIterator.this.atEnd());
@@ -327,7 +340,7 @@ public final class BufferedIterator<T> {
 
         @Override
         public boolean isReleasable() {
-            synchronized(this) {
+            synchronized (this) {
                 if (wakeupReceived) {
                     fireWakeup();
                     return true;
