@@ -2,7 +2,6 @@ package com.github.groupon.monsoon.history.influx;
 
 import com.groupon.lex.metrics.history.CollectHistory;
 import com.groupon.lex.metrics.history.xdr.DirCollectHistory;
-import com.groupon.lex.metrics.lib.BufferedIterator;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
@@ -78,7 +77,7 @@ public class FileConvert {
         try {
             final CollectHistory dst = new InfluxHistory(InfluxDBFactory.connect(influxDst), database);
             try {
-                BufferedIterator.stream(src.stream()).forEach(dst::add);
+                src.stream().forEach(dst::add);
             } finally {
                 if (dst instanceof AutoCloseable)
                     ((AutoCloseable) dst).close();
