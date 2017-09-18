@@ -5,22 +5,21 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.stream.JsonWriter;
 import com.groupon.lex.metrics.history.xdr.DirCollectHistory;
 import com.groupon.lex.metrics.json.Json;
-import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.util.Iterator;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import lombok.Getter;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.ParserProperties;
-import java.nio.file.Path;
-import java.util.Iterator;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 class Exporter {
     private static final Logger LOG = Logger.getLogger(Exporter.class.getName());
@@ -83,7 +82,7 @@ class Exporter {
 
         out.beginArray();
         try {
-            final Iterator<TimeSeriesCollection> tsdata_iter = BufferedIterator.stream(src.stream()).iterator();
+            final Iterator<TimeSeriesCollection> tsdata_iter = src.stream().iterator();
             while (tsdata_iter.hasNext()) {
                 final TimeSeriesCollection tsdata = tsdata_iter.next();
                 Json.toJson(gson, out, tsdata);

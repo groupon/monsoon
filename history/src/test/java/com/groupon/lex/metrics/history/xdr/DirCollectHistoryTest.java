@@ -8,7 +8,6 @@ package com.groupon.lex.metrics.history.xdr;
 import static com.groupon.lex.metrics.history.xdr.TSDataFileChainTest.CHAIN_WIDTH;
 import com.groupon.lex.metrics.history.xdr.support.FileSupport;
 import com.groupon.lex.metrics.history.xdr.support.StreamedCollection;
-import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -64,7 +63,7 @@ public class DirCollectHistoryTest {
     @Test
     public void size_stays_below_threshold() throws Exception {
         LOG.log(Level.INFO, "starting test");
-        final Iterator<TimeSeriesCollection> iter = BufferedIterator.iterator(create_tsdata_().iterator());
+        final Iterator<TimeSeriesCollection> iter = create_tsdata_().iterator();
         // First, grow until 90%, to get an estimate of file size usage.
         int count_until_90_percent = 0;
         while (getTmpdirSize() < 9 * LIMIT / 10) {
