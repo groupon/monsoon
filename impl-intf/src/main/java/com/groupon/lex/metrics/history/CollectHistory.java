@@ -3,7 +3,6 @@ package com.groupon.lex.metrics.history;
 import com.groupon.lex.metrics.GroupName;
 import static com.groupon.lex.metrics.history.HistoryContext.LOOK_BACK;
 import static com.groupon.lex.metrics.history.HistoryContext.LOOK_FORWARD;
-import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -115,7 +114,7 @@ public interface CollectHistory {
      * Return a History Context for evaluating expressions.
      */
     public default Stream<Context> getContext(Duration stepsize, ExpressionLookBack lookback, TimeSeriesMetricFilter filter) {
-        return HistoryContext.stream(BufferedIterator.stream(stream(stepsize)), lookback);
+        return HistoryContext.stream(stream(stepsize), lookback);
     }
 
     /**
@@ -123,7 +122,7 @@ public interface CollectHistory {
      * 'begin' timestamp (inclusive).
      */
     public default Stream<Context> getContext(DateTime begin, Duration stepsize, ExpressionLookBack lookback, TimeSeriesMetricFilter filter) {
-        return HistoryContext.stream(BufferedIterator.stream(stream(begin.minus(lookback.hintDuration()), stepsize)), lookback)
+        return HistoryContext.stream(stream(begin.minus(lookback.hintDuration()), stepsize), lookback)
                 .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin));
     }
 
@@ -132,7 +131,7 @@ public interface CollectHistory {
      * timestamp (inclusive) and the 'end' timestamp (inclusive).
      */
     public default Stream<Context> getContext(DateTime begin, DateTime end, Duration stepsize, ExpressionLookBack lookback, TimeSeriesMetricFilter filter) {
-        return HistoryContext.stream(BufferedIterator.stream(stream(begin.minus(lookback.hintDuration()), end, stepsize)), lookback)
+        return HistoryContext.stream(stream(begin.minus(lookback.hintDuration()), end, stepsize), lookback)
                 .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin));
     }
 
