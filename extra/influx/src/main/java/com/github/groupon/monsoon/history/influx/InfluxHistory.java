@@ -25,6 +25,7 @@
  */
 package com.github.groupon.monsoon.history.influx;
 
+import com.google.common.collect.Iterators;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricName;
@@ -40,11 +41,15 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
+import java.net.SocketTimeoutException;
+import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.singleton;
 import static java.util.Collections.unmodifiableMap;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -68,6 +73,7 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 
 public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoCloseable {
+    private static final int TARGET_BATCH_SIZE = 100000;
     private static final Logger LOG = Logger.getLogger(InfluxHistory.class.getName());
 
     public InfluxHistory(InfluxDB influxDB, String database) {
@@ -88,26 +94,47 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
 
     @Override
     public boolean addAll(@NonNull Collection<? extends TimeSeriesCollection> c) {
-        final BatchPoints batchPoints = BatchPoints
-                .database(getDatabase())
-                .build();
+        return addAll(c.iterator());
+    }
 
-        c.stream()
-                .flatMap(tsdata -> {
-                    final DateTime timestamp = tsdata.getTimestamp();
-                    return tsdata.getTSValues().stream()
-                            .flatMap(tsv -> timeSeriesValueToPoint(tsv, timestamp));
-                })
-                .forEach(batchPoints::point);
+    @Override
+    public boolean addAll(@NonNull Iterator<? extends TimeSeriesCollection> i) {
+        final Iterator<BatchPoints> bpIter = asBatchPointIteration_(i);
+        if (!bpIter.hasNext()) return false;
 
-        final boolean changed = !batchPoints.getPoints().isEmpty();
-        try {
-            getInfluxDB().write(batchPoints);
-        } catch (InfluxDBException ex) {
-            LOG.log(Level.WARNING, "unable to write points", ex);
-            throw ex;
-        }
-        return changed;
+        bpIter.forEachRemaining((bp) -> {
+            try {
+                getInfluxDB().write(bp);
+            } catch (InfluxDBException ex) {
+                if (ex.getCause() instanceof SocketTimeoutException)
+                    LOG.log(Level.WARNING, "influx write timed out"); // Influx documentation says this might happen
+                else
+                    throw ex;
+            }
+        });
+        return true;
+    }
+
+    private Iterator<BatchPoints> asBatchPointIteration_(@NonNull Iterator<? extends TimeSeriesCollection> i) {
+        return Iterators.transform(
+                Iterators.partition(
+                        Iterators.concat(Iterators.transform(i, InfluxHistory::asPointIteration_)),
+                        TARGET_BATCH_SIZE),
+                (points) -> {
+                    return BatchPoints
+                    .database(getDatabase())
+                    .points(points.toArray(new Point[]{}))
+                    .build();
+                });
+    }
+
+    private static Iterator<Point> asPointIteration_(@NonNull TimeSeriesCollection tsdata) {
+        LOG.log(Level.INFO, "Preparing {0} for writing", tsdata.getTimestamp());
+        final DateTime timestamp = tsdata.getTimestamp();
+        return tsdata.getTSValues().parallelStream()
+                .flatMap(tsv -> timeSeriesValueToPoint(tsv, timestamp))
+                .collect(() -> new ArrayList<Point>(), List::add, List::addAll)
+                .iterator();
     }
 
     @Override

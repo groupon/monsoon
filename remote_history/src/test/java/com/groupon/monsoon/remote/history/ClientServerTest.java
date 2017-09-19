@@ -164,7 +164,7 @@ public class ClientServerTest {
     public void add() throws Exception {
         // Invokes the addAll method.
         List<TimeSeriesCollection> expected = generateCollection().limit(1).collect(Collectors.toList());
-        when(history.addAll(Mockito.any())).thenReturn(true);
+        when(history.addAll(Mockito.<Collection<? extends TimeSeriesCollection>>any())).thenReturn(true);
 
         client.add(expected.get(0));
 
@@ -175,7 +175,7 @@ public class ClientServerTest {
     @Test
     public void addAll() throws Exception {
         List<TimeSeriesCollection> expected = generateCollection().collect(Collectors.toList());
-        when(history.addAll(Mockito.any())).thenReturn(true);
+        when(history.addAll(Mockito.<Collection<? extends TimeSeriesCollection>>any())).thenReturn(true);
 
         client.addAll(expected);
 
