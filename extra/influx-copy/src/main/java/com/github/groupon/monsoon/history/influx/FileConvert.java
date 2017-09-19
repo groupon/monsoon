@@ -62,8 +62,10 @@ public class FileConvert {
         }
 
         // If verbose mode is requested, dial up the log spam.
-        if (verbose)
+        if (verbose) {
             Logger.getLogger("com.groupon.lex").setLevel(Level.INFO);
+            Logger.getLogger("com.github.groupon.monsoon").setLevel(Level.INFO);
+        }
 
         // If there are no files, comlain with a non-zero exit code.
         if (srcdir == null)
@@ -77,7 +79,7 @@ public class FileConvert {
         try {
             final CollectHistory dst = new InfluxHistory(InfluxDBFactory.connect(influxDst), database);
             try {
-                src.stream().forEach(dst::add);
+                copy(src, dst);
             } finally {
                 if (dst instanceof AutoCloseable)
                     ((AutoCloseable) dst).close();
@@ -91,6 +93,7 @@ public class FileConvert {
     public static void main(String[] args) throws Exception {
         // Dial down the log spam.
         Logger.getLogger("com.groupon.lex").setLevel(Level.WARNING);
+        Logger.getLogger("com.github.groupon.monsoon").setLevel(Level.WARNING);
 
         try {
             new FileConvert(args).run();
@@ -98,5 +101,9 @@ public class FileConvert {
             LOG.log(Level.SEVERE, "Unable to complete copy operation: ", ex);
             System.exit(EX_TEMPFAIL);
         }
+    }
+
+    private static void copy(CollectHistory src, CollectHistory dst) {
+        dst.addAll(src.stream().iterator());
     }
 }
