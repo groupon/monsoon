@@ -35,6 +35,7 @@ import com.groupon.lex.metrics.history.HistoryContext;
 import static com.groupon.lex.metrics.history.HistoryContext.LOOK_BACK;
 import static com.groupon.lex.metrics.history.HistoryContext.LOOK_FORWARD;
 import com.groupon.lex.metrics.history.IntervalIterator;
+import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -54,6 +55,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Spliterators;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -73,7 +80,8 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 
 public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoCloseable {
-    private static final int TARGET_BATCH_SIZE = 100000;
+    private static final int TARGET_BATCH_SIZE = 10000;
+    private static final int MAX_INFLIGHT_WRITES = 10;
     private static final Logger LOG = Logger.getLogger(InfluxHistory.class.getName());
 
     public InfluxHistory(InfluxDB influxDB, String database) {
@@ -99,20 +107,68 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
 
     @Override
     public boolean addAll(@NonNull Iterator<? extends TimeSeriesCollection> i) {
-        final Iterator<BatchPoints> bpIter = asBatchPointIteration_(i);
-        if (!bpIter.hasNext()) return false;
+        final ExecutorService executor = new ThreadPoolExecutor(0, MAX_INFLIGHT_WRITES, 15L, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+        try {
+            final BufferedIterator<Future<?>> buffer = new BufferedIterator<>(
+                    ForkJoinPool.commonPool(),
+                    Iterators.transform(asBatchPointIteration_(i), (bp) -> asyncWrite_(bp, executor)),
+                    2 * MAX_INFLIGHT_WRITES);
 
-        bpIter.forEachRemaining((bp) -> {
-            try {
-                getInfluxDB().write(bp);
-            } catch (InfluxDBException ex) {
-                if (ex.getCause() instanceof SocketTimeoutException)
-                    LOG.log(Level.WARNING, "influx write timed out"); // Influx documentation says this might happen
-                else
+            boolean changed = false;
+            while (!buffer.atEnd()) {
+                try {
+                    buffer.waitAvail();
+                    if (buffer.nextAvail()) {
+                        unpackFuture_(buffer.next());
+                        changed = true;
+                    }
+                } catch (RuntimeException | Error ex) { // Prevent lower catchblock from eating these.
                     throw ex;
+                } catch (InterruptedException ex) {
+                    LOG.log(Level.WARNING, "ignoring interruption exception", ex);
+                } catch (Exception ex) {
+                    throw new IllegalStateException("unexpected exception while writing points", ex);
+                }
             }
-        });
-        return true;
+
+            return changed;
+        } finally {
+            executor.shutdown();
+        }
+    }
+
+    private Future<?> asyncWrite_(BatchPoints bp, ExecutorService executor) {
+        return executor.submit(
+                () -> {
+                    try {
+                        getInfluxDB().write(bp);
+                    } catch (InfluxDBException ex) {
+                        if (ex.getCause() instanceof SocketTimeoutException)
+                            LOG.log(Level.WARNING, "influx write timed out"); // Influx documentation says this might happen
+                        else
+                            throw ex;
+                    }
+                },
+                null);
+    }
+
+    private static <T> T unpackFuture_(Future<T> f) throws Exception {
+        for (;;) {
+            try {
+                return f.get();
+            } catch (InterruptedException ex) {
+                LOG.log(Level.WARNING, "ignoring interruption", ex);
+                // Loop will restart read.
+            } catch (ExecutionException ex) {
+                if (ex.getCause() instanceof Error)
+                    throw (Error) ex.getCause();
+                if (ex.getCause() instanceof RuntimeException)
+                    throw (RuntimeException) ex.getCause();
+                if (ex.getCause() instanceof Exception)
+                    throw (Exception) ex.getCause();
+                throw new RuntimeException("unexpected exception", ex);
+            }
+        }
     }
 
     private Iterator<BatchPoints> asBatchPointIteration_(@NonNull Iterator<? extends TimeSeriesCollection> i) {
@@ -120,12 +176,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
                 Iterators.partition(
                         Iterators.concat(Iterators.transform(i, InfluxHistory::asPointIteration_)),
                         TARGET_BATCH_SIZE),
-                (points) -> {
-                    return BatchPoints
-                    .database(getDatabase())
-                    .points(points.toArray(new Point[]{}))
-                    .build();
-                });
+                (points) -> BatchPoints.database(getDatabase()).points(points.toArray(new Point[]{})).build());
     }
 
     private static Iterator<Point> asPointIteration_(@NonNull TimeSeriesCollection tsdata) {
