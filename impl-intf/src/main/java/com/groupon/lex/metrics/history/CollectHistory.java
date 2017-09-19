@@ -12,6 +12,7 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -31,6 +32,15 @@ public interface CollectHistory {
     public boolean add(TimeSeriesCollection tsv);
 
     public boolean addAll(Collection<? extends TimeSeriesCollection> c);
+
+    public default boolean addAll(Iterator<? extends TimeSeriesCollection> i) {
+        boolean changed = false;
+        while (i.hasNext()) {
+            if (add(i.next()))
+                changed = true;
+        }
+        return changed;
+    }
 
     public long getFileSize();
 

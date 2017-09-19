@@ -61,7 +61,7 @@ public class RTFTimeSeriesValue extends AbstractTimeSeriesValue {
 
     @Override
     public Map<MetricName, MetricValue> getMetrics() {
-        return tbl.getMetrics().entrySet().stream()
+        return tbl.getMetrics().entrySet().parallelStream()
                 .map(entry -> SimpleMapEntry.create(entry.getKey(), entry.getValue().decodeOrThrow()))
                 .filter(entry -> entry.getValue().contains(index))
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().get(index)));
