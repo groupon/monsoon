@@ -1,16 +1,21 @@
 package com.groupon.lex.metrics.history.xdr.support;
 
+import com.google.common.collect.ImmutableMap;
 import com.groupon.lex.metrics.GroupName;
+import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricName;
 import com.groupon.lex.metrics.MetricValue;
 import com.groupon.lex.metrics.SimpleGroupPath;
 import com.groupon.lex.metrics.Tags;
 import com.groupon.lex.metrics.history.TSDataVersionDispatch.Releaseable;
+import com.groupon.lex.metrics.history.v2.list.FileListFileSupport;
+import com.groupon.lex.metrics.history.v2.tables.FileTableFileSupport;
 import com.groupon.lex.metrics.history.xdr.Const;
 import com.groupon.lex.metrics.timeseries.ImmutableTimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.SimpleTimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
+import java.io.File;
 import java.io.IOException;
 import static java.lang.Math.sqrt;
 import java.nio.ByteBuffer;
@@ -154,5 +159,84 @@ public class FileSupport {
         bufs.forEach(out::put);
         out.flip();
         return out;
+    }
+
+    /**
+     * Generate sample data files.
+     */
+    public static void main(String[] args) throws IOException {
+        final List<TimeSeriesCollection> tsdata = Stream.<TimeSeriesCollection>builder()
+                .add(new SimpleTimeSeriesCollection(
+                        DateTime.parse("1980-01-01T08:00:00.000Z"),
+                        Stream.of(
+                                new ImmutableTimeSeriesValue(
+                                        GroupName.valueOf(
+                                                SimpleGroupPath.valueOf("test", "histogram"),
+                                                Tags.valueOf(singletonMap("true", MetricValue.TRUE))),
+                                        singletonMap(
+                                                MetricName.valueOf("hist", "o", "gram"),
+                                                MetricValue.fromHistValue(
+                                                        new Histogram(
+                                                                new Histogram.RangeWithCount(0, 1, 2),
+                                                                new Histogram.RangeWithCount(3, 4, 5))))),
+                                new ImmutableTimeSeriesValue(
+                                        GroupName.valueOf(
+                                                SimpleGroupPath.valueOf("test", "int"),
+                                                Tags.valueOf(singletonMap("false", MetricValue.FALSE))),
+                                        singletonMap(
+                                                MetricName.valueOf("i", "n", "t"),
+                                                MetricValue.fromIntValue(42)))
+                        )))
+                .add(new SimpleTimeSeriesCollection(
+                        DateTime.parse("1990-01-01T09:00:00.000Z"),
+                        Stream.of(
+                                new ImmutableTimeSeriesValue(
+                                        GroupName.valueOf(
+                                                SimpleGroupPath.valueOf("test", "histogram"),
+                                                Tags.EMPTY),
+                                        singletonMap(
+                                                MetricName.valueOf("hist", "o", "gram"),
+                                                MetricValue.fromHistValue(
+                                                        new Histogram(
+                                                                new Histogram.RangeWithCount(0, 1, 2),
+                                                                new Histogram.RangeWithCount(3, 4, 5))))),
+                                new ImmutableTimeSeriesValue(
+                                        GroupName.valueOf(
+                                                SimpleGroupPath.valueOf("test", "flt"),
+                                                Tags.EMPTY),
+                                        singletonMap(
+                                                MetricName.valueOf("f", "l", "o", "a", "t"),
+                                                MetricValue.fromDblValue(Math.E))),
+                                new ImmutableTimeSeriesValue(
+                                        GroupName.valueOf(
+                                                SimpleGroupPath.valueOf("test", "empty"),
+                                                Tags.EMPTY),
+                                        singletonMap(
+                                                MetricName.valueOf("value"),
+                                                MetricValue.EMPTY)),
+                                new ImmutableTimeSeriesValue(
+                                        GroupName.valueOf(
+                                                SimpleGroupPath.valueOf("test", "string"),
+                                                Tags.EMPTY),
+                                        ImmutableMap.<MetricName, MetricValue>builder()
+                                        .put(
+                                                MetricName.valueOf("value"),
+                                                MetricValue.fromStrValue("a string"))
+                                        .put(
+                                                MetricName.valueOf("another"),
+                                                MetricValue.fromStrValue("string"))
+                                        .build())
+                        )))
+                .build()
+                .collect(Collectors.toList());
+
+        new FileSupport(new FileSupport0(), true)
+                .create_file(new File("/tmp/tsdata_v0.tsd").toPath(), tsdata);
+        new FileSupport(new FileSupport1(), true)
+                .create_file(new File("/tmp/tsdata_v1.tsd").toPath(), tsdata);
+        new FileSupport(new FileTableFileSupport(), true)
+                .create_file(new File("/tmp/tsdata_v2_tables.tsd").toPath(), tsdata);
+        new FileSupport(new FileListFileSupport(), true)
+                .create_file(new File("/tmp/tsdata_v2_list.tsd").toPath(), tsdata);
     }
 }
