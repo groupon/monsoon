@@ -26,6 +26,7 @@
 package com.github.groupon.monsoon.history.influx;
 
 import com.google.common.collect.Iterators;
+import com.google.common.collect.UnmodifiableIterator;
 import com.groupon.lex.metrics.GroupName;
 import com.groupon.lex.metrics.Histogram;
 import com.groupon.lex.metrics.MetricName;
@@ -43,7 +44,6 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.net.SocketTimeoutException;
-import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.singleton;
 import static java.util.Collections.unmodifiableMap;
@@ -82,6 +82,7 @@ import org.joda.time.Duration;
 public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoCloseable {
     private static final int TARGET_BATCH_SIZE = 10000;
     private static final int MAX_INFLIGHT_WRITES = 10;
+    private static final int INFLIGHT_QUEUE = 500;
     private static final Logger LOG = Logger.getLogger(InfluxHistory.class.getName());
 
     public InfluxHistory(InfluxDB influxDB, String database) {
@@ -112,7 +113,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
             final BufferedIterator<Future<?>> buffer = new BufferedIterator<>(
                     ForkJoinPool.commonPool(),
                     Iterators.transform(asBatchPointIteration_(i), (bp) -> asyncWrite_(bp, executor)),
-                    2 * MAX_INFLIGHT_WRITES);
+                    INFLIGHT_QUEUE);
 
             boolean changed = false;
             while (!buffer.atEnd()) {
@@ -137,11 +138,14 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
         }
     }
 
-    private Future<?> asyncWrite_(BatchPoints bp, ExecutorService executor) {
+    private Future<?> asyncWrite_(List<Map.Entry<DateTime, TimeSeriesValue>> tsvList, ExecutorService executor) {
         return executor.submit(
                 () -> {
                     try {
-                        getInfluxDB().write(bp);
+                        final Point[] points = tsvList.stream()
+                        .flatMap(timestampedTsv -> timeSeriesValueToPoint(timestampedTsv.getValue(), timestampedTsv.getKey()))
+                        .toArray(Point[]::new);
+                        getInfluxDB().write(BatchPoints.database(getDatabase()).points(points).build());
                     } catch (InfluxDBException ex) {
                         if (ex.getCause() instanceof SocketTimeoutException)
                             LOG.log(Level.WARNING, "influx write timed out"); // Influx documentation says this might happen
@@ -171,21 +175,16 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
         }
     }
 
-    private Iterator<BatchPoints> asBatchPointIteration_(@NonNull Iterator<? extends TimeSeriesCollection> i) {
-        return Iterators.transform(
-                Iterators.partition(
-                        Iterators.concat(Iterators.transform(i, InfluxHistory::asPointIteration_)),
-                        TARGET_BATCH_SIZE),
-                (points) -> BatchPoints.database(getDatabase()).points(points.toArray(new Point[]{})).build());
-    }
-
-    private static Iterator<Point> asPointIteration_(@NonNull TimeSeriesCollection tsdata) {
-        LOG.log(Level.INFO, "Preparing {0} for writing", tsdata.getTimestamp());
-        final DateTime timestamp = tsdata.getTimestamp();
-        return tsdata.getTSValues().parallelStream()
-                .flatMap(tsv -> timeSeriesValueToPoint(tsv, timestamp))
-                .collect(() -> new ArrayList<Point>(), List::add, List::addAll)
-                .iterator();
+    private UnmodifiableIterator<List<Map.Entry<DateTime, TimeSeriesValue>>> asBatchPointIteration_(@NonNull Iterator<? extends TimeSeriesCollection> i) {
+        return Iterators.partition(
+                Iterators.concat(
+                        Iterators.transform(i, tsdata -> {
+                            final DateTime timestamp = tsdata.getTimestamp();
+                            LOG.log(Level.INFO, "Preparing TSData {0} for write", timestamp);
+                            return Iterators.transform(tsdata.getTSValues().iterator(),
+                                    tsv -> SimpleMapEntry.create(timestamp, tsv));
+                        })),
+                TARGET_BATCH_SIZE);
     }
 
     @Override

@@ -67,8 +67,8 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
 
     @Override
     public Set<GroupName> getGroups(Predicate<? super GroupName> filter) {
-        return table.decodeOrThrow().values().parallelStream()
-                .flatMap(grpMap -> grpMap.entrySet().parallelStream())
+        return table.decodeOrThrow().values().stream()
+                .flatMap(grpMap -> grpMap.entrySet().stream())
                 .filter(groupEntry -> filter.test(groupEntry.getKey()))
                 .filter(groupEntry -> groupEntry.getValue().decodeOrThrow().contains(index))
                 .map(Map.Entry::getKey)
@@ -77,11 +77,11 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
 
     @Override
     public Set<SimpleGroupPath> getGroupPaths(Predicate<? super SimpleGroupPath> filter) {
-        return table.decodeOrThrow().entrySet().parallelStream()
+        return table.decodeOrThrow().entrySet().stream()
                 .filter(pathMap -> filter.test(pathMap.getKey()))
                 .filter(pathMap -> {
                     Map<GroupName, SegmentReader<RTFGroupTable>> grpMap = pathMap.getValue();
-                    return grpMap.values().parallelStream()
+                    return grpMap.values().stream()
                             .anyMatch(grp -> grp.decodeOrThrow().contains(index));
                 })
                 .map(Map.Entry::getKey)
@@ -94,8 +94,8 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
 
     @Override
     public Collection<TimeSeriesValue> getTSValues() {
-        return table.decodeOrThrow().values().parallelStream()
-                .flatMap(grpMap -> grpMap.entrySet().parallelStream())
+        return table.decodeOrThrow().values().stream()
+                .flatMap(grpMap -> grpMap.entrySet().stream())
                 .map(grpEntry -> SimpleMapEntry.create(grpEntry.getKey(), grpEntry.getValue().decodeOrThrow()))
                 .filter(grpEntry -> grpEntry.getValue().contains(index))
                 .map(grpEntry -> newTSV(grpEntry.getKey(), grpEntry.getValue()))
@@ -104,7 +104,7 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
 
     @Override
     public TimeSeriesValueSet getTSValue(SimpleGroupPath name) {
-        return new TimeSeriesValueSet(table.decodeOrThrow().get(name).entrySet().parallelStream()
+        return new TimeSeriesValueSet(table.decodeOrThrow().get(name).entrySet().stream()
                 .map(grpEntry -> SimpleMapEntry.create(grpEntry.getKey(), grpEntry.getValue().decodeOrThrow()))
                 .filter(grpEntry -> grpEntry.getValue().contains(index))
                 .map(grpEntry -> newTSV(grpEntry.getKey(), grpEntry.getValue())));
@@ -120,9 +120,9 @@ public class RTFTimeSeriesCollection extends AbstractTimeSeriesCollection {
 
     @Override
     public TimeSeriesValueSet get(Predicate<? super SimpleGroupPath> pathFilter, Predicate<? super GroupName> groupFilter) {
-        return new TimeSeriesValueSet(table.decodeOrThrow().entrySet().parallelStream()
+        return new TimeSeriesValueSet(table.decodeOrThrow().entrySet().stream()
                 .filter(entry -> pathFilter.test(entry.getKey()))
-                .flatMap(entry -> entry.getValue().entrySet().parallelStream())
+                .flatMap(entry -> entry.getValue().entrySet().stream())
                 .filter(entry -> groupFilter.test(entry.getKey()))
                 .map(grpSegmentEntry -> SimpleMapEntry.create(grpSegmentEntry.getKey(), grpSegmentEntry.getValue().decodeOrThrow()))
                 .filter(grpTblEntry -> grpTblEntry.getValue().contains(index))
