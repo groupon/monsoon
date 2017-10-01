@@ -77,7 +77,7 @@ public class FileConvert {
     public void run() throws IOException, Exception {
         final CollectHistory src = new DirCollectHistory(srcdir_path_);
         try {
-            final CollectHistory dst = new InfluxHistory(InfluxDBFactory.connect(influxDst), database);
+            final CollectHistory dst = new InfluxHistory(InfluxDBFactory.connect(influxDst).enableGzip(), database);
             try {
                 copy(src, dst);
             } finally {
