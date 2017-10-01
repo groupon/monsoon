@@ -109,8 +109,6 @@ public class ToXdr {
                     tsfile_tagged_datapoint tdp = new tsfile_tagged_datapoint();
                     tdp.tags = tags(v.getGroup().getTags());
                     tdp.tsv = v.getMetrics().entrySet().stream()
-                            .filter(entry -> entry.getValue().isPresent())
-                            .sorted(Comparator.comparing(Map.Entry::getKey))
                             .map(entry -> metric(entry.getKey(), entry.getValue()))
                             .toArray(tsfile_metric[]::new);
                     return tdp;

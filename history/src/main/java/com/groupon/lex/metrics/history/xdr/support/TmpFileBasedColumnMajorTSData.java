@@ -89,9 +89,7 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
                                         (g) -> new GroupWriter());
 
                                 try {
-                                    groupWriter.fixBacklog(timestamps.size());
-
-                                    groupWriter.add(tsv.getMetrics());
+                                    groupWriter.add(timestamps.size(), tsv.getMetrics());
                                 } catch (IOException ex) {
                                     throw new RuntimeIOException(ex);
                                 }
@@ -231,7 +229,7 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
     private static class GroupWriter {
         private final Map<MetricName, MetricWriter> metrics = new ConcurrentHashMap<>();
 
-        public void add(Map<MetricName, MetricValue> tsv) throws IOException {
+        public void add(int index, Map<MetricName, MetricValue> tsv) throws IOException {
             try {
                 tsv.entrySet().parallelStream()
                         .forEach(entry -> {
@@ -246,6 +244,7 @@ public class TmpFileBasedColumnMajorTSData implements ColumnMajorTSData {
                                     });
 
                             try {
+                                f.fixBacklog(index);
                                 f.add(entry.getValue());
                             } catch (IOException ex) {
                                 throw new RuntimeIOException(ex);
