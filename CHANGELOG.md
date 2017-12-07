@@ -1,7 +1,7 @@
 Change log
 ====
 
-monsoon-2.3-SNAPSHOT
+monsoon-2.3
 ----
 
 Features:
