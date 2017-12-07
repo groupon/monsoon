@@ -44,6 +44,7 @@ import com.groupon.lex.metrics.timeseries.TimeSeriesMetricFilter;
 import com.groupon.lex.metrics.timeseries.TimeSeriesValue;
 import com.groupon.lex.metrics.timeseries.expression.Context;
 import java.net.SocketTimeoutException;
+import java.util.ArrayList;
 import java.util.Collection;
 import static java.util.Collections.singleton;
 import static java.util.Collections.unmodifiableMap;
@@ -86,8 +87,12 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
     private static final Logger LOG = Logger.getLogger(InfluxHistory.class.getName());
 
     public InfluxHistory(InfluxDB influxDB, String database) {
+        this(influxDB, database, false);
+    }
+
+    public InfluxHistory(InfluxDB influxDB, String database, boolean verifyDatabaseConnection) {
         super(influxDB, database);
-        if (!influxDB.databaseExists(database))
+        if (verifyDatabaseConnection && !influxDB.databaseExists(database))
             throw new IllegalArgumentException("database does not exist");
     }
 
@@ -356,7 +361,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
         @NonNull
         private final PointBuilderTemplate template;
 
-        private Point.Builder plainValue = null;
+        private final List<Point.Builder> plainValue = new ArrayList<>(1);
         private final Map<Histogram.Range, Point.Builder> histogramValue = new HashMap<>();
 
         public void addMetric(MetricName name, MetricValue value) {
@@ -387,13 +392,22 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
         }
 
         private Point.Builder getOrCreatePlain() {
-            if (plainValue == null)
-                plainValue = template.getBuilder();
-            return plainValue;
+            if (plainValue.isEmpty()) {
+                final Point.Builder newPlainValue = template.getBuilder();
+                plainValue.add(newPlainValue);
+                return newPlainValue;
+            }
+
+            Point.Builder last = plainValue.get(plainValue.size() - 1);
+            if (last.build().lineProtocol().length() >= 32768) {
+                last = template.getBuilder();
+                plainValue.add(last);
+            }
+            return last;
         }
 
         public Stream<Point.Builder> stream() {
-            final Stream<Point.Builder> plainStream = (plainValue == null ? Stream.empty() : Stream.of(plainValue));
+            final Stream<Point.Builder> plainStream = plainValue.stream();
             final Stream<Point.Builder> histogramStream = histogramValue.values().stream();
             return Stream.concat(plainStream, histogramStream);
         }

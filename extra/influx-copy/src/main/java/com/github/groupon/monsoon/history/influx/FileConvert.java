@@ -32,6 +32,9 @@ public class FileConvert {
     @Option(name = "--database", usage = "Influx database to where data will be written")
     private String database;
 
+    @Option(name = "--skip_db_check", usage = "Don't check if the database exists (useful if you're using telegraf for instance)")
+    private boolean skipDatabaseExistCheck = false;
+
     @Argument(metaVar = "/src/dir", usage = "path: which dir contains source files", index = 0)
     private String srcdir;
 
@@ -77,7 +80,7 @@ public class FileConvert {
     public void run() throws IOException, Exception {
         final CollectHistory src = new DirCollectHistory(srcdir_path_);
         try {
-            final CollectHistory dst = new InfluxHistory(InfluxDBFactory.connect(influxDst).enableGzip(), database);
+            final CollectHistory dst = new InfluxHistory(InfluxDBFactory.connect(influxDst).enableGzip(), database, !skipDatabaseExistCheck);
             try {
                 copy(src, dst);
             } finally {
