@@ -4,6 +4,12 @@ Change log
 monsoon-2.3
 ----
 
+Bug fixes:
+- Remove non-functional thread pool logic from influx history addAll method.
+
+monsoon-2.3
+----
+
 Features:
 - When backed by a history, the scraper will use the history as backing store for historical data.  
   Values that are not used in a historical context will be removed from memory, improving memory efficiency.
