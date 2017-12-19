@@ -36,7 +36,6 @@ import com.groupon.lex.metrics.history.HistoryContext;
 import static com.groupon.lex.metrics.history.HistoryContext.LOOK_BACK;
 import static com.groupon.lex.metrics.history.HistoryContext.LOOK_FORWARD;
 import com.groupon.lex.metrics.history.IntervalIterator;
-import com.groupon.lex.metrics.lib.BufferedIterator;
 import com.groupon.lex.metrics.lib.SimpleMapEntry;
 import com.groupon.lex.metrics.timeseries.ExpressionLookBack;
 import com.groupon.lex.metrics.timeseries.TimeSeriesCollection;
@@ -56,12 +55,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Spliterators;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -82,9 +75,9 @@ import org.joda.time.Duration;
 
 public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoCloseable {
     private static final int TARGET_BATCH_SIZE = 10000;
-    private static final int MAX_INFLIGHT_WRITES = 10;
-    private static final int INFLIGHT_QUEUE = 500;
     private static final Logger LOG = Logger.getLogger(InfluxHistory.class.getName());
+    private final boolean verifyDatabaseConnection;
+    private volatile int targetBatchSize = TARGET_BATCH_SIZE;
 
     public InfluxHistory(InfluxDB influxDB, String database) {
         this(influxDB, database, false);
@@ -92,6 +85,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
 
     public InfluxHistory(InfluxDB influxDB, String database, boolean verifyDatabaseConnection) {
         super(influxDB, database);
+        this.verifyDatabaseConnection = verifyDatabaseConnection;
         if (verifyDatabaseConnection && !influxDB.databaseExists(database))
             throw new IllegalArgumentException("database does not exist");
     }
@@ -113,70 +107,37 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
 
     @Override
     public boolean addAll(@NonNull Iterator<? extends TimeSeriesCollection> i) {
-        final ExecutorService executor = new ThreadPoolExecutor(0, MAX_INFLIGHT_WRITES, 15L, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
-        try {
-            final BufferedIterator<Future<?>> buffer = new BufferedIterator<>(
-                    ForkJoinPool.commonPool(),
-                    Iterators.transform(asBatchPointIteration_(i), (bp) -> asyncWrite_(bp, executor)),
-                    INFLIGHT_QUEUE);
-
-            boolean changed = false;
-            while (!buffer.atEnd()) {
-                try {
-                    buffer.waitAvail();
-                    if (buffer.nextAvail()) {
-                        unpackFuture_(buffer.next());
-                        changed = true;
-                    }
-                } catch (RuntimeException | Error ex) { // Prevent lower catchblock from eating these.
-                    throw ex;
-                } catch (InterruptedException ex) {
-                    LOG.log(Level.WARNING, "ignoring interruption exception", ex);
-                } catch (Exception ex) {
-                    throw new IllegalStateException("unexpected exception while writing points", ex);
-                }
-            }
-
-            return changed;
-        } finally {
-            executor.shutdown();
+        boolean changed = false;
+        final UnmodifiableIterator<List<Map.Entry<DateTime, TimeSeriesValue>>> batchPointIter = asBatchPointIteration_(i);
+        while (batchPointIter.hasNext()) {
+            write_(batchPointIter.next());
+            changed = true;
         }
+
+        return changed;
     }
 
-    private Future<?> asyncWrite_(List<Map.Entry<DateTime, TimeSeriesValue>> tsvList, ExecutorService executor) {
-        return executor.submit(
-                () -> {
-                    try {
-                        final Point[] points = tsvList.stream()
-                        .flatMap(timestampedTsv -> timeSeriesValueToPoint(timestampedTsv.getValue(), timestampedTsv.getKey()))
-                        .toArray(Point[]::new);
-                        getInfluxDB().write(BatchPoints.database(getDatabase()).points(points).build());
-                    } catch (InfluxDBException ex) {
-                        if (ex.getCause() instanceof SocketTimeoutException)
-                            LOG.log(Level.WARNING, "influx write timed out"); // Influx documentation says this might happen
-                        else
-                            throw ex;
-                    }
-                },
-                null);
+    public int getTargetBatchSize() {
+        return targetBatchSize;
     }
 
-    private static <T> T unpackFuture_(Future<T> f) throws Exception {
-        for (;;) {
-            try {
-                return f.get();
-            } catch (InterruptedException ex) {
-                LOG.log(Level.WARNING, "ignoring interruption", ex);
-                // Loop will restart read.
-            } catch (ExecutionException ex) {
-                if (ex.getCause() instanceof Error)
-                    throw (Error) ex.getCause();
-                if (ex.getCause() instanceof RuntimeException)
-                    throw (RuntimeException) ex.getCause();
-                if (ex.getCause() instanceof Exception)
-                    throw (Exception) ex.getCause();
-                throw new RuntimeException("unexpected exception", ex);
-            }
+    public void setTargetBatchSize(int targetBatchSize) {
+        if (targetBatchSize < 1)
+            throw new IllegalArgumentException("targetBatchSize must be at least 1");
+        this.targetBatchSize = targetBatchSize;
+    }
+
+    private void write_(List<Map.Entry<DateTime, TimeSeriesValue>> tsvList) {
+        try {
+            final Point[] points = tsvList.stream()
+                    .flatMap(timestampedTsv -> timeSeriesValueToPoint(timestampedTsv.getValue(), timestampedTsv.getKey()))
+                    .toArray(Point[]::new);
+            getInfluxDB().write(BatchPoints.database(getDatabase()).points(points).build());
+        } catch (InfluxDBException ex) {
+            if (ex.getCause() instanceof SocketTimeoutException)
+                LOG.log(Level.WARNING, "influx write timed out"); // Influx documentation says this might happen
+            else
+                throw ex;
         }
     }
 
@@ -189,7 +150,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
                             return Iterators.transform(tsdata.getTSValues().iterator(),
                                     tsv -> SimpleMapEntry.create(timestamp, tsv));
                         })),
-                TARGET_BATCH_SIZE);
+                targetBatchSize);
     }
 
     @Override
@@ -304,8 +265,8 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
                 .filter(ctx -> !ctx.getTSData().getCurrentCollection().getTimestamp().isBefore(begin));
     }
 
-    private static Stream<Point> timeSeriesValueToPoint(@NonNull TimeSeriesValue tsv, @NonNull DateTime timestamp) {
-        final PointBuilder pointBuilder = new PointBuilder(new PointBuilderTemplate(tsv.getGroup(), timestamp));
+    private Stream<Point> timeSeriesValueToPoint(@NonNull TimeSeriesValue tsv, @NonNull DateTime timestamp) {
+        final PointBuilder pointBuilder = new PointBuilder(new PointBuilderTemplate(tsv.getGroup(), timestamp), verifyDatabaseConnection);
         tsv.getMetrics().forEach(pointBuilder::addMetric);
         return pointBuilder.stream()
                 .map(Point.Builder::build);
@@ -360,6 +321,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
     private static class PointBuilder {
         @NonNull
         private final PointBuilderTemplate template;
+        private final boolean verifyDatabaseConnection;
 
         private final List<Point.Builder> plainValue = new ArrayList<>(1);
         private final Map<Histogram.Range, Point.Builder> histogramValue = new HashMap<>();
@@ -399,7 +361,7 @@ public class InfluxHistory extends InfluxUtil implements CollectHistory, AutoClo
             }
 
             Point.Builder last = plainValue.get(plainValue.size() - 1);
-            if (last.build().lineProtocol().length() >= 32768) {
+            if (verifyDatabaseConnection && last.build().lineProtocol().length() >= 32768) {
                 last = template.getBuilder();
                 plainValue.add(last);
             }
